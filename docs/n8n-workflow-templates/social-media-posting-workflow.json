@@ -1,0 +1,450 @@
+{
+  "name": "Social Media Posting Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "social-media-post",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and validate social media post data\nconst postData = $input.item.json;\n\nif (!postData.content || !postData.platforms) {\n  throw new Error('Missing required fields: content and platforms');\n}\n\nreturn {\n  content: postData.content,\n  platforms: postData.platforms || [],\n  media_urls: postData.media_urls || [],\n  scheduled_for: postData.scheduled_for || null,\n  campaign_id: postData.campaign_id || null,\n  metadata: postData.metadata || {},\n  post_id: `POST-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`\n};"
+      },
+      "id": "extract-data",
+      "name": "Extract Post Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "scheduled",
+              "leftValue": "={{ $json.scheduled_for }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-schedule",
+      "name": "Check if Scheduled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "minutes": 0
+      },
+      "id": "wait-schedule",
+      "name": "Wait for Scheduled Time",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "facebook",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "facebook",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-facebook",
+      "name": "Route to Facebook",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "post",
+        "pageId": "={{ $env.FACEBOOK_PAGE_ID }}",
+        "text": "={{ $json.content }}",
+        "additionalFields": {
+          "link": "={{ $json.metadata.link || '' }}",
+          "images": "={{ $json.media_urls }}"
+        }
+      },
+      "id": "post-facebook",
+      "name": "Post to Facebook",
+      "type": "n8n-nodes-base.facebook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "instagram",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "instagram",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-instagram",
+      "name": "Route to Instagram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "upload",
+        "caption": "={{ $json.content }}",
+        "mediaUrl": "={{ $json.media_urls[0] || '' }}",
+        "additionalFields": {}
+      },
+      "id": "post-instagram",
+      "name": "Post to Instagram",
+      "type": "n8n-nodes-base.instagram",
+      "typeVersion": 1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "linkedin",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "linkedin",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-linkedin",
+      "name": "Route to LinkedIn",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 700]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "text": "={{ $json.content }}",
+        "visibility": "PUBLIC",
+        "additionalFields": {
+          "url": "={{ $json.metadata.link || '' }}",
+          "media": "={{ $json.media_urls }}"
+        }
+      },
+      "id": "post-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [1250, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "twitter",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "twitter",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-twitter",
+      "name": "Route to Twitter/X",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 900]
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "post",
+        "text": "={{ $json.content }}",
+        "additionalFields": {
+          "media": "={{ $json.media_urls }}"
+        }
+      },
+      "id": "post-twitter",
+      "name": "Post to Twitter/X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 1,
+      "position": [1250, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate posting results\nconst results = [];\nconst input = $input.item.json;\n\n// Check each platform result\nif ($node['Post to Facebook']?.json) {\n  results.push({ platform: 'facebook', status: 'success', post_id: $node['Post to Facebook'].json.id });\n}\nif ($node['Post to Instagram']?.json) {\n  results.push({ platform: 'instagram', status: 'success', post_id: $node['Post to Instagram'].json.id });\n}\nif ($node['Post to LinkedIn']?.json) {\n  results.push({ platform: 'linkedin', status: 'success', post_id: $node['Post to LinkedIn'].json.id });\n}\nif ($node['Post to Twitter/X']?.json) {\n  results.push({ platform: 'twitter', status: 'success', post_id: $node['Post to Twitter/X'].json.id });\n}\nreturn {\n  ...input,\n  posting_results: results,\n  total_platforms: input.platforms.length,\n  successful_posts: results.length,\n  posted_at: new Date().toISOString()\n};"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=📱 Social Media Post Published\\n\\nPost ID: {{ $json.post_id }}\\nPlatforms: {{ $json.platforms.join(', ') }}\\nSuccessful: {{ $json.successful_posts }}/{{ $json.total_platforms }}\\n\\nContent: {{ $json.content.substring(0, 100) }}...",
+        "otherOptions": {}
+      },
+      "id": "notify-team",
+      "name": "Notify Marketing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, post_id: $json.post_id, platforms: $json.platforms, successful_posts: $json.successful_posts, total_platforms: $json.total_platforms, posting_results: $json.posting_results, posted_at: $json.posted_at } }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Post Data": {
+      "main": [
+        [
+          {
+            "node": "Check if Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Scheduled": {
+      "main": [
+        [
+          {
+            "node": "Wait for Scheduled Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Scheduled Time": {
+      "main": [
+        [
+          {
+            "node": "Route to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Facebook": {
+      "main": [
+        [
+          {
+            "node": "Post to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Facebook": {
+      "main": [
+        [
+          {
+            "node": "Route to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Post to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Route to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Route to Twitter/X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Twitter/X": {
+      "main": [
+        [
+          {
+            "node": "Post to Twitter/X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Twitter/X": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Notify Marketing Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Marketing Team": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["social-media", "marketing", "posting"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

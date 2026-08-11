@@ -1,0 +1,201 @@
+{
+  "name": "SWF-Error-Handler (Modular)",
+  "nodes": [
+    {
+      "name": "Error Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "error",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wf",
+              "name": "workflowName",
+              "value": "={{ $json.body?.workflowName ?? $json.workflowName ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "err",
+              "name": "error",
+              "value": "={{ $json.body?.error ?? $json.error ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "node",
+              "name": "failedNode",
+              "value": "={{ $json.body?.failedNode ?? $json.failedNode ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Format Alert",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "alert",
+              "name": "alertText",
+              "value": "=Workflow {{ $json.workflowName }} failed at node {{ $json.failedNode }}: {{ $json.error }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Notify Admin",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $env.ADMIN_EMAIL }}"
+            },
+            {
+              "name": "subject",
+              "value": "=n8n Error: {{ $json.workflowName }}"
+            },
+            {
+              "name": "body",
+              "value": "={{ $json.alertText }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Error",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        896,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "={{ $json.workflowName }}"
+            },
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "error",
+              "value": "={{ $json.error }}"
+            },
+            {
+              "name": "failedNode",
+              "value": "={{ $json.failedNode }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

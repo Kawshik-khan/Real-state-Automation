@@ -1,0 +1,57 @@
+# Environment & Credentials
+.env
+.env.*
+*.env
+backend/.env
+automation/.env
+platform-api/.env
+n8n-token.txt
+
+# Local Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated PDFs & Assets
+*.pdf
+
+# Temporary & Local Scratch/Fix Notes
+chat-response-format-fix.md
+.chat-response-format-fix.md
+supabase-migration-plan.txt
+
+# Temporary Test & Utility Scripts (Local execution only)
+test_chat_response_format.py
+test_telegram_grok.py
+mcp_login_test.sh
+tmp_get_n8n_key.sh
+automation/test_telegram_n8n.py
+automation/get_telegram_chat_id.py
+backend/scripts/test_supabase_rest_vector.py
+test_*.py
+
+# Python Caches & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.benchmarks/
+*.egg-info/
+.eggs/
+
+# Node.js & Frontend Build Outputs
+node_modules/
+dist/
+.output/
+
+# IDE & AI Agent Workspace State
+.vscode/
+.idea/
+.agents/
+.hermes/
+.junie/
+.DS_Store
+

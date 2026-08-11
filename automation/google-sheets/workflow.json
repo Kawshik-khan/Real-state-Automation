@@ -1,0 +1,263 @@
+{
+  "name": "Google Sheets Lead & Message Sync Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "google-sheets-leads",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Lead / Message Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "convId",
+              "name": "conversationId",
+              "value": "={{ $json.body?.conversation_id || $json.body?.conversationId || $json.conversationId || 'conv_unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "name",
+              "name": "name",
+              "value": "={{ $json.body?.name || $json.name || 'New Lead' }}",
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "value": "={{ $json.body?.phone || $json.phone || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "name": "channel",
+              "value": "={{ $json.body?.channel || $json.channel || 'website' }}",
+              "type": "string"
+            },
+            {
+              "id": "lastMsg",
+              "name": "lastMessage",
+              "value": "={{ $json.body?.message?.text || $json.body?.lastMessage || $json.body?.text || $json.message || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "intent",
+              "name": "intent",
+              "value": "={{ $json.body?.intent || $json.intent || 'property_inquiry' }}",
+              "type": "string"
+            },
+            {
+              "id": "confidence",
+              "name": "confidence",
+              "value": "={{ $json.body?.confidence || $json.confidence || 0.90 }}",
+              "type": "number"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "={{ $json.body?.status || $json.status || 'active' }}",
+              "type": "string"
+            },
+            {
+              "id": "updatedAt",
+              "name": "updatedAt",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "normalize-data",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEETS_SPREADSHEET_ID || '' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "list",
+          "cachedResultName": "Leads"
+        },
+        "columnToMatchOn": "Conversation ID",
+        "valueToMatchOn": "={{ $json.conversationId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "columnId": "Conversation ID",
+              "fieldValue": "={{ $json.conversationId }}"
+            },
+            {
+              "columnId": "Lead Name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "columnId": "Phone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "columnId": "Channel",
+              "fieldValue": "={{ $json.channel }}"
+            },
+            {
+              "columnId": "Last Message",
+              "fieldValue": "={{ $json.lastMessage }}"
+            },
+            {
+              "columnId": "Intent",
+              "fieldValue": "={{ $json.intent }}"
+            },
+            {
+              "columnId": "Confidence",
+              "fieldValue": "={{ $json.confidence }}"
+            },
+            {
+              "columnId": "Status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "columnId": "Updated At",
+              "fieldValue": "={{ $json.updatedAt }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "google-sheets-upsert",
+      "name": "Google Sheets Append or Update",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth-cred",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GOOGLE_SHEETS_WEBHOOK_URL || ($env.FASTAPI_BASE_URL + '/api/v1/automation/logs') }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conversationId\": \"{{ $json.conversationId }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"lastMessage\": \"{{ $json.lastMessage }}\",\n  \"intent\": \"{{ $json.intent }}\",\n  \"confidence\": {{ $json.confidence }},\n  \"status\": \"{{ $json.status }}\",\n  \"updatedAt\": \"{{ $json.updatedAt }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "google-sheets-webhook-fallback",
+      "name": "Google Sheets Webhook Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        660,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'synced', conversationId: $json.conversationId, updatedAt: $json.updatedAt } }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Lead / Message Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Append or Update",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Webhook Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Append or Update": {
+      "main": [
+        [
+          {
+            "node": "Respond Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Webhook Fallback": {
+      "main": [
+        [
+          {
+            "node": "Respond Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "tags": [
+    "google-sheets",
+    "leads",
+    "auto-update"
+  ],
+  "description": "Automatically appends new leads or updates existing user rows in Google Sheets upon receiving messages or status changes."
+}

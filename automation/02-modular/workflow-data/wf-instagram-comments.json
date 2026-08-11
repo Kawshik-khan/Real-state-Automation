@@ -1,0 +1,189 @@
+{
+  "name": "WF-Instagram-Comments (Modular)",
+  "nodes": [
+    {
+      "name": "IG Comments Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-comments",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mid",
+              "name": "mediaId",
+              "value": "={{ $json.body?.mediaId ?? $json.mediaId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "cid",
+              "name": "commentId",
+              "value": "={{ $json.body?.commentId ?? $json.commentId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "msg",
+              "name": "text",
+              "value": "={{ $json.body?.text ?? $json.text ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "aid",
+              "name": "authorId",
+              "value": "={{ $json.body?.authorId ?? $json.authorId ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Moderate IG Comment",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/moderation/spam",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "source",
+              "value": "instagram"
+            },
+            {
+              "name": "authorId",
+              "value": "={{ $json.authorId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Reply IG Comment",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/instagram/comment",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "commentId",
+              "value": "={{ $json.commentId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Respond",
+      "typeVersion": 1,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        896,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      }
+    }
+  ],
+  "connections": {
+    "IG Comments Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Moderate IG Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moderate IG Comment": {
+      "main": [
+        [
+          {
+            "node": "Reply IG Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply IG Comment": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

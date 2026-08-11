@@ -1,0 +1,82 @@
+{
+  "name": "GLG Assets - Notification Hub",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "notifications/send",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true, "responseData": "firstEntryJson" }
+      },
+      "id": "notif-webhook",
+      "name": "Notification Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "channels", "name": "channels", "value": "={{ $json.body?.channels ?? $json.channels ?? [\"email\"] }}", "type": "array" },
+            { "id": "type", "name": "type", "value": "={{ $json.body?.type ?? $json.type ?? \"info\" }}", "type": "string" },
+            { "id": "title", "name": "title", "value": "={{ $json.body?.title ?? $json.title ?? \"\" }}", "type": "string" },
+            { "id": "message", "name": "message", "value": "={{ $json.body?.message ?? $json.message ?? \"\" }}", "type": "string" },
+            { "id": "recipient", "name": "recipient", "value": "={{ $json.body?.recipient ?? $json.recipient ?? \"\" }}", "type": "string" },
+            { "id": "tenantId", "name": "tenantId", "value": "={{ $json.body?.tenantId ?? $json.tenantId ?? $env.DEFAULT_TENANT_ID }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "normalize-notif",
+      "name": "Normalize Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'channels': $json.channels, 'type': $json.type, 'title': $json.title, 'message': $json.message, 'recipient': $json.recipient, 'tenantId': $json.tenantId } }}",
+        "options": { "timeout": 15000 },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "onError": "continueErrorOutput"
+      },
+      "id": "fastapi-notif",
+      "name": "Send via FastAPI Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBodyType": "firstEntryJson",
+        "responseBody": "={{ { success: true, deliveredTo: $json.channels } }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Notification Webhook": { "main": [[{ "node": "Normalize Notification", "type": "main", "index": 0 }]] },
+    "Normalize Notification": { "main": [[{ "node": "Send via FastAPI Notification", "type": "main", "index": 0 }]] },
+    "Send via FastAPI Notification": { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true },
+  "pinData": {},
+  "tags": ["glg-assets", "notifications", "automation"]
+}

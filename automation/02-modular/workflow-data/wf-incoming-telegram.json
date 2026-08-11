@@ -1,0 +1,158 @@
+{
+  "name": "WF-Incoming-Telegram (Modular)",
+  "nodes": [
+    {
+      "name": "Telegram Trigger",
+      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "chatId",
+              "name": "chatId",
+              "value": "={{ $json.message?.chat?.id ?? $json.chatId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "msg",
+              "name": "message",
+              "value": "={{ $json.message?.text ?? $json.text ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "userId",
+              "name": "userId",
+              "value": "={{ $json.message?.from?.id ?? $json.userId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "conv",
+              "name": "conversationId",
+              "value": "={{ \"tg_\" + ($json.message?.chat?.id ?? $json.chatId ?? \"\") }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Process AI",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "conversation_id",
+              "value": "={{ $json.conversationId }}"
+            },
+            {
+              "name": "channel",
+              "value": "telegram"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json.userId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Telegram Reply",
+      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        672,
+        300
+      ],
+      "parameters": {
+        "chatId": "={{ $json.conversation_id ? $json.conversation_id.replace('tg_', '') : $node[\"Normalize Input\"].json.chatId }}",
+        "text": "={{ $json.reply || \"Thank you for contacting GLG Assets!\" }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Process AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "telegram",
+    "ai-gateway"
+  ],
+  "description": "Telegram Channel Inbound AI Gateway Node Workflow"
+}

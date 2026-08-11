@@ -1,0 +1,324 @@
+{
+  "name": "Social Content Generator with Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Social AI OS Content Request",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Topic",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project"
+            },
+            {
+              "fieldLabel": "Platforms",
+              "fieldType": "multiSelect",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "facebook"
+                  },
+                  {
+                    "option": "instagram"
+                  },
+                  {
+                    "option": "linkedin"
+                  },
+                  {
+                    "option": "threads"
+                  },
+                  {
+                    "option": "x"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Schedule at",
+              "fieldType": "date"
+            }
+          ]
+        }
+      },
+      "id": "marketing-request-form",
+      "name": "Marketing Request Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/content/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "content-agent",
+      "name": "Content Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/content/approval",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "create-approval-request",
+      "name": "Create Approval Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "wait-for-approval",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.approved }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "approved?",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/content/publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "schedule-and-publish",
+      "name": "Schedule and Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "log-rejection",
+      "name": "Log Rejection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Marketing Request Form": {
+      "main": [
+        [
+          {
+            "node": "Content Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Agent": {
+      "main": [
+        [
+          {
+            "node": "Create Approval Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Approval Request": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Schedule and Publish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "pinData": {},
+  "tags": [
+    "content",
+    "approval",
+    "facebook",
+    "instagram",
+    "linkedin",
+    "threads",
+    "x"
+  ]
+}

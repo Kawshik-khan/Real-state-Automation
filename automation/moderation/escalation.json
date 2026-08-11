@@ -1,0 +1,369 @@
+{
+  "name": "Human Escalation Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "escalations/create",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "escalation-webhook",
+      "name": "Escalation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "conversationId",
+              "value": "={{ $json.body.conversationId || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "channel",
+              "value": "={{ $json.body.channel || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "reason",
+              "value": "={{ $json.body.reason || 'low_confidence' }}",
+              "type": "string"
+            },
+            {
+              "name": "confidence",
+              "value": "={{ $json.body.confidence || 0 }}",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "value": "={{ $json.body.summary || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "normalize-escalation",
+      "name": "Normalize Escalation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify/slack",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "slack-alert",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        650,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify/telegram",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "telegram-alert",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        650,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "email-alert",
+      "name": "Email Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        650,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "whatsapp-support-alert",
+      "name": "WhatsApp Support Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        650,
+        510
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/handoffs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "record-handoff",
+      "name": "Record Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        950,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', executionId: $execution.id } }}",
+        "options": {}
+      },
+      "id": "acknowledge-webhook",
+      "name": "Acknowledge Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1150,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Escalation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Escalation": {
+      "main": [
+        [
+          {
+            "node": "Slack Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp Support Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Alert": {
+      "main": [
+        [
+          {
+            "node": "Record Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Record Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Alert": {
+      "main": [
+        [
+          {
+            "node": "Record Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Support Alert": {
+      "main": [
+        [
+          {
+            "node": "Record Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Handoff": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "pinData": {},
+  "tags": [
+    "escalation",
+    "slack",
+    "telegram",
+    "email",
+    "whatsapp"
+  ]
+}

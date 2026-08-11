@@ -1,0 +1,424 @@
+{
+  "name": "WF-Project-Images (Modular)",
+  "nodes": [
+    {
+      "name": "Project Images Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "project-images",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pid",
+              "name": "projectId",
+              "value": "={{ $json.body?.projectId ?? $json.projectId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "ch",
+              "name": "channel",
+              "value": "={{ $json.body?.channel ?? $json.channel ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "rid",
+              "name": "recipientId",
+              "value": "={{ $json.body?.recipientId ?? $json.recipientId ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fetch Project Images",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/image",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Build Media Carousel",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "position": [
+        672,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const images = $json.images || [];\nconst carousel = {\n  type: \"carousel\",\n  cards: images.map((img, idx) => ({\n    title: img.caption || `Image ${idx + 1}`,\n    imageUrl: img.url,\n    subtitle: `Project: ${$json.projectName || \"\"}`\n  }))\n};\nreturn [{ ...$json, carousel, imageUrls: images.map(i => i.url), captions: images.map(i => i.caption) }];"
+      }
+    },
+    {
+      "name": "Route by Platform",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        896,
+        176
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "whatsapp",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "whatsapp"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "facebook",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "facebook"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "instagram",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "instagram"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown"
+        }
+      }
+    },
+    {
+      "name": "Send WhatsApp Media",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/whatsapp/template",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipientId",
+              "value": "={{ $json.recipientId }}"
+            },
+            {
+              "name": "template",
+              "value": "project_images"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrls }}"
+            },
+            {
+              "name": "captions",
+              "value": "={{ $json.captions }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Facebook Carousel",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/facebook/carousel",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipientId",
+              "value": "={{ $json.recipientId }}"
+            },
+            {
+              "name": "carousel",
+              "value": "={{ $json.carousel }}"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrls }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Instagram Album",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/instagram/album",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipientId",
+              "value": "={{ $json.recipientId }}"
+            },
+            {
+              "name": "mediaUrls",
+              "value": "={{ $json.imageUrls }}"
+            },
+            {
+              "name": "captions",
+              "value": "={{ $json.captions }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Completion",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-project-images"
+            },
+            {
+              "name": "status",
+              "value": "sent"
+            },
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            },
+            {
+              "name": "channel",
+              "value": "={{ $json.channel }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Project Images Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Images": {
+      "main": [
+        [
+          {
+            "node": "Build Media Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Media Carousel": {
+      "main": [
+        [
+          {
+            "node": "Route by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Facebook Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Instagram Album",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Media": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Facebook Carousel": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Instagram Album": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

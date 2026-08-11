@@ -1,0 +1,195 @@
+{
+  "name": "WF-Google-Sheets-Sync (Modular)",
+  "nodes": [
+    {
+      "name": "Webhook Trigger",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "google-sheets-sync",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Payload",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "convId",
+              "name": "conversationId",
+              "value": "={{ $json.body?.conversation_id || $json.body?.conversationId || $json.conversationId || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "name",
+              "name": "name",
+              "value": "={{ $json.body?.name || $json.name || \"New Lead\" }}",
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "value": "={{ $json.body?.phone || $json.phone || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "name": "channel",
+              "value": "={{ $json.body?.channel || $json.channel || \"website\" }}",
+              "type": "string"
+            },
+            {
+              "id": "lastMsg",
+              "name": "lastMessage",
+              "value": "={{ $json.body?.lastMessage || $json.body?.text || $json.message || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "intent",
+              "name": "intent",
+              "value": "={{ $json.body?.intent || $json.intent || \"property_inquiry\" }}",
+              "type": "string"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "value": "={{ $json.body?.status || $json.status || \"active\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Upsert Google Sheet",
+      "typeVersion": 4.5,
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEETS_SPREADSHEET_ID || \"\" }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "list"
+        },
+        "columnToMatchOn": "Conversation ID",
+        "valueToMatchOn": "={{ $json.conversationId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "columnId": "Conversation ID",
+              "fieldValue": "={{ $json.conversationId }}"
+            },
+            {
+              "columnId": "Lead Name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "columnId": "Phone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "columnId": "Channel",
+              "fieldValue": "={{ $json.channel }}"
+            },
+            {
+              "columnId": "Last Message",
+              "fieldValue": "={{ $json.lastMessage }}"
+            },
+            {
+              "columnId": "Intent",
+              "fieldValue": "={{ $json.intent }}"
+            },
+            {
+              "columnId": "Status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "columnId": "Updated At",
+              "fieldValue": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Respond to Webhook",
+      "typeVersion": 1,
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'synced', conversationId: $json.conversationId } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Upsert Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "google-sheets",
+    "upsert"
+  ],
+  "description": "Modular Google Sheets Append or Update Subworkflow Node"
+}

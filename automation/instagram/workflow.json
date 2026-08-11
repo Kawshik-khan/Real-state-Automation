@@ -1,0 +1,29 @@
+{
+  "name": "Instagram DM AI Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-webhook"
+      },
+      "name": "Instagram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/chat",
+        "options": {
+          "headers": {
+            "X-Automation-Secret": "glg-secret-key"
+          }
+        }
+      },
+      "name": "Call FastAPI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "name": "Telegram Channel AI Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/chat",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "glg-secret-key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"{{ $json.message.text }}\",\n  \"conversation_id\": \"tg_{{ $json.message.chat.id }}\",\n  \"channel\": \"telegram\",\n  \"user_id\": \"{{ $json.message.from.id }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Call FastAPI AI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.conversation_id ? $json.conversation_id.replace('tg_', '') : $node[\"Telegram Trigger\"].json.message.chat.id }}",
+        "text": "={{ $json.reply || $json.text || \"Thank you for contacting GLG Assets via Telegram!\" }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "name": "Send Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call FastAPI AI Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call FastAPI AI Chat": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

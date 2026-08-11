@@ -1,0 +1,440 @@
+"""LangGraph orchestration for the AI pipeline.
+
+State is AIState (Pydantic BaseModel). Nodes receive and return dicts
+of fields to update — LangGraph merges them into the state object.
+"""
+from __future__ import annotations
+from typing import Any
+from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
+from app.agents.state import AIState
+from app.agents.state import ModerationResult, IntentResult, Action, LeadScore
+
+
+# ── Entry ───────────────────────────────────────────────────
+
+def entry_node(state: AIState) -> dict:
+    return {}
+
+
+# ── Moderation ──────────────────────────────────────────────
+
+async def moderation_node(state: AIState) -> dict:
+    from app.services.llm import llm_service
+
+    if not state.message.strip():
+        return {"moderation": ModerationResult(action="allow"), "moderated": True}
+
+    try:
+        result = await llm_service.structured_chat(
+            [
+                {"role": "system", "content": MODERATION_PROMPT},
+                {"role": "user", "content": state.message},
+            ],
+            json_schema={},
+            temperature=0.1,
+        )
+        return {"moderation": ModerationResult(**result), "moderated": True}
+    except Exception:
+        return {"moderation": ModerationResult(action="allow"), "moderated": True}
+
+
+def moderation_router(state: AIState) -> str:
+    if state.moderation.action == "block":
+        return "blocked"
+    return "supervisor"
+
+
+async def blocked_node(state: AIState) -> dict:
+    return {
+        "agent_used": "moderation",
+        "agent_reply": "I'm sorry, but I can't process that message. Please keep our conversation respectful and on-topic.",
+        "agent_done": True,
+        "safety_check_passed": True,
+        "safety_checked": True,
+        "output_built": True,
+    }
+
+
+# ── Supervisor ──────────────────────────────────────────────
+
+async def supervisor_node(state: AIState) -> dict:
+    from app.services.llm import llm_service
+
+    history_context = ""
+    if state.history:
+        entries = state.history[-5:]
+        history_context = "\n".join(
+            f"{e['role']}: {e['content'][:200]}" for e in entries
+        )
+
+    messages = [{"role": "system", "content": SUPERVISOR_PROMPT}]
+    if history_context:
+        messages.append({"role": "system", "content": f"Conversation history:\n{history_context}"})
+    messages.append({"role": "user", "content": f"Channel: {state.channel}\nMessage: {state.message}"})
+
+    try:
+        result = await llm_service.structured_chat(messages, json_schema={}, temperature=0.2)
+        return {"intent": IntentResult(**result), "intent_classified": True, "messages_used": state.messages_used + 1}
+    except Exception:
+        return {"intent": IntentResult(intent="other", confidence=0.5), "intent_classified": True}
+
+
+def intent_router(state: AIState) -> str:
+    intent = state.intent.intent
+    if intent == "greeting":
+        return "greeting_handler"
+    elif intent in ("booking", "lead"):
+        return "booking_handler"
+    elif state.intent.requires_escalation:
+        return "booking_handler"
+    return "memory_load"
+
+
+# ── Memory ──────────────────────────────────────────────────
+
+async def memory_load_node(state: AIState) -> dict:
+    from app.services.memory import conversation_memory
+
+    history = await conversation_memory.get_history(state.conversation_id)
+    return {
+        "history": [
+            {"role": e.role, "content": e.content, "timestamp": e.timestamp.isoformat()}
+            for e in history
+        ],
+        "memory_loaded": True,
+    }
+
+
+def agent_router(state: AIState) -> str:
+    intent = state.intent.intent
+    if intent == "property_search":
+        return "property_agent"
+    elif intent == "faq":
+        return "faq_agent"
+    elif intent == "content_request":
+        return "content_agent"
+    elif intent in ("complaint", "chitchat", "other"):
+        return "fallback_handler"
+    return "fallback_handler"
+
+
+# ── Agents ──────────────────────────────────────────────────
+
+async def property_agent_node(state: AIState) -> dict:
+    from app.agents.property_agent import property_agent
+    from app.rag.pipeline import rag
+
+    try:
+        entities = state.intent.entities or {}
+        agent_context = f"Looking for: {state.message}\n"
+        if entities.get("project"):
+            agent_context += f"Project: {entities['project']}\n"
+        if entities.get("location"):
+            agent_context += f"Location: {entities['location']}\n"
+        if entities.get("budget"):
+            agent_context += f"Budget: {entities['budget']}\n"
+
+        rag_context, rag_done = "", False
+        try:
+            chunks = await rag.query(state.message, top_k=3)
+            if chunks:
+                context_str = await rag.build_context(chunks)
+                agent_context += f"\nKnowledge base context:\n{context_str}"
+                rag_context = context_str
+                rag_done = True
+        except Exception:
+            pass
+
+        reply = await property_agent.handle(state.message, entities, extra_context=agent_context)
+        return {"agent_reply": reply, "agent_used": "property_agent", "agent_done": True,
+                "rag_context": rag_context, "rag_done": rag_done}
+    except Exception as e:
+        return {"agent_reply": "I'm sorry, I couldn't find property information right now. Please try again.",
+                "agent_used": "property_agent", "agent_done": True, "agent_error": str(e)}
+
+
+async def faq_agent_node(state: AIState) -> dict:
+    from app.agents.faq_agent import faq_agent
+    from app.rag.pipeline import rag
+
+    try:
+        agent_context = state.message
+        rag_context, rag_done = "", False
+        try:
+            chunks = await rag.query(state.message, top_k=2)
+            if chunks:
+                context_str = await rag.build_context(chunks)
+                agent_context += f"\n\nReference context:\n{context_str}"
+                rag_context = context_str
+                rag_done = True
+        except Exception:
+            pass
+
+        reply = await faq_agent.handle(state.message, extra_context=agent_context)
+        return {"agent_reply": reply, "agent_used": "faq_agent", "agent_done": True,
+                "rag_context": rag_context, "rag_done": rag_done}
+    except Exception as e:
+        return {"agent_reply": "I'm sorry, I couldn't find that information. Please contact our team.",
+                "agent_used": "faq_agent", "agent_done": True, "agent_error": str(e)}
+
+
+async def content_agent_node(state: AIState) -> dict:
+    from app.agents.content_agent import content_agent
+
+    try:
+        reply = await content_agent.handle(state.message)
+        return {"agent_reply": reply, "agent_used": "content_agent", "agent_done": True}
+    except Exception as e:
+        return {"agent_reply": "I'm sorry, I couldn't generate that content right now.",
+                "agent_used": "content_agent", "agent_done": True, "agent_error": str(e)}
+
+
+async def greeting_handler_node(state: AIState) -> dict:
+    channel_names = {"whatsapp": "WhatsApp", "facebook": "Facebook Messenger",
+                     "instagram": "Instagram", "website": "our website"}
+    ch = channel_names.get(state.channel, "chat")
+    return {
+        "agent_reply": (
+            f"👋 Welcome to *GLG Assets*! I'm your AI real estate assistant.\n\n"
+            f"I can help you with:\n"
+            f"🏢 *Property Search* — Find your dream home\n"
+            f"📋 *Project Info* — Details about our developments\n"
+            f"❓ *FAQs* — Answer your questions\n"
+            f"📅 *Schedule Visit* — Book a site tour\n\n"
+            f"How can I help you today? 😊"
+        ),
+        "agent_used": "greeting_handler",
+        "agent_done": True,
+        "requires_escalation": False,
+    }
+
+
+async def booking_handler_node(state: AIState) -> dict:
+    return {
+        "agent_reply": (
+            f"Thank you for your interest! 🎉\n\n"
+            f"I'll connect you with our sales team who will follow up with personalized assistance. "
+            f"In the meantime, feel free to ask me any questions about our projects!\n\n"
+            f"📞 You can also reach us at +91-1800-GLG-ASSET"
+        ),
+        "agent_actions": [Action(type="escalate", payload={"reason": state.intent.intent, "priority": "high"})],
+        "agent_used": "booking_handler",
+        "agent_done": True,
+        "requires_escalation": True,
+        "escalation_reason": state.intent.escalation_reason or "Booking/lead request",
+    }
+
+
+async def fallback_handler_node(state: AIState) -> dict:
+    from app.services.llm import llm_service
+
+    system_prompt = (
+        f"You are a helpful real-estate assistant for GLG Assets. "
+        f"You're chatting via {state.channel}. "
+        f"Be friendly, professional, and concise. "
+        f"If the user asks something you can't answer, offer to connect them with a human agent."
+    )
+
+    context_messages = [{"role": "system", "content": system_prompt}]
+    if state.rag_context:
+        context_messages.append({"role": "system", "content": f"Relevant context:\n{state.rag_context}"})
+    if state.history:
+        for entry in state.history[-6:]:
+            context_messages.append({"role": entry["role"], "content": entry["content"]})
+    context_messages.append({"role": "user", "content": state.message})
+
+    try:
+        reply = await llm_service.chat(context_messages, temperature=0.5)
+    except Exception:
+        reply = "I apologize, but I'm having trouble processing your request right now. Please try again or contact our team for assistance."
+    return {"agent_reply": reply, "agent_used": "fallback", "agent_done": True}
+
+
+# ── Safety Check ────────────────────────────────────────────
+
+async def safety_check_node(state: AIState) -> dict:
+    from app.services.llm import llm_service
+
+    if not state.agent_reply.strip():
+        return {"safety_check_passed": True, "safety_checked": True}
+
+    prompt = f"""You are a safety checker. Review this message for harmful or inappropriate content.
+Reply should be allowed for a real-estate customer communication channel.
+
+Message: "{state.agent_reply[:500]}"
+
+Respond with JSON: {{"safe": true, "reason": ""}} or {{"safe": false, "reason": "..."}}"""
+
+    try:
+        result = await llm_service.structured_chat(
+            [{"role": "user", "content": prompt}], json_schema={}, temperature=0.1,
+        )
+        if result.get("safe") is False:
+            return {
+                "agent_reply": "I'm sorry, I couldn't generate an appropriate response. Let me connect you with a team member.",
+                "requires_escalation": True,
+                "safety_check_passed": False,
+                "safety_checked": True,
+            }
+        return {"safety_check_passed": True, "safety_checked": True}
+    except Exception:
+        return {"safety_check_passed": True, "safety_checked": True}
+
+
+# ── Response Builder ────────────────────────────────────────
+
+async def response_builder_node(state: AIState) -> dict:
+    from app.services.memory import conversation_memory
+    from app.schemas.chat import MemoryEntry
+
+    user_entry = MemoryEntry(role="user", content=state.message)
+    await conversation_memory.add(state.conversation_id, user_entry)
+
+    assistant_entry = MemoryEntry(role="assistant", content=state.agent_reply)
+    await conversation_memory.add(state.conversation_id, assistant_entry)
+
+    return {"output_built": True}
+
+
+async def output_formatter_node(state: AIState) -> dict:
+    return {}
+
+
+# ── Lead Intent Scoring Engine ───────────────────────────────
+
+async def lead_scoring_node(state: AIState) -> dict:
+    """Computes a Lead Intent Score (0-100) based on budget, timeline, and engagement."""
+    msg_lower = state.message.lower()
+    
+    # 1. Budget Readiness (max 35 pts)
+    budget_pts = 0
+    budget_status = "unknown"
+    if any(k in msg_lower for k in ["crore", "lakh", "budget", "$", "৳", "price", "cost", "cash", "loan", "financing"]):
+        if any(k in msg_lower for k in ["crore", "lakh", "under", "ready", "pre-approved", "$", "৳"]):
+            budget_pts = 35
+            budget_status = "ready"
+        else:
+            budget_pts = 20
+            budget_status = "exploratory"
+
+    # 2. Timeline & Urgency (max 35 pts)
+    timeline_pts = 0
+    timeline_urgency = "unknown"
+    if any(k in msg_lower for k in ["visit", "tour", "tomorrow", "schedule", "book", "urgent", "ready to buy", "handover", "next week"]):
+        timeline_pts = 35
+        timeline_urgency = "immediate"
+    elif any(k in msg_lower for k in ["month", "soon", "planning", "duplex", "flat"]):
+        timeline_pts = 20
+        timeline_urgency = "1-3_months"
+
+    # 3. Engagement Depth & Intent (max 30 pts)
+    engagement_pts = 0
+    channel_depth = "medium" if state.channel in ["whatsapp", "instagram"] else "low"
+    
+    if state.intent.intent in ["booking", "lead"]:
+        engagement_pts += 20
+    elif state.intent.intent == "property_search":
+        engagement_pts += 15
+
+    if len(state.history) >= 2:
+        engagement_pts += 10
+        channel_depth = "high"
+
+    total_score = min(100, budget_pts + timeline_pts + engagement_pts)
+    is_hot = total_score >= 80 or state.intent.intent in ["booking", "lead"]
+
+    lead_score_obj = LeadScore(
+        score=total_score,
+        budget_status=budget_status,
+        timeline_urgency=timeline_urgency,
+        channel_depth=channel_depth,
+        high_priority_hot_lead=is_hot,
+        scoring_breakdown={
+            "budget_pts": budget_pts,
+            "timeline_pts": timeline_pts,
+            "engagement_pts": engagement_pts,
+        }
+    )
+
+    updates = {"lead_score": lead_score_obj}
+    if is_hot:
+        updates["requires_escalation"] = True
+        updates["escalation_reason"] = f"🔥 HOT LEAD (Score {total_score}/100) — High Intent Sales Opportunity"
+
+    return updates
+
+
+# ── Graph Builder ───────────────────────────────────────────
+
+def build_ai_graph() -> CompiledStateGraph:
+    workflow = StateGraph(AIState)
+
+    workflow.add_node("entry", entry_node)
+    workflow.add_node("moderation", moderation_node)
+    workflow.add_node("blocked", blocked_node)
+    workflow.add_node("supervisor", supervisor_node)
+    workflow.add_node("lead_scoring", lead_scoring_node)
+    workflow.add_node("memory_load", memory_load_node)
+    workflow.add_node("greeting_handler", greeting_handler_node)
+    workflow.add_node("booking_handler", booking_handler_node)
+    workflow.add_node("property_agent", property_agent_node)
+    workflow.add_node("faq_agent", faq_agent_node)
+    workflow.add_node("content_agent", content_agent_node)
+    workflow.add_node("fallback_handler", fallback_handler_node)
+    workflow.add_node("safety_check", safety_check_node)
+    workflow.add_node("response_builder", response_builder_node)
+    workflow.add_node("output_formatter", output_formatter_node)
+
+    workflow.set_entry_point("entry")
+    workflow.add_edge("entry", "moderation")
+    workflow.add_conditional_edges("moderation", moderation_router, {
+        "blocked": "blocked",
+        "supervisor": "supervisor",
+    })
+    workflow.add_edge("blocked", "safety_check")
+    workflow.add_edge("supervisor", "lead_scoring")
+    workflow.add_conditional_edges("lead_scoring", intent_router, {
+        "memory_load": "memory_load",
+        "greeting_handler": "greeting_handler",
+        "booking_handler": "booking_handler",
+        "blocked": "blocked",
+    })
+    workflow.add_edge("greeting_handler", "safety_check")
+    workflow.add_edge("booking_handler", "safety_check")
+    workflow.add_conditional_edges("memory_load", agent_router, {
+        "property_agent": "property_agent",
+        "faq_agent": "faq_agent",
+        "content_agent": "content_agent",
+        "booking_handler": "booking_handler",
+        "fallback_handler": "fallback_handler",
+    })
+    for agent in ["property_agent", "faq_agent", "content_agent", "fallback_handler"]:
+        workflow.add_edge(agent, "safety_check")
+    workflow.add_edge("safety_check", "response_builder")
+    workflow.add_edge("response_builder", "output_formatter")
+    workflow.add_edge("output_formatter", END)
+
+    return workflow.compile()
+
+
+SUPERVISOR_PROMPT = """You are an intent classifier for a real-estate company called GLG Assets.
+Analyze the user's message and classify their intent into exactly one of these categories:
+- property_search: Looking for properties, units, inventory, projects, or asking about available real estate
+- faq: General question about the company, services, process, documentation requirements
+- content_request: Asking to create content like captions, descriptions, social media posts
+- booking: Wants to schedule a site visit, tour, or meeting
+- lead: Wants to be contacted or expressing interest in buying/renting
+- complaint: Has a complaint or issue
+- greeting: Saying hello or starting a conversation
+- chitchat: General conversation not related to real estate
+- other: None of the above
+Respond as JSON:
+{"intent": "one_of_the_above", "confidence": 0.0-1.0, "entities": {"project": "", "location": "", "bedrooms": 0, "budget": ""}, "requires_escalation": false, "escalation_reason": ""}"""
+
+MODERATION_PROMPT = """You are a content moderation assistant for GLG Assets, a real-estate company.
+Analyze the user message for spam, toxicity, PII, or inappropriate content.
+Respond with a JSON object:
+{"is_spam": false, "is_toxic": false, "contains_pii": false, "is_inappropriate": false, "confidence": 0.0, "action": "allow|flag|block", "reason": ""}"""
+
+ai_graph = build_ai_graph()

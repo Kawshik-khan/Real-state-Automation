@@ -1,0 +1,35 @@
+{
+  "name": "Nightly Analytics & Email Report (Workflow 5)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Nightly Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/v1/analytics/daily-metrics",
+        "options": {
+          "headers": {
+            "X-Automation-Secret": "glg-secret-key"
+          }
+        }
+      },
+      "name": "Fetch Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ]
+}

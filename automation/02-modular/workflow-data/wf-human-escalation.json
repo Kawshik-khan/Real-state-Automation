@@ -1,0 +1,310 @@
+{
+  "name": "WF-Human-Escalation (Modular)",
+  "nodes": [
+    {
+      "name": "Escalation Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "escalate",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conv",
+              "name": "conversationId",
+              "value": "={{ $json.body?.conversationId ?? $json.conversationId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "uid",
+              "name": "userId",
+              "value": "={{ $json.body?.userId ?? $json.userId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "msg",
+              "name": "message",
+              "value": "={{ $json.body?.message ?? $json.message ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "ch",
+              "name": "channel",
+              "value": "={{ $json.body?.channel ?? $json.channel ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "ai",
+              "name": "aiResponse",
+              "value": "={{ $json.body?.aiResponse ?? $json.aiResponse ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "act",
+              "name": "action",
+              "value": "={{ $json.body?.action ?? $json.action ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "conf",
+              "name": "confidence",
+              "value": "={{ $json.body?.confidence ?? $json.confidence ?? 1 }}",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Check Escalation",
+      "typeVersion": 2.3,
+      "type": "n8n-nodes-base.if",
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "escalate"
+            }
+          ],
+          "combinator": "or"
+        }
+      }
+    },
+    {
+      "name": "Notify Slack",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/slack",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "#support-escalations"
+            },
+            {
+              "name": "text",
+              "value": "=Escalation needed for conversation {{ $json.conversationId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Notify Email",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $env.SUPPORT_EMAIL }}"
+            },
+            {
+              "name": "subject",
+              "value": "=Escalation: {{ $json.conversationId }}"
+            },
+            {
+              "name": "body",
+              "value": "=User {{ $json.userId }} on {{ $json.channel }}: {{ $json.message }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Escalation",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-human-escalation"
+            },
+            {
+              "name": "type",
+              "value": "escalation"
+            },
+            {
+              "name": "conversationId",
+              "value": "={{ $json.conversationId }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "channel",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "name": "status",
+              "value": "escalated"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "No Escalation Needed",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "no_escalation_needed",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Escalation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Check Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Escalation": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Escalation Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack": {
+      "main": [
+        [
+          {
+            "node": "Notify Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Email": {
+      "main": [
+        [
+          {
+            "node": "Log Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

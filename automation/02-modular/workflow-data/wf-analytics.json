@@ -1,0 +1,232 @@
+{
+  "name": "WF-Analytics (Modular)",
+  "nodes": [
+    {
+      "name": "Nightly Schedule (11PM)",
+      "typeVersion": 1.3,
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        144
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "minutesInterval": 1440
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fetch Daily Analytics",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/analytics/daily",
+        "sendBody": false,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      }
+    },
+    {
+      "name": "Fetch Engagement",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/analytics/engagement",
+        "sendBody": false,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      }
+    },
+    {
+      "name": "Fetch Failed Replies",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/analytics/failed-replies",
+        "sendBody": false,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      }
+    },
+    {
+      "name": "Compile Report",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const report = `=== Daily Analytics Report ===\nDate: ${$json.date || \"N/A\"}\nTotal Conversations: ${$json.totalConversations || 0}\nNew Leads: ${$json.newLeads || 0}\nMessages Sent: ${$json.messagesSent || 0}\nFailed Replies: ${$json.failedCount || 0}\nEngagement: FB ${$json.facebookLikes || 0} likes, IG ${$json.instagramLikes || 0} likes`;\nreturn [{ report, generatedAt: new Date().toISOString(), date: $json.date }];"
+      }
+    },
+    {
+      "name": "Send Email Report",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $env.ADMIN_EMAIL }}"
+            },
+            {
+              "name": "subject",
+              "value": "=Analytics Report"
+            },
+            {
+              "name": "body",
+              "value": "={{ $json.report }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Completion",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-analytics"
+            },
+            {
+              "name": "status",
+              "value": "completed"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.date }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nightly Schedule (11PM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Daily Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Daily Analytics": {
+      "main": [
+        [
+          {
+            "node": "Fetch Engagement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Engagement": {
+      "main": [
+        [
+          {
+            "node": "Fetch Failed Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Failed Replies": {
+      "main": [
+        [
+          {
+            "node": "Compile Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Report": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Report": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

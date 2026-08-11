@@ -1,0 +1,397 @@
+{
+  "name": "WF-Moderation (Modular)",
+  "nodes": [
+    {
+      "name": "Moderation Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "moderate",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "txt",
+              "name": "text",
+              "value": "={{ $json.body?.text ?? $json.text ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "src",
+              "name": "source",
+              "value": "={{ $json.body?.source ?? $json.source ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "aid",
+              "name": "authorId",
+              "value": "={{ $json.body?.authorId ?? $json.authorId ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Call Moderation API",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/moderation/spam",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "authorId",
+              "value": "={{ $json.authorId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Check Verdict",
+      "typeVersion": 2.3,
+      "type": "n8n-nodes-base.if",
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isToxic }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "or"
+        }
+      }
+    },
+    {
+      "name": "Hide Comment",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/{{ $json.source }}/hide",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "authorId",
+              "value": "={{ $json.authorId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "action",
+              "value": "hide"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Flag for Review",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/moderation/flag",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "authorId",
+              "value": "={{ $json.authorId }}"
+            },
+            {
+              "name": "isToxic",
+              "value": "={{ $json.isToxic }}"
+            },
+            {
+              "name": "isSpam",
+              "value": "={{ $json.isSpam }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Notify Admin",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $env.ADMIN_EMAIL }}"
+            },
+            {
+              "name": "subject",
+              "value": "=Moderation Alert: {{ $json.source }}"
+            },
+            {
+              "name": "body",
+              "value": "=Flagged from {{ $json.authorId }}: {{ $json.text }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Action",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1568,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-moderation"
+            },
+            {
+              "name": "action",
+              "value": "={{ $json.isToxic ? \"blocked\" : \"allowed\" }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Allow Content",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "allow",
+              "name": "allow",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "verdict",
+              "name": "verdict",
+              "value": "clean",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Moderation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Call Moderation API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Moderation API": {
+      "main": [
+        [
+          {
+            "node": "Check Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Verdict": {
+      "main": [
+        [
+          {
+            "node": "Hide Comment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Allow Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hide Comment": {
+      "main": [
+        [
+          {
+            "node": "Flag for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag for Review": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Log Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allow Content": {
+      "main": [
+        [
+          {
+            "node": "Log Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

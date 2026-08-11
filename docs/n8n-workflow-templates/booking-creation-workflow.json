@@ -1,0 +1,255 @@
+{
+  "name": "Booking Creation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "BookingCreated",
+        "options": {}
+      },
+      "id": "event-trigger",
+      "name": "Event Trigger",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract booking data from event\nconst bookingData = $input.item.json.data;\nreturn {\n  booking_id: bookingData.booking_id,\n  customer_id: bookingData.customer_id,\n  property_id: bookingData.property_id,\n  date: bookingData.date,\n  time: bookingData.time\n};"
+      },
+      "id": "extract-data",
+      "name": "Extract Booking Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://platform-api:8000/api/v1/n8n/events/booking-created",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "={{ $json.booking_id }}"
+            },
+            {
+              "name": "customer_id",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "property_id",
+              "value": "={{ $json.property_id }}"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "name": "time",
+              "value": "={{ $json.time }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "publish-event",
+      "name": "Publish to Platform",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm-system/api/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "={{ $json.booking_id }}"
+            },
+            {
+              "name": "customer_id",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "property_id",
+              "value": "={{ $json.property_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sync-to-crm",
+      "name": "Sync to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "summary",
+              "value": "=Property Visit - {{ $json.property_id }}"
+            },
+            {
+              "name": "start",
+              "value": "={{ { dateTime: $json.date + 'T' + $json.time + ':00' } }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ { dateTime: $json.date + 'T' + $json.time + ':00' } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "add-to-calendar",
+      "name": "Add to Google Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "channel": "whatsapp",
+        "chatId": "={{ $json.customer_id }}",
+        "text": "=Your property visit has been confirmed for {{ $json.date }} at {{ $json.time }}. We look forward to seeing you!",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Send WhatsApp Confirmation",
+      "type": "n8n-nodes-base.whatsappApi",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=New booking created: {{ $json.booking_id }} for {{ $json.customer_id }} on {{ $json.date }} at {{ $json.time }}",
+        "otherOptions": {}
+      },
+      "id": "notify-sales",
+      "name": "Notify Sales Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Event Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Booking Data": {
+      "main": [
+        [
+          {
+            "node": "Publish to Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to Platform": {
+      "main": [
+        [
+          {
+            "node": "Sync to CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync to CRM": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["booking", "calendar", "automation"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

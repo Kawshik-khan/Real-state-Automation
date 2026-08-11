@@ -1,0 +1,91 @@
+{
+  "name": "GLG Assets - Daily Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{
+            "field": "cronExpression",
+            "expression": "0 8 * * 1-5"
+          }]
+        }
+      },
+      "id": "daily-schedule",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/daily-digest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Tenant-Id", "value": "={{ $env.DEFAULT_TENANT_ID }}" }
+          ]
+        },
+        "options": { "timeout": 30000 },
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 5000,
+        "onError": "continueErrorOutput"
+      },
+      "id": "fetch-report",
+      "name": "Fetch Daily Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "digestDate", "name": "digestDate", "value": "={{ $now.toFormat('yyyy-MM-dd') }}", "type": "string" },
+            { "id": "summary", "name": "summary", "value": "={{ $json.body?.summary ?? \"No data available\" }}", "type": "string" },
+            { "id": "newLeads", "name": "newLeads", "value": "={{ $json.body?.newLeads ?? 0 }}", "type": "number" },
+            { "id": "newBookings", "name": "newBookings", "value": "={{ $json.body?.newBookings ?? 0 }}", "type": "number" },
+            { "id": "messagesProcessed", "name": "messagesProcessed", "value": "={{ $json.body?.messagesProcessed ?? 0 }}", "type": "number" },
+            { "id": "escalations", "name": "escalations", "value": "={{ $json.body?.escalations ?? 0 }}", "type": "number" }
+          ]
+        }
+      },
+      "id": "parse-digest",
+      "name": "Parse Digest Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'channels': ['email'], 'type': 'digest', 'title': 'Daily Digest - ' + $json.digestDate, 'message': $json.summary + '\n\nNew Leads: ' + $json.newLeads + '\nNew Bookings: ' + $json.newBookings + '\nMessages: ' + $json.messagesProcessed + '\nEscalations: ' + $json.escalations, 'tenantId': $env.DEFAULT_TENANT_ID } }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "send-digest",
+      "name": "Send Digest Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Daily Schedule": { "main": [[{ "node": "Fetch Daily Report", "type": "main", "index": 0 }]] },
+    "Fetch Daily Report": { "main": [[{ "node": "Parse Digest Response", "type": "main", "index": 0 }]] },
+    "Parse Digest Response": { "main": [[{ "node": "Send Digest Notification", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true },
+  "pinData": {},
+  "tags": ["glg-assets", "digest", "scheduled", "automation"]
+}

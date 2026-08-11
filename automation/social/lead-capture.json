@@ -1,0 +1,307 @@
+{
+  "name": "Lead Capture (Sheets or Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leads/capture",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lead-capture-webhook",
+      "name": "Lead Capture Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "name",
+              "value": "={{ $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json.body.phone || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "project",
+              "value": "={{ $json.body.project || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "platform",
+              "value": "={{ $json.body.platform || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "conversationId",
+              "value": "={{ $json.body.conversationId || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.body.message || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "normalize-lead",
+      "name": "Normalize Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $env.LEAD_STORAGE }}",
+              "rightValue": "google_sheets",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "use-google-sheets",
+      "name": "Use Google Sheets",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GOOGLE_SHEETS_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "append-google-sheet",
+      "name": "Append Google Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        800,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "insert-supabase-lead",
+      "name": "Insert Supabase Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        800,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "log-lead",
+      "name": "Log Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', executionId: $execution.id } }}",
+        "options": {}
+      },
+      "id": "acknowledge-webhook",
+      "name": "Acknowledge Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Capture Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead": {
+      "main": [
+        [
+          {
+            "node": "Use Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Append Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Supabase Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Log Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Supabase Lead": {
+      "main": [
+        [
+          {
+            "node": "Log Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "pinData": {},
+  "tags": [
+    "leads",
+    "no-crm",
+    "social-ai-os-v1"
+  ]
+}

@@ -1,0 +1,509 @@
+{
+  "name": "Campaign Execution Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "campaign-execute",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract campaign data\nconst campaignData = $input.item.json;\n\nreturn {\n  campaign_id: campaignData.campaign_id || `CAMPAIGN-${Date.now()}`,\n  name: campaignData.name,\n  type: campaignData.type || 'awareness',\n  start_date: campaignData.start_date,\n  end_date: campaignData.end_date,\n  budget: campaignData.budget || 0,\n  target_audience: campaignData.target_audience || [],\n  content_pieces: campaignData.content_pieces || [],\n  platforms: campaignData.platforms || ['facebook', 'instagram'],\n  schedule: campaignData.schedule || 'immediate',\n  status: 'pending'\n};"
+      },
+      "id": "extract-campaign",
+      "name": "Extract Campaign",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate campaign data\nconst campaign = $input.item.json;\n\nif (!campaign.name || !campaign.content_pieces.length) {\n  throw new Error('Campaign name and content pieces are required');\n}\n\nif (new Date(campaign.end_date) < new Date()) {\n  throw new Error('End date cannot be in the past');\n}\n\nreturn {\n  ...campaign,\n  validation_status: 'valid',\n  validated_at: new Date().toISOString()\n};"
+      },
+      "id": "validate-campaign",
+      "name": "Validate Campaign",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "scheduled",
+              "leftValue": "={{ $json.schedule }}",
+              "rightValue": "immediate",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-schedule",
+      "name": "Check Schedule",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "unit": "hours"
+      },
+      "id": "wait-start",
+      "name": "Wait for Start Date",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split content pieces for distribution\nconst campaign = $input.item.json;\nconst pieces = campaign.content_pieces;\nconst platforms = campaign.platforms;\n\nconst distributionPlan = pieces.map((piece, index) => ({\n  piece_index: index,\n  content: piece,\n  platforms: platforms,\n  scheduled_offset: index * 4, // Post every 4 hours\n  scheduled_time: new Date(Date.now() + index * 4 * 60 * 60 * 1000).toISOString()\n}));\n\nreturn {\n  ...campaign,\n  distribution_plan: distributionPlan,\n  total_pieces: pieces.length,\n  campaign_status: 'active',\n  started_at: new Date().toISOString()\n};"
+      },
+      "id": "create-distribution-plan",
+      "name": "Create Distribution Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "mode": "each",
+        "fieldToSplitOut": "distribution_plan",
+        "options": {}
+      },
+      "id": "split-pieces",
+      "name": "Split Content Pieces",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "unit": "hours"
+      },
+      "id": "wait-piece-schedule",
+      "name": "Wait for Piece Schedule",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "facebook",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "facebook",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-facebook",
+      "name": "Route to Facebook",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "post",
+        "pageId": "={{ $env.FACEBOOK_PAGE_ID }}",
+        "text": "={{ $json.content }}",
+        "additionalFields": {}
+      },
+      "id": "post-facebook",
+      "name": "Post to Facebook",
+      "type": "n8n-nodes-base.facebook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "instagram",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "instagram",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-instagram",
+      "name": "Route to Instagram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "upload",
+        "caption": "={{ $json.content }}",
+        "mediaUrl": "={{ $json.media_url || '' }}",
+        "additionalFields": {}
+      },
+      "id": "post-instagram",
+      "name": "Post to Instagram",
+      "type": "n8n-nodes-base.instagram",
+      "typeVersion": 1,
+      "position": [1850, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "linkedin",
+              "leftValue": "={{ $json.platforms }}",
+              "rightValue": "linkedin",
+              "operator": {
+                "type": "array",
+                "operation": "containsString"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "route-linkedin",
+      "name": "Route to LinkedIn",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1650, 700]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "text": "={{ $json.content }}",
+        "visibility": "PUBLIC",
+        "additionalFields": {}
+      },
+      "id": "post-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [1850, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Track campaign metrics\nconst piece = $input.item.json;\n\nconst metrics = {\n  campaign_id: piece.campaign_id,\n  piece_index: piece.piece_index,\n  platforms: piece.platforms,\n  posted_at: new Date().toISOString(),\n  initial_metrics: {\n    reach: 0,\n    engagement: 0,\n    clicks: 0,\n    conversions: 0\n  }\n};\n\nreturn {\n  ...piece,\n  metrics: metrics\n};"
+      },
+      "id": "track-metrics",
+      "name": "Track Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 500]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [2250, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate campaign summary\nconst results = $input.item.json;\n\nconst summary = {\n  campaign_id: results[0].campaign_id,\n  name: results[0].name,\n  total_pieces: results[0].total_pieces,\n  pieces_posted: results.length,\n  platforms_used: results[0].platforms,\n  started_at: results[0].started_at,\n  completed_at: new Date().toISOString(),\n  status: 'completed',\n  total_reach: results.reduce((sum, r) => sum + (r.metrics?.initial_metrics?.reach || 0), 0),\n  total_engagement: results.reduce((sum, r) => sum + (r.metrics?.initial_metrics?.engagement || 0), 0)\n};\n\nreturn summary;"
+      },
+      "id": "calculate-summary",
+      "name": "Calculate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 500]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=🚀 Campaign Completed\\n\\nCampaign: {{ $json.name }}\\nID: {{ $json.campaign_id }}\\nPieces Posted: {{ $json.pieces_posted }}/{{ $json.total_pieces }}\\nPlatforms: {{ $json.platforms_used.join(', ') }}\\nDuration: {{ $json.started_at }} to {{ $json.completed_at }}\\n\\nTotal Reach: {{ $json.total_reach }}\\nTotal Engagement: {{ $json.total_engagement }}",
+        "otherOptions": {}
+      },
+      "id": "notify-team",
+      "name": "Notify Marketing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [2650, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2850, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Campaign": {
+      "main": [
+        [
+          {
+            "node": "Validate Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Campaign": {
+      "main": [
+        [
+          {
+            "node": "Check Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Schedule": {
+      "main": [
+        [
+          {
+            "node": "Wait for Start Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Distribution Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Start Date": {
+      "main": [
+        [
+          {
+            "node": "Create Distribution Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Distribution Plan": {
+      "main": [
+        [
+          {
+            "node": "Split Content Pieces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Content Pieces": {
+      "main": [
+        [
+          {
+            "node": "Wait for Piece Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Piece Schedule": {
+      "main": [
+        [
+          {
+            "node": "Route to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Facebook": {
+      "main": [
+        [
+          {
+            "node": "Post to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Facebook": {
+      "main": [
+        [
+          {
+            "node": "Route to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Post to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Route to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Track Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Metrics": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Calculate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Summary": {
+      "main": [
+        [
+          {
+            "node": "Notify Marketing Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Marketing Team": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["campaign", "marketing", "social-media", "automation"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

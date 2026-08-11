@@ -1,0 +1,24 @@
+{
+  "name": "Moderator Agent",
+  "version": "1.0",
+  "scope": "Spam/toxicity decisions, comment safety, escalation, and human transfer.",
+  "fastapiAgentKey": "moderator",
+  "confidenceThreshold": 0.85,
+  "allowedActions": [
+    "answer",
+    "request_clarification",
+    "escalate"
+  ],
+  "forbiddenActions": [
+    "set_price",
+    "offer_discount",
+    "make_payment_commitment",
+    "legal_commitment"
+  ],
+  "handoffWhen": [
+    "confidence_below_threshold",
+    "human_requested",
+    "unsafe_or_abusive_content",
+    "missing_authoritative_data"
+  ]
+}

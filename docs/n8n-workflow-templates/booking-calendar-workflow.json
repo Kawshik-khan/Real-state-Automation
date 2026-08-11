@@ -1,0 +1,293 @@
+{
+  "name": "Booking and Calendar Integration Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "BookingCreated",
+        "options": {}
+      },
+      "id": "event-trigger",
+      "name": "Booking Created Event",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and validate booking data\nconst bookingData = $input.item.json.data;\n\nif (!bookingData.booking_id || !bookingData.customer_id || !bookingData.property_id) {\n  throw new Error('Missing required booking fields');\n}\n\nreturn {\n  booking_id: bookingData.booking_id,\n  customer_id: bookingData.customer_id,\n  property_id: bookingData.property_id,\n  date: bookingData.date,\n  time: bookingData.time,\n  tenant_id: bookingData.tenant_id || 'default'\n};"
+      },
+      "id": "extract-data",
+      "name": "Extract Booking Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/inventory",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "project_id",
+              "value": "={{ $json.property_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-property-details",
+      "name": "Get Property Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate calendar event\nconst booking = $input.item.json;\nconst property = $input.item.json;\n\nconst startTime = `${booking.date}T${booking.time}:00`;\nconst endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(); // 1 hour visit\n\nconst calendarEvent = {\n  summary: `Property Visit - ${booking.property_id}`,\n  description: `Property visit for customer ${booking.customer_id}\\nProperty: ${booking.property_id}\\nBooking ID: ${booking.booking_id}`,\n  start: {\n    dateTime: startTime,\n    timeZone: 'UTC'\n  },\n  end: {\n    dateTime: endTime,\n    timeZone: 'UTC'\n  },\n  attendees: [\n    {\n      email: `${booking.customer_id}@customer.com`,\n      displayName: 'Customer'\n    }\n  ],\n  reminders: {\n    useDefault: false,\n    overrides: [\n      { method: 'email', minutes: 1440 }, // 24 hours before\n      { method: 'popup', minutes: 60 } // 1 hour before\n    ]\n  }\n};\n\nreturn {\n  ...booking,\n  calendar_event: calendarEvent,\n  event_start: startTime,\n  event_end: endTime\n};"
+      },
+      "id": "generate-calendar-event",
+      "name": "Generate Calendar Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "summary",
+              "value": "={{ $json.calendar_event.summary }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.calendar_event.description }}"
+            },
+            {
+              "name": "start",
+              "value": "={{ $json.calendar_event.start }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $json.calendar_event.end }}"
+            },
+            {
+              "name": "attendees",
+              "value": "={{ $json.calendar_event.attendees }}"
+            },
+            {
+              "name": "reminders",
+              "value": "={{ $json.calendar_event.reminders }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "add-to-calendar",
+      "name": "Add to Google Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "channel": "whatsapp",
+        "chatId": "={{ $json.customer_id }}",
+        "text": "=✅ Your property visit has been confirmed!\\n\\n📅 Date: {{ $json.date }}\\n⏰ Time: {{ $json.time }}\\n🏠 Property: {{ $json.property_id }}\\n\\nWe look forward to seeing you! Please arrive 10 minutes early.",
+        "options": {}
+      },
+      "id": "send-whatsapp-confirmation",
+      "name": "Send WhatsApp Confirmation",
+      "type": "n8n-nodes-base.whatsappApi",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "channel": "email",
+        "subject": "=Property Visit Confirmation - {{ $json.date }}",
+        "emailType": "html",
+        "body": "=Dear Customer,\\n\\nYour property visit has been successfully scheduled.\\n\\n📅 Date: {{ $json.date }}\\n⏰ Time: {{ $json.time }}\\n🏠 Property ID: {{ $json.property_id }}\\n\\nLocation details and directions will be sent 24 hours before your visit.\\n\\nIf you need to reschedule, please reply to this email or contact us via WhatsApp.\\n\\nBest regards,\\nReal Estate Team",
+        "options": {}
+      },
+      "id": "send-email-confirmation",
+      "name": "Send Email Confirmation",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=📅 New Booking Confirmed\\n\\nCustomer: {{ $json.customer_id }}\\nProperty: {{ $json.property_id }}\\nDate: {{ $json.date }}\\nTime: {{ $json.time }}\\nBooking ID: {{ $json.booking_id }}\\n\\nCalendar event created and confirmation sent.",
+        "otherOptions": {}
+      },
+      "id": "notify-sales",
+      "name": "Notify Sales Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Schedule follow-up reminders\nconst booking = $input.item.json;\nconst visitDate = new Date(booking.date + 'T' + booking.time);\nconst now = new Date();\n\n// Calculate time until visit\nconst hoursUntilVisit = (visitDate - now) / (1000 * 60 * 60);\n\nlet followUpSchedule = [];\n\nif (hoursUntilVisit > 24) {\n  // 24 hours before\n  followUpSchedule.push({\n    type: 'reminder',\n    timing: '24h_before',\n    scheduled_for: new Date(visitDate.getTime() - 24 * 60 * 60 * 1000).toISOString()\n  });\n}\n\nif (hoursUntilVisit > 2) {\n  // 2 hours before\n  followUpSchedule.push({\n    type: 'reminder',\n    timing: '2h_before',\n    scheduled_for: new Date(visitDate.getTime() - 2 * 60 * 60 * 1000).toISOString()\n  });\n}\n\n// 24 hours after visit\nfollowUpSchedule.push({\n  type: 'followup',\n  timing: '24h_after',\n  scheduled_for: new Date(visitDate.getTime() + 24 * 60 * 60 * 1000).toISOString()\n});\n\nreturn {\n  ...booking,\n  follow_up_schedule: followUpSchedule\n};"
+      },
+      "id": "schedule-followups",
+      "name": "Schedule Follow-up Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, booking_id: $json.booking_id, calendar_event_created: true, confirmations_sent: true, follow_ups_scheduled: $json.follow_up_schedule.length, processed_at: new Date().toISOString() } }}"
+      },
+      "id": "respond",
+      "name": "Respond to Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2050, 300]
+    }
+  ],
+  "connections": {
+    "Booking Created Event": {
+      "main": [
+        [
+          {
+            "node": "Extract Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Booking Data": {
+      "main": [
+        [
+          {
+            "node": "Get Property Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Property Details": {
+      "main": [
+        [
+          {
+            "node": "Generate Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send Email Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Sales Team": {
+      "main": [
+        [
+          {
+            "node": "Schedule Follow-up Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Follow-up Reminders": {
+      "main": [
+        [
+          {
+            "node": "Respond to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["booking", "calendar", "integration", "reminders"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

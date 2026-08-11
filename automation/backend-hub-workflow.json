@@ -1,0 +1,210 @@
+{
+  "name": "GLG Assets - Backend Integration Hub",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Webhook Receiver",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hub/incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "route-action",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body?.action ?? $json.action }}",
+        "rules": [
+          { "value": "daily-digest", "outputKey": "daily-digest" },
+          { "value": "booking", "outputKey": "booking" },
+          { "value": "notify", "outputKey": "notify" },
+          { "value": "chat", "outputKey": "chat" }
+        ],
+        "fallbackOutputKey": "unknown"
+      }
+    },
+    {
+      "id": "daily-digest",
+      "name": "Daily Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 100],
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:8000/api/v1/automation/daily-digest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      }
+    },
+    {
+      "id": "booking",
+      "name": "Create Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 250],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/booking",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body?.payload || $json }}",
+        "options": { "timeout": 15000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body?.payload || $json }}",
+        "options": { "timeout": 15000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      }
+    },
+    {
+      "id": "chat",
+      "name": "Chat Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 550],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body?.payload || $json }}",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      }
+    },
+    {
+      "id": "unknown-action",
+      "name": "Unknown Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 700],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/logs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"level\": \"warn\", \"message\": \"Unknown action: \" + ($json.action || \"none\"), \"source\": \"backend-hub\", \"tenantId\": $json.body?.tenantId || $json.tenantId || \"default\" } }}",
+        "options": { "timeout": 10000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      }
+    },
+    {
+      "id": "response-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [850, 400],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, action: $json.action || $json.body?.action, data: $json } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "response-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [850, 700],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: \"Unknown action: \" + ($json.action || \"none\") } }}",
+        "options": { "responseCode": 400 }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Receiver": {
+      "main": [[ { "node": "Route by Action", "type": "main", "index": 0 } ]]
+    },
+    "Route by Action": {
+      "main": [
+        [{ "node": "Daily Digest", "type": "main", "index": 0 }],
+        [{ "node": "Create Booking", "type": "main", "index": 0 }],
+        [{ "node": "Send Notification", "type": "main", "index": 0 }],
+        [{ "node": "Chat Query", "type": "main", "index": 0 }],
+        [{ "node": "Unknown Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Daily Digest": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    },
+    "Create Booking": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    },
+    "Send Notification": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    },
+    "Chat Query": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    },
+    "Unknown Action": {
+      "main": [[ { "node": "Respond Error", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "pinData": {}
+}

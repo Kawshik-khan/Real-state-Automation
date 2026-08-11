@@ -1,0 +1,250 @@
+{
+  "id": "VMVAiXhYYk9vQuIM",
+  "name": "GLG Assets - Master Integration Hub",
+  "active": false,
+  "isArchived": false,
+  "versionId": "55972e91-3db2-4b52-aacd-14cb1d82bd18",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "createdAt": "2026-07-26T09:06:11.210Z",
+  "updatedAt": "2026-07-26T09:07:17.867Z",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Backend Health Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Booking Create",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Send",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Classify Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Chat",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Daily Digest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Automation Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "bd203da4-bf29-43e0-8b0d-5a22a45641d1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        576
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7d785bc1-9a5e-435f-b882-d5d7c324abfa",
+      "name": "Backend Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/health",
+        "authentication": "none",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "aa99a67c-e123-47cd-8158-c8b08346d02d",
+      "name": "Booking Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/booking",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "249eca06-fd92-4b38-afbe-92b23f80b2e4",
+      "name": "Notify Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        384
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "bd27806f-b822-41ae-80fa-1ed5ba922308",
+      "name": "Classify Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        576
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/classify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "f5a5b653-15c0-4c19-949a-1c979e622b1a",
+      "name": "AI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        768
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "40518bc5-3b75-4bda-aa95-beaa96d81b9b",
+      "name": "Daily Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        960
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/daily-digest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9d219064-0450-4341-b2e4-38c525d66847",
+      "name": "Automation Logs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        1152
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.FASTAPI_BASE_URL || \"http://localhost:8000\") }}/api/v1/automation/logs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "nodeGroups": [],
+  "activeVersion": null,
+  "tags": [],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "parentFolderId": null,
+  "description": "Central integration hub connecting all FastAPI backend endpoints (health, booking, notify, classify, chat, daily-digest, logs). Uses httpHeaderAuth credential for X-Automation-Secret header.",
+  "scopes": [
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true
+}

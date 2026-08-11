@@ -1,0 +1,167 @@
+{
+  "name": "Weekly Executive Summary Digest (Monday 8:00 AM Cron)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Cron Trigger (Every Mon 8:00 AM)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/analytics/weekly-digest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Weekly Executive Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/slack",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "#executive-reports"
+            },
+            {
+              "name": "message",
+              "value": "={{ $node[\"Fetch Weekly Executive Digest\"].json[\"markdown_report\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Dispatch Slack Executive Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        720,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "executives@glgassets.com"
+            },
+            {
+              "name": "subject",
+              "value": "📊 GLG Assets Weekly Executive Digest"
+            },
+            {
+              "name": "body",
+              "value": "={{ $node[\"Fetch Weekly Executive Digest\"].json[\"markdown_report\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Dispatch Executive Email Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        720,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Cron Trigger (Every Mon 8:00 AM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weekly Executive Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Weekly Executive Digest": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Slack Executive Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Dispatch Executive Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "weekly-digest-v1"
+}

@@ -1,0 +1,385 @@
+{
+  "name": "Social Media Monitoring Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Hourly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "resource": "page",
+        "pageId": "={{ $env.FACEBOOK_PAGE_ID }}",
+        "limit": 10,
+        "additionalFields": {}
+      },
+      "id": "get-facebook-posts",
+      "name": "Get Facebook Posts",
+      "type": "n8n-nodes-base.facebook",
+      "typeVersion": 1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "resource": "user",
+        "limit": 10,
+        "additionalFields": {}
+      },
+      "id": "get-instagram-posts",
+      "name": "Get Instagram Posts",
+      "type": "n8n-nodes-base.instagram",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "resource": "organization",
+        "limit": 10,
+        "additionalFields": {}
+      },
+      "id": "get-linkedin-posts",
+      "name": "Get LinkedIn Posts",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "resource": "tweet",
+        "query": "real estate OR property OR apartment OR house",
+        "limit": 10,
+        "additionalFields": {}
+      },
+      "id": "search-twitter",
+      "name": "Search Twitter/X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 1,
+      "position": [450, 800]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "merge-posts",
+      "name": "Merge All Posts",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [650, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze engagement metrics\nconst allPosts = $input.item.json;\nconst metrics = {\n  total_posts: allPosts.length,\n  platforms: ['facebook', 'instagram', 'linkedin', 'twitter'],\n  total_likes: 0,\n  total_comments: 0,\n  total_shares: 0,\n  total_impressions: 0,\n  top_performing: [],\n  low_performing: [],\n  analyzed_at: new Date().toISOString()\n};\n\nallPosts.forEach(post => {\n  const likes = post.likes || post.reactions?.summary?.total_count || 0;\n  const comments = post.comments?.summary?.total_count || post.comment_count || 0;\n  const shares = post.shares || 0;\n  const impressions = post.impressions || 0;\n  \n  metrics.total_likes += likes;\n  metrics.total_comments += comments;\n  metrics.total_shares += shares;\n  metrics.total_impressions += impressions;\n  \n  const engagementRate = (likes + comments + shares) / (impressions || 1) * 100;\n  \n  if (engagementRate > 5) {\n    metrics.top_performing.push({\n      post_id: post.id,\n      platform: post.platform || 'unknown',\n      engagement_rate: engagementRate,\n      likes: likes,\n      comments: comments,\n      shares: shares\n    });\n  } else if (engagementRate < 1) {\n    metrics.low_performing.push({\n      post_id: post.id,\n      platform: post.platform || 'unknown',\n      engagement_rate: engagementRate,\n      likes: likes,\n      comments: comments,\n      shares: shares\n    });\n  }\n});\n\nreturn metrics;"
+      },
+      "id": "analyze-metrics",
+      "name": "Analyze Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "low-engagement",
+              "leftValue": "={{ $json.total_likes / $json.total_posts }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-performance",
+      "name": "Check Performance",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=⚠️ Low Social Media Engagement Alert\\n\\nTotal Posts: {{ $json.total_posts }}\\nAvg Likes/Post: {{ ($json.total_likes / $json.total_posts).toFixed(1) }}\\nAvg Comments/Post: {{ ($json.total_comments / $json.total_posts).toFixed(1) }}\\n\\nLow Performing Posts: {{ $json.low_performing.length }}\\n\\nConsider reviewing content strategy.",
+        "otherOptions": {}
+      },
+      "id": "alert-low-performance",
+      "name": "Alert Low Performance",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=📊 Social Media Performance Report\\n\\nTotal Posts: {{ $json.total_posts }}\\nTotal Likes: {{ $json.total_likes }}\\nTotal Comments: {{ $json.total_comments }}\\nTotal Shares: {{ $json.total_shares }}\\nTotal Impressions: {{ $json.total_impressions }}\\n\\nTop Performing: {{ $json.top_performing.length }} posts\\nLow Performing: {{ $json.low_performing.length }} posts\\n\\nAnalyzed at: {{ $json.analyzed_at }}",
+        "otherOptions": {}
+      },
+      "id": "send-report",
+      "name": "Send Performance Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1250, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/analytics/social-media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "total_posts",
+              "value": "={{ $json.total_posts }}"
+            },
+            {
+              "name": "total_likes",
+              "value": "={{ $json.total_likes }}"
+            },
+            {
+              "name": "total_comments",
+              "value": "={{ $json.total_comments }}"
+            },
+            {
+              "name": "total_shares",
+              "value": "={{ $json.total_shares }}"
+            },
+            {
+              "name": "analyzed_at",
+              "value": "={{ $json.analyzed_at }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-analytics",
+      "name": "Log to Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Identify trends and insights\nconst metrics = $input.item.json;\n\nconst insights = {\n  engagement_rate: metrics.total_posts > 0 ? ((metrics.total_likes + metrics.total_comments + metrics.total_shares) / metrics.total_impressions * 100).toFixed(2) : 0,\n  avg_likes_per_post: metrics.total_posts > 0 ? (metrics.total_likes / metrics.total_posts).toFixed(1) : 0,\n  avg_comments_per_post: metrics.total_posts > 0 ? (metrics.total_comments / metrics.total_posts).toFixed(1) : 0,\n  top_performing_content: metrics.top_performing.slice(0, 3),\n  recommendations: []\n};\n\n// Generate recommendations\nif (insights.engagement_rate < 2) {\n  insights.recommendations.push('Consider using more visual content (images/videos)');\n  insights.recommendations.push('Post during peak engagement hours');\n}\n\nif (insights.avg_likes_per_post < 10) {\n  insights.recommendations.push('Review content relevance to target audience');\n  insights.recommendations.push('Use more engaging hooks in captions');\n}\n\nif (metrics.top_performing.length > 0) {\n  insights.recommendations.push('Create more content similar to top-performing posts');\n}\n\nreturn insights;"
+      },
+      "id": "generate-insights",
+      "name": "Generate Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=💡 Social Media Insights\\n\\nEngagement Rate: {{ $json.engagement_rate }}%\\nAvg Likes/Post: {{ $json.avg_likes_per_post }}\\nAvg Comments/Post: {{ $json.avg_comments_per_post }}",
+        "otherOptions": {}
+      },
+      "id": "share-insights",
+      "name": "Share Insights",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1850, 500]
+    }
+  ],
+  "connections": {
+    "Hourly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Facebook Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Instagram Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get LinkedIn Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Twitter/X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Facebook Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Instagram Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get LinkedIn Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Twitter/X": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Posts": {
+      "main": [
+        [
+          {
+            "node": "Analyze Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Metrics": {
+      "main": [
+        [
+          {
+            "node": "Check Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Performance": {
+      "main": [
+        [
+          {
+            "node": "Alert Low Performance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Performance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Low Performance": {
+      "main": [
+        [
+          {
+            "node": "Log to Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Performance Report": {
+      "main": [
+        [
+          {
+            "node": "Log to Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Analytics": {
+      "main": [
+        [
+          {
+            "node": "Generate Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Insights": {
+      "main": [
+        [
+          {
+            "node": "Share Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["social-media", "monitoring", "analytics", "engagement"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

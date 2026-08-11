@@ -1,0 +1,339 @@
+{
+  "name": "WF-Knowledge-Upload (Modular)",
+  "nodes": [
+    {
+      "name": "Knowledge Upload Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-upload",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "doc",
+              "name": "documentUrl",
+              "value": "={{ $json.body?.documentUrl ?? $json.documentUrl ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "type",
+              "name": "documentType",
+              "value": "={{ $json.body?.documentType ?? $json.documentType ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "pid",
+              "name": "projectId",
+              "value": "={{ $json.body?.projectId ?? $json.projectId ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download Document",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.documentUrl }}",
+        "sendBody": false,
+        "specifyBody": "json",
+        "options": {
+          "response": {
+            "response": {
+              "format": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Send to OCR",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/knowledge/ocr",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "documentUrl",
+              "value": "={{ $json.documentUrl }}"
+            },
+            {
+              "name": "documentType",
+              "value": "={{ $json.documentType }}"
+            },
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Chunks to Embedding",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/knowledge/embed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "ocrId",
+              "value": "={{ $json.ocrId }}"
+            },
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "documentType",
+              "value": "={{ $json.documentType }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Vector Index",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/knowledge/index/update",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            },
+            {
+              "name": "ocrId",
+              "value": "={{ $json.ocrId }}"
+            },
+            {
+              "name": "chunkCount",
+              "value": "={{ $json.chunkCount }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Notify Admin",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/notifications/email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $env.ADMIN_EMAIL }}"
+            },
+            {
+              "name": "subject",
+              "value": "=Knowledge Upload: {{ $json.documentType }}"
+            },
+            {
+              "name": "body",
+              "value": "=Document processed. OCR: {{ $json.ocrId }}, Chunks: {{ $json.chunkCount }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log Completion",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-knowledge-upload"
+            },
+            {
+              "name": "status",
+              "value": "completed"
+            },
+            {
+              "name": "documentUrl",
+              "value": "={{ $json.documentUrl }}"
+            },
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Knowledge Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Download Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Document": {
+      "main": [
+        [
+          {
+            "node": "Send to OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to OCR": {
+      "main": [
+        [
+          {
+            "node": "Send Chunks to Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Chunks to Embedding": {
+      "main": [
+        [
+          {
+            "node": "Update Vector Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Vector Index": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

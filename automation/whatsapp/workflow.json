@@ -1,0 +1,30 @@
+{
+  "name": "WhatsApp Channel AI Gateway (Workflow 1)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/chat",
+        "options": {
+          "headers": {
+            "X-Automation-Secret": "glg-secret-key"
+          }
+        }
+      },
+      "name": "Call FastAPI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ]
+}

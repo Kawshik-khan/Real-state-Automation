@@ -1,0 +1,278 @@
+{
+  "name": "WF-Content-Generator (Modular)",
+  "nodes": [
+    {
+      "name": "Content Generator Form",
+      "typeVersion": 2.6,
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "formTitle": "Generate Social Media Content",
+        "formDescription": "Fill in the details",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Project Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "e.g. Lakeside Villa",
+              "parameterName": "projectName"
+            },
+            {
+              "fieldLabel": "Key Features",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "e.g. 5BR, pool, garden, mountain view",
+              "parameterName": "features"
+            },
+            {
+              "fieldLabel": "Image URLs",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "https://...",
+              "parameterName": "imageUrls"
+            },
+            {
+              "fieldLabel": "Target Platform",
+              "fieldType": "select",
+              "requiredField": true,
+              "placeholder": "Select platform",
+              "parameterName": "platform",
+              "selectOptions": {
+                "values": [
+                  {
+                    "option": "Facebook"
+                  },
+                  {
+                    "option": "Instagram"
+                  },
+                  {
+                    "option": "LinkedIn"
+                  },
+                  {
+                    "option": "All"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Content Tone",
+              "fieldType": "select",
+              "requiredField": true,
+              "placeholder": "Select tone",
+              "parameterName": "tone",
+              "selectOptions": {
+                "values": [
+                  {
+                    "option": "Professional"
+                  },
+                  {
+                    "option": "Casual"
+                  },
+                  {
+                    "option": "Luxury"
+                  },
+                  {
+                    "option": "Urgent"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Form Data",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "proj",
+              "name": "projectName",
+              "value": "={{ $json.body?.projectName ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "feat",
+              "name": "features",
+              "value": "={{ $json.body?.features ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "img",
+              "name": "imageUrls",
+              "value": "={{ $json.body?.imageUrls ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "plat",
+              "name": "platform",
+              "value": "={{ $json.body?.platform ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "tone",
+              "name": "tone",
+              "value": "={{ $json.body?.tone ?? \"Professional\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assemble AI Prompt",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const images = ($json.imageUrls || \"\").split(\",\").map(u => u.trim()).filter(Boolean);\nconst prompt = `Generate a ${$json.tone} social media post for \"${$json.projectName}\".\nKey features: ${$json.features}. Platform: ${$json.platform}.\nInclude a compelling headline, body text, and 3 hashtags.`;\nreturn [{ ...$json, prompt, imageUrlsArray: images }];"
+      }
+    },
+    {
+      "name": "Call AI Content API",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/content/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "prompt",
+              "value": "={{ $json.prompt }}"
+            },
+            {
+              "name": "projectName",
+              "value": "={{ $json.projectName }}"
+            },
+            {
+              "name": "platform",
+              "value": "={{ $json.platform }}"
+            },
+            {
+              "name": "tone",
+              "value": "={{ $json.tone }}"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrlsArray }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Parse Content",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "headline",
+              "name": "headline",
+              "value": "={{ $json.content?.headline ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "body",
+              "name": "body",
+              "value": "={{ $json.content?.body ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "tags",
+              "name": "hashtags",
+              "value": "={{ $json.content?.hashtags ?? [] }}",
+              "type": "json"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Content Generator Form": {
+      "main": [
+        [
+          {
+            "node": "Normalize Form Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Form Data": {
+      "main": [
+        [
+          {
+            "node": "Assemble AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call AI Content API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call AI Content API": {
+      "main": [
+        [
+          {
+            "node": "Parse Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

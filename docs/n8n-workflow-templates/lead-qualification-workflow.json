@@ -1,0 +1,416 @@
+{
+  "name": "Lead Qualification and Scoring Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "LeadCreated",
+        "options": {}
+      },
+      "id": "event-trigger",
+      "name": "Lead Created Event",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and validate lead data\nconst leadData = $input.item.json.data;\n\n// Validate required fields\nif (!leadData.lead_id || !leadData.customer_id) {\n  throw new Error('Missing required lead fields');\n}\n\nreturn {\n  lead_id: leadData.lead_id,\n  customer_id: leadData.customer_id,\n  source: leadData.source || 'unknown',\n  initial_intent: leadData.initial_intent || 'general_inquiry',\n  budget: leadData.budget || 0,\n  preferred_location: leadData.preferred_location || null,\n  timeline: leadData.timeline || 'unknown',\n  tenant_id: leadData.tenant_id || 'default'\n};"
+      },
+      "id": "extract-data",
+      "name": "Extract Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BANT Assessment\nconst lead = $input.item.json;\nlet score = 0;\nlet reasons = [];\n\n// Budget Assessment (0-30 points)\nif (lead.budget > 500000) {\n  score += 30;\n  reasons.push('High budget (>500k)');\n} else if (lead.budget > 200000) {\n  score += 20;\n  reasons.push('Medium budget (200k-500k)');\n} else if (lead.budget > 50000) {\n  score += 10;\n  reasons.push('Low budget (50k-200k)');\n}\n\n// Timeline Assessment (0-25 points)\nif (lead.timeline === 'immediate') {\n  score += 25;\n  reasons.push('Immediate timeline');\n} else if (lead.timeline === '3-6 months') {\n  score += 15;\n  reasons.push('3-6 month timeline');\n} else if (lead.timeline === '6-12 months') {\n  score += 10;\n  reasons.push('6-12 month timeline');\n}\n\n// Intent Assessment (0-20 points)\nif (lead.initial_intent === 'property_purchase') {\n  score += 20;\n  reasons.push('Purchase intent');\n} else if (lead.initial_intent === 'rental') {\n  score += 15;\n  reasons.push('Rental intent');\n} else if (lead.initial_intent === 'investment') {\n  score += 18;\n  reasons.push('Investment intent');\n}\n\n// Source Assessment (0-15 points)\nif (lead.source === 'referral') {\n  score += 15;\n  reasons.push('Referral source');\n} else if (lead.source === 'whatsapp') {\n  score += 10;\n  reasons.push('WhatsApp source');\n} else if (lead.source === 'website') {\n  score += 8;\n  reasons.push('Website source');\n}\n\n// Location Preference (0-10 points)\nif (lead.preferred_location) {\n  score += 10;\n  reasons.push('Location specified');\n}\n\n// Determine category\nlet category;\nif (score >= 70) {\n  category = 'hot';\n} else if (score >= 40) {\n  category = 'warm';\n} else {\n  category = 'cold';\n}\n\nreturn {\n  ...lead,\n  calculated_score: score,\n  category: category,\n  qualification_reasons: reasons,\n  assessed_at: new Date().toISOString()\n};"
+      },
+      "id": "bant-assessment",
+      "name": "BANT Assessment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "hot-lead",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "hot",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "route-by-category",
+      "name": "Route by Lead Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $json.tenant_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "customer_id",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "name",
+              "value": "Lead from {{ $json.source }}"
+            },
+            {
+              "name": "contact",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "status",
+              "value": "QUALIFIED"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-lead-hot",
+      "name": "Update Lead (Hot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $json.tenant_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "customer_id",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "name",
+              "value": "Lead from {{ $json.source }}"
+            },
+            {
+              "name": "contact",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "status",
+              "value": "NEW"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-lead-warm",
+      "name": "Update Lead (Warm)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $json.tenant_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "customer_id",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "name",
+              "value": "Lead from {{ $json.source }}"
+            },
+            {
+              "name": "contact",
+              "value": "={{ $json.customer_id }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "status",
+              "value": "NEW"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-lead-cold",
+      "name": "Update Lead (Cold)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 600]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=🔥 HOT LEAD ALERT\\n\\nCustomer: {{ $json.customer_id }}\\nSource: {{ $json.source }}\\nIntent: {{ $json.initial_intent }}\\nBudget: {{ $json.budget }}\\nTimeline: {{ $json.timeline }}\\nScore: {{ $json.calculated_score }}/100\\n\\nReasons: {{ $json.qualification_reasons.join(', ') }}",
+        "otherOptions": {}
+      },
+      "id": "alert-hot",
+      "name": "Alert Sales (Hot Lead)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=📋 New Warm Lead\\n\\nCustomer: {{ $json.customer_id }}\\nSource: {{ $json.source }}\\nIntent: {{ $json.initial_intent }}\\nScore: {{ $json.calculated_score }}/100\\n\\nAdded to nurturing queue",
+        "otherOptions": {}
+      },
+      "id": "notify-warm",
+      "name": "Notify Team (Warm Lead)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "channel": "email",
+        "subject": "=Welcome - Property Information",
+        "emailType": "html",
+        "body": "=Dear Customer,\\n\\nThank you for your interest in our properties. Based on your preferences ({{ $json.preferred_location || 'various locations' }}), we have some great options for you.\\n\\nOur team will be in touch shortly to discuss your requirements in more detail.\\n\\nBest regards,\\nReal Estate Team",
+        "options": {}
+      },
+      "id": "nurture-cold",
+      "name": "Add to Nurturing (Cold Lead)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1250, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, lead_id: $json.lead_id, category: $json.category, score: $json.calculated_score, processed_at: new Date().toISOString() } }}"
+      },
+      "id": "respond",
+      "name": "Respond to Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Lead Created Event": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Data": {
+      "main": [
+        [
+          {
+            "node": "BANT Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BANT Assessment": {
+      "main": [
+        [
+          {
+            "node": "Route by Lead Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Lead Category": {
+      "main": [
+        [
+          {
+            "node": "Update Lead (Hot)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead (Warm)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead (Cold)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead (Hot)": {
+      "main": [
+        [
+          {
+            "node": "Alert Sales (Hot Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead (Warm)": {
+      "main": [
+        [
+          {
+            "node": "Notify Team (Warm Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead (Cold)": {
+      "main": [
+        [
+          {
+            "node": "Add to Nurturing (Cold Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Sales (Hot Lead)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team (Warm Lead)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Nurturing (Cold Lead)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["lead", "qualification", "scoring", "bant"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

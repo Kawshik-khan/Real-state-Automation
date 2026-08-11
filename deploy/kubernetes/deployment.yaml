@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: real-estate-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: real-estate-platform}
+  template:
+    metadata:
+      labels: {app: real-estate-platform}
+    spec:
+      containers:
+        - name: api
+          image: real-estate-platform:latest
+          ports: [{containerPort: 8000}]
+          readinessProbe: {httpGet: {path: /health/ready, port: 8000}}
+          livenessProbe: {httpGet: {path: /health/live, port: 8000}}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 1, memory: 1Gi}

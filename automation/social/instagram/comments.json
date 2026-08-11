@@ -1,0 +1,331 @@
+{
+  "name": "Instagram Comment Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram/comments",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "comment-webhook",
+      "name": "Comment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "channel",
+              "value": "instagram",
+              "type": "string"
+            },
+            {
+              "name": "commentId",
+              "value": "={{ $json.body.entry?.[0]?.changes?.[0]?.value?.comment_id || $json.body.commentId || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "comment",
+              "value": "={{ $json.body.entry?.[0]?.changes?.[0]?.value?.message || $json.body.text || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "authorId",
+              "value": "={{ $json.body.entry?.[0]?.changes?.[0]?.value?.from?.id || $json.body.authorId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "normalize-comment",
+      "name": "Normalize Comment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.comment }}",
+              "rightValue": "price",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "is-price-enquiry",
+      "name": "Is Price Enquiry",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "reply",
+              "value": "Hi! Which project are you interested in? We currently have apartments in Gulshan, Bashundhara and Uttara.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "price-enquiry-reply",
+      "name": "Price Enquiry Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        800,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/moderate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "moderator-agent",
+      "name": "Moderator Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        800,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/outbound",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-comment-reply",
+      "name": "Post Comment Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Tenant-Id",
+              "value": "={{ $env.DEFAULT_TENANT_ID }}"
+            },
+            {
+              "name": "X-Automation-Secret",
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "log-comment",
+      "name": "Log Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', executionId: $execution.id } }}",
+        "options": {}
+      },
+      "id": "acknowledge-webhook",
+      "name": "Acknowledge Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Comment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Comment": {
+      "main": [
+        [
+          {
+            "node": "Is Price Enquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Price Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Price Enquiry Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Moderator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Price Enquiry Reply": {
+      "main": [
+        [
+          {
+            "node": "Post Comment Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moderator Agent": {
+      "main": [
+        [
+          {
+            "node": "Post Comment Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Comment Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Comment": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "pinData": {},
+  "tags": [
+    "instagram",
+    "comments",
+    "moderation",
+    "social-ai-os-v1"
+  ]
+}

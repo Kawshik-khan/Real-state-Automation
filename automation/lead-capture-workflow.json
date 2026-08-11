@@ -1,0 +1,155 @@
+{
+  "name": "GLG Assets - Lead Capture Webhook",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Lead Capture Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leads/capture",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "normalize-lead",
+      "name": "Normalize Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 300],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ {\n  \"leadId\": $json.body?.leadId ?? $json.leadId ?? $execution.id,\n  \"name\": $json.body?.name ?? $json.name ?? \"\",\n  \"email\": $json.body?.email ?? $json.email ?? \"\",\n  \"phone\": $json.body?.phone ?? $json.phone ?? \"\",\n  \"message\": $json.body?.message ?? $json.message ?? \"\",\n  \"source\": $json.body?.source ?? $json.source ?? \"webhook\",\n  \"tenantId\": $json.body?.tenantId ?? $json.tenantId ?? \"default\"\n} }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "classify-lead",
+      "name": "Classify via Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [650, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/classify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"leadId\": $json.leadId, \"name\": $json.name, \"email\": $json.email, \"phone\": $json.phone, \"message\": $json.message, \"source\": $json.source, \"tenantId\": $json.tenantId } }}",
+        "options": { "timeout": 20000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "check-priority",
+      "name": "High Priority?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [850, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.priority }}",
+              "operator": { "type": "string", "operation": "equals" },
+              "rightValue": "high"
+            }
+          ],
+          "combinator": "or"
+        }
+      }
+    },
+    {
+      "id": "notify-urgent",
+      "name": "Notify Urgent Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1050, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"channels\": [\"email\", \"slack\"], \"type\": \"urgent_lead\", \"title\": \"URGENT: \" + $json.name, \"message\": \"Priority lead from \" + $json.source + \"\\nName: \" + $json.name + \"\\nPhone: \" + ($json.phone || \"N/A\") + \"\\nEmail: \" + ($json.email || \"N/A\"), \"tenantId\": $json.tenantId } }}",
+        "options": { "timeout": 15000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "T1ylitzYk651xiML",
+          "name": "GLG Assets Backend"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1250, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, leadId: $json.leadId, priority: $json.priority, category: $json.category, assignedAgent: $json.assignedAgent } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1050, 500],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error?.message || \"Classification failed\" } }}",
+        "options": { "responseCode": 500 }
+      }
+    }
+  ],
+  "connections": {
+    "Lead Capture Webhook": {
+      "main": [[ { "node": "Normalize Lead", "type": "main", "index": 0 } ]]
+    },
+    "Normalize Lead": {
+      "main": [[ { "node": "Classify via Backend", "type": "main", "index": 0 } ]]
+    },
+    "Classify via Backend": {
+      "main": [
+        [{ "node": "High Priority?", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "High Priority?": {
+      "main": [
+        [{ "node": "Notify Urgent Lead", "type": "main", "index": 0 }],
+        [{ "node": "Respond Success", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Urgent Lead": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "pinData": {}
+}

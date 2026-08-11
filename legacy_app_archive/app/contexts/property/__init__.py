@@ -1,0 +1,1 @@
+"""Property context boundary."""

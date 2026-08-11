@@ -1,0 +1,13 @@
+FROM glg-backend:latest AS base
+
+# Install production dependencies for RAG pipeline + LangGraph
+RUN pip install --no-cache-dir \
+    python-multipart \
+    langgraph \
+    langgraph-checkpoint \
+    pgvector
+
+# Our new rag modules + __init__.py already copied into the container
+# by docker cp. This image build won't persist those — we'll use
+# docker cp again after building. The key is to have the pip deps
+# baked into the image so the container starts first time.

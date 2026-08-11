@@ -1,0 +1,472 @@
+{
+  "name": "WF-Brochure-Sender (Modular)",
+  "nodes": [
+    {
+      "name": "Brochure Webhook",
+      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-brochure",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalize Input",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "uid",
+              "name": "userId",
+              "value": "={{ $json.body?.userId ?? $json.userId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "pid",
+              "name": "projectId",
+              "value": "={{ $json.body?.projectId ?? $json.projectId ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "ch",
+              "name": "channel",
+              "value": "={{ $json.body?.channel ?? $json.channel ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fetch Brochure Data",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        448,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/booking",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "projectId",
+              "value": "={{ $json.projectId }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assemble Brochure",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.set",
+      "position": [
+        672,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pdf",
+              "name": "pdfUrl",
+              "value": "={{ $json.brochure.pdfUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "imgs",
+              "name": "imageUrls",
+              "value": "={{ $json.brochure.imageUrls }}",
+              "type": "json"
+            },
+            {
+              "id": "vid",
+              "name": "videoUrl",
+              "value": "={{ $json.brochure.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "proj",
+              "name": "projectName",
+              "value": "={{ $json.brochure.projectName }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Route by Channel",
+      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        896,
+        176
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "whatsapp",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "whatsapp"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "facebook",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "facebook"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "instagram",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "instagram"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown"
+        }
+      }
+    },
+    {
+      "name": "Send WhatsApp Brochure",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/whatsapp/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "type",
+              "value": "brochure"
+            },
+            {
+              "name": "pdfUrl",
+              "value": "={{ $json.pdfUrl }}"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrls }}"
+            },
+            {
+              "name": "projectName",
+              "value": "={{ $json.projectName }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Facebook Brochure",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/facebook/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipientId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "type",
+              "value": "brochure"
+            },
+            {
+              "name": "pdfUrl",
+              "value": "={{ $json.pdfUrl }}"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrls }}"
+            },
+            {
+              "name": "projectName",
+              "value": "={{ $json.projectName }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Instagram Brochure",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/social/instagram/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipientId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "type",
+              "value": "brochure"
+            },
+            {
+              "name": "imageUrls",
+              "value": "={{ $json.imageUrls }}"
+            },
+            {
+              "name": "projectName",
+              "value": "={{ $json.projectName }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log to Backend",
+      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "workflow",
+              "value": "wf-brochure-sender"
+            },
+            {
+              "name": "status",
+              "value": "completed"
+            },
+            {
+              "name": "channel",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Brochure Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Brochure Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Brochure Data": {
+      "main": [
+        [
+          {
+            "node": "Assemble Brochure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Brochure": {
+      "main": [
+        [
+          {
+            "node": "Route by Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Channel": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Brochure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Facebook Brochure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Instagram Brochure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Brochure": {
+      "main": [
+        [
+          {
+            "node": "Log to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Facebook Brochure": {
+      "main": [
+        [
+          {
+            "node": "Log to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Instagram Brochure": {
+      "main": [
+        [
+          {
+            "node": "Log to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "description": ""
+}

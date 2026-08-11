@@ -1,0 +1,153 @@
+# ──────────────────────────────────────────────
+#  GLG Assets — Social AI OS (Production Stack)
+#  Frontend + FastAPI Backend + Platform API + Database + n8n
+# ──────────────────────────────────────────────
+
+services:
+
+  # ── React Frontend (Vite + Nginx SPA Server) ──
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: glg-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - glg-net
+
+  # ── FastAPI Backend (Workstreams 01-33) ──
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: glg-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-glg_assets}
+      - AUTOMATION_SHARED_SECRET=${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - glg-net
+
+  # ── Platform API (Workstreams 34-45) ──
+  platform-api:
+    build:
+      context: ./platform-api
+      dockerfile: Dockerfile
+    container_name: glg-platform-api
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./platform-api/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-glg_assets}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || curl -f http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - glg-net
+
+  # ── PostgreSQL with pgvector ──
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: glg-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-glg_assets}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - glg-net
+
+  # ── n8n Workflow Automation ──
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: glg-n8n
+    ports:
+      - "5678:5678"
+    env_file:
+      - ./automation/.env
+    environment:
+      # Database — separate n8n database in PostgreSQL
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: db
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-postgres}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_POSTGRESDB_DATABASE: n8n
+      # Encryption key for credentials storage
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-glg-assets-n8n-encryption-key-change-in-prod}
+      N8N_MCP_SERVER_ENABLED: "true"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 168
+      N8N_AUTH_ENABLED: "false"
+      N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE: "true"
+
+      # ── Social AI OS — required env vars ──
+      FASTAPI_BASE_URL: http://backend:8000
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-glg-assets-main}
+      AUTOMATION_SHARED_SECRET: ${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+      LEAD_STORAGE: postgres
+      GOOGLE_SHEETS_WEBHOOK_URL: ""
+      SUPABASE_URL: ""
+      FACEBOOK_PAGE_ID: ""
+      ADMIN_EMAIL: admin@glgassets.local
+      SUPPORT_EMAIL: support@glgassets.local
+      TELEGRAM_SUPPORT_CHAT_ID: ""
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./automation:/automation
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - glg-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  glg-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  n8n-data:

@@ -1,0 +1,7 @@
+{
+  "name": "real-estate-engagement-admin",
+  "private": true,
+  "scripts": {"dev": "next dev", "build": "next build", "test": "vitest"},
+  "dependencies": {"next": "^15.0.0", "react": "^19.0.0", "react-dom": "^19.0.0"},
+  "devDependencies": {"typescript": "^5.0.0", "vitest": "^2.0.0"}
+}

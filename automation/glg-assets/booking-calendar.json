@@ -1,0 +1,102 @@
+{
+  "name": "GLG Assets - Booking Calendar",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bookings/create",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true, "responseData": "firstEntryJson" }
+      },
+      "id": "booking-webhook",
+      "name": "Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "name", "name": "name", "value": "={{ $json.body?.name ?? $json.name ?? \"\" }}", "type": "string" },
+            { "id": "email", "name": "email", "value": "={{ $json.body?.email ?? $json.email ?? \"\" }}", "type": "string" },
+            { "id": "phone", "name": "phone", "value": "={{ $json.body?.phone ?? $json.phone ?? \"\" }}", "type": "string" },
+            { "id": "propertyId", "name": "propertyId", "value": "={{ $json.body?.propertyId ?? $json.propertyId ?? \"\" }}", "type": "string" },
+            { "id": "tourDate", "name": "tourDate", "value": "={{ $json.body?.tourDate ?? $json.tourDate ?? \"\" }}", "type": "string" },
+            { "id": "tourTime", "name": "tourTime", "value": "={{ $json.body?.tourTime ?? $json.tourTime ?? \"\" }}", "type": "string" },
+            { "id": "message", "name": "message", "value": "={{ $json.body?.message ?? $json.message ?? \"\" }}", "type": "string" },
+            { "id": "source", "name": "source", "value": "={{ $json.body?.source ?? $json.source ?? \"website\" }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "normalize-booking",
+      "name": "Normalize Booking Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/booking",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'name': $json.name, 'email': $json.email, 'phone': $json.phone, 'propertyId': $json.propertyId, 'tourDate': $json.tourDate, 'tourTime': $json.tourTime, 'message': $json.message, 'source': $json.source, 'tenantId': $env.DEFAULT_TENANT_ID } }}",
+        "options": { "timeout": 15000 },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "onError": "continueErrorOutput"
+      },
+      "id": "fastapi-booking",
+      "name": "Send to FastAPI Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBodyType": "firstEntryJson",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [800, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBodyType": "firstEntryJson",
+        "responseBody": "={{ { success: false, error: $json.error?.message || 'Booking creation failed' } }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [800, 440]
+    }
+  ],
+  "connections": {
+    "Booking Webhook": { "main": [[{ "node": "Normalize Booking Data", "type": "main", "index": 0 }]] },
+    "Normalize Booking Data": { "main": [[{ "node": "Send to FastAPI Booking", "type": "main", "index": 0 }]] },
+    "Send to FastAPI Booking": {
+      "main": [
+        [{ "node": "Respond OK", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true },
+  "pinData": {},
+  "tags": ["glg-assets", "booking", "automation"]
+}

@@ -1,0 +1,147 @@
+{
+  "name": "GLG Assets - Lead Qualification & Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leads/qualify",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true, "responseData": "firstEntryJson" }
+      },
+      "id": "qual-webhook",
+      "name": "Qualification Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            { "id": "leadId", "name": "leadId", "value": "={{ $json.body?.leadId ?? $json.leadId ?? $execution.id }}", "type": "string" },
+            { "id": "name", "name": "name", "value": "={{ $json.body?.name ?? $json.name ?? \"\" }}", "type": "string" },
+            { "id": "email", "name": "email", "value": "={{ $json.body?.email ?? $json.email ?? \"\" }}", "type": "string" },
+            { "id": "phone", "name": "phone", "value": "={{ $json.body?.phone ?? $json.phone ?? \"\" }}", "type": "string" },
+            { "id": "message", "name": "message", "value": "={{ $json.body?.message ?? $json.message ?? \"\" }}", "type": "string" },
+            { "id": "source", "name": "source", "value": "={{ $json.body?.source ?? $json.source ?? \"unknown\" }}", "type": "string" },
+            { "id": "tenantId", "name": "tenantId", "value": "={{ $json.body?.tenantId ?? $json.tenantId ?? $env.DEFAULT_TENANT_ID }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "normalize-lead",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/classify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'leadId': $json.leadId, 'name': $json.name, 'email': $json.email, 'phone': $json.phone, 'message': $json.message, 'source': $json.source, 'tenantId': $json.tenantId } }}",
+        "options": { "timeout": 20000 },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "onError": "continueErrorOutput"
+      },
+      "id": "classify-lead",
+      "name": "Classify Lead via FastAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "high",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "route-high",
+      "name": "High Priority?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FASTAPI_BASE_URL }}/api/v1/automation/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'channels': ['email', 'slack'], 'type': 'urgent_lead', 'title': 'URGENT: High-Value Lead', 'message': 'Name: ' + $json.name + '\nPhone: ' + ($json.phone || 'N/A') + '\nEmail: ' + ($json.email || 'N/A') + '\nBudget: ' + ($json.budget || 'N/A') + '\nSource: ' + $json.source, 'tenantId': $json.tenantId } }}",
+        "options": { "timeout": 15000 },
+        "onError": "continueErrorOutput"
+      },
+      "id": "notify-urgent",
+      "name": "Notify Urgent Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1000, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBodyType": "firstEntryJson",
+        "responseBody": "={{ { success: true, leadId: $json.leadId, priority: $json.priority, category: $json.category, assignedAgent: $json.assignedAgent } }}",
+        "options": {}
+      },
+      "id": "respond-classification",
+      "name": "Respond Classification",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBodyType": "firstEntryJson",
+        "responseBody": "={{ { success: false, error: $json.error?.message || 'Classification failed' } }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [800, 500]
+    }
+  ],
+  "connections": {
+    "Qualification Webhook": { "main": [[{ "node": "Normalize Lead Data", "type": "main", "index": 0 }]] },
+    "Normalize Lead Data": { "main": [[{ "node": "Classify Lead via FastAPI", "type": "main", "index": 0 }]] },
+    "Classify Lead via FastAPI": {
+      "main": [
+        [{ "node": "High Priority?", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "High Priority?": {
+      "main": [
+        [{ "node": "Notify Urgent Lead", "type": "main", "index": 0 }],
+        [{ "node": "Respond Classification", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Urgent Lead": { "main": [[{ "node": "Respond Classification", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true },
+  "pinData": {},
+  "tags": ["glg-assets", "leads", "qualification", "routing"]
+}
