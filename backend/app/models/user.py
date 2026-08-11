@@ -2,7 +2,12 @@
 
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+
+try:
+    from pydantic import EmailStr
+except ImportError:
+    EmailStr = str
 
 
 class UserRole(str, Enum):
