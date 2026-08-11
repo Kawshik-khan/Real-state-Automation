@@ -330,55 +330,87 @@ export default function DashboardHome({ setActiveTab }) {
         {/* MANAGER ROLE KPIS */}
         {userRole === 'manager' && (
           <>
+            {/* KPI 1: Total Ad Spend */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Team Lead Volume</span>
-                <UserCheck size={20} color="#60A5FA" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Total Ad Spend (Monthly)</span>
+                <DollarSign size={20} color="#10B981" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-                {metrics.totalLeads} Total
+                ৳1,25,000
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowUpRight size={14} /> +12% vs last month
+              </span>
+            </div>
+
+            {/* KPI 2: Campaign Reach & Impressions */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Campaign Reach &amp; Views</span>
+                <TrendingUp size={20} color="#60A5FA" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                185,000 Reach
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#60A5FA', fontWeight: 600 }}>
-                Across All Channels
+                340,000 Total Impressions
               </span>
             </div>
 
+            {/* KPI 3: Messages Received from Ads */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>AI Self-Resolution %</span>
-                <TrendingUp size={20} color="#8B5CF6" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Messages Received from Ads</span>
+                <Inbox size={20} color="#34D399" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-                {metrics.aiRate}
+                1,420 Messages
               </h3>
-              <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
-                Automated Bot Resolution
+              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600 }}>
+                Cost Per Message: ৳88
               </span>
             </div>
 
+            {/* KPI 4: Response Rate & AI Speed */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>AI Response Rate &amp; Speed</span>
+                <Clock size={20} color="#8B5CF6" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                96.8% Answered
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
+                Avg 1.2s AI Response Time
+              </span>
+            </div>
+
+            {/* KPI 5: Qualified Hot Leads */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Qualified Leads &amp; Tours</span>
+                <UserCheck size={20} color="#FBBF24" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                {metrics.totalLeads} Qualified
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#FBBF24', fontWeight: 600 }}>
+                32 Confirmed Site Tours
+              </span>
+            </div>
+
+            {/* KPI 6: Pending Social Approvals */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Pending Social Approvals</span>
-                <Share2 size={20} color="#FBBF24" />
+                <Share2 size={20} color="#F43F5E" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
                 {metrics.pendingApprovals} Posts
               </h3>
-              <span style={{ fontSize: '0.75rem', color: '#FBBF24', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.75rem', color: '#FB7185', fontWeight: 600 }}>
                 Requires Manager Sign-off
-              </span>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Lead Conversion Rate</span>
-                <DollarSign size={20} color="#10B981" />
-              </div>
-              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-                {metrics.conversionRate}
-              </h3>
-              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600 }}>
-                +3.2% vs last month
               </span>
             </div>
           </>
@@ -614,6 +646,93 @@ export default function DashboardHome({ setActiveTab }) {
             <button className="glass-card" onClick={() => setActiveTab('properties')} style={{ padding: '12px', color: '#FFFFFF', cursor: 'pointer', textAlign: 'center', fontWeight: 600 }}>
               🏢 Search Properties &amp; Pricing
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGER ROLE MAIN FEATURE: Active Ad Campaigns Performance & CPL Table */}
+      {userRole === 'manager' && (
+        <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Active Ad Campaigns &amp; Marketing Performance</h3>
+              <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '2px' }}>
+                Real-time advertising spend, reach, incoming message inquiries, and cost per lead (CPL).
+              </p>
+            </div>
+            <button className="btn-gradient" onClick={() => setActiveTab('content')}>
+              <Share2 size={16} /> Content &amp; Campaign Manager
+            </button>
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#9CA3AF' }}>
+                  <th style={{ padding: '12px 16px' }}>Campaign Name &amp; Platform</th>
+                  <th style={{ padding: '12px 16px' }}>Ad Budget Spent</th>
+                  <th style={{ padding: '12px 16px' }}>Reach</th>
+                  <th style={{ padding: '12px 16px' }}>Messages Recv</th>
+                  <th style={{ padding: '12px 16px' }}>Qualified Leads</th>
+                  <th style={{ padding: '12px 16px' }}>Cost Per Lead (CPL)</th>
+                  <th style={{ padding: '12px 16px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#FFFFFF' }}>
+                    GLG Sky Tower - Gulshan 3BHK
+                    <div style={{ fontSize: '0.7rem', color: '#8B5CF6' }}>Meta Click-to-WhatsApp</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34D399' }}>৳45,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>65,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>520</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#60A5FA' }}>58 Leads</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#C084FC' }}>৳775 / lead</td>
+                  <td style={{ padding: '12px 16px' }}><span className="badge badge-emerald">🟢 Active</span></td>
+                </tr>
+
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#FFFFFF' }}>
+                    Palm Beach Villa - Coastal Luxury
+                    <div style={{ fontSize: '0.7rem', color: '#8B5CF6' }}>Instagram Reels Video Ad</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34D399' }}>৳38,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>52,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>410</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#60A5FA' }}>42 Leads</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#C084FC' }}>৳904 / lead</td>
+                  <td style={{ padding: '12px 16px' }}><span className="badge badge-emerald">🟢 Active</span></td>
+                </tr>
+
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#FFFFFF' }}>
+                    Dhanmondi Heights - Residential
+                    <div style={{ fontSize: '0.7rem', color: '#38BDF8' }}>Google Search Text Ads</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34D399' }}>৳24,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>38,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>310</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#60A5FA' }}>28 Leads</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#C084FC' }}>৳857 / lead</td>
+                  <td style={{ padding: '12px 16px' }}><span className="badge badge-emerald">🟢 Active</span></td>
+                </tr>
+
+                <tr>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#FFFFFF' }}>
+                    Bandra Skyline - Investment Units
+                    <div style={{ fontSize: '0.7rem', color: '#F43F5E' }}>FB Instant Lead Form</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34D399' }}>৳18,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>30,000</td>
+                  <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>180</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#60A5FA' }}>14 Leads</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#C084FC' }}>৳1,285 / lead</td>
+                  <td style={{ padding: '12px 16px' }}><span className="badge badge-amber">🟡 Paused</span></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
