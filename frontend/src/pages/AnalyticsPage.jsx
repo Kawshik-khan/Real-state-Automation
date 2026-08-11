@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -27,6 +27,7 @@ import {
   Pie, 
   Cell 
 } from 'recharts';
+import { getAnalyticsReport } from '../services/api';
 
 const DAILY_VOLUME_DATA = [
   { day: 'Mon', WhatsApp: 140, Facebook: 85, Instagram: 60, Website: 40 },
@@ -53,6 +54,13 @@ const HOT_LEADS = [
 
 export default function AnalyticsPage() {
   const [playingAudio, setPlayingAudio] = useState(false);
+  const [liveReport, setLiveReport] = useState(null);
+
+  useEffect(() => {
+    getAnalyticsReport()
+      .then(res => setLiveReport(res))
+      .catch(err => console.warn('Live analytics report fallback:', err));
+  }, []);
 
   const toggleVoiceBriefing = () => {
     setPlayingAudio(!playingAudio);

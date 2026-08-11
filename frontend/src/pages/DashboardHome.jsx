@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   MessageSquare, 
@@ -10,12 +10,47 @@ import {
   UserCheck,
   Send
 } from 'lucide-react';
-import { sendChatMessage } from '../services/api';
+import { sendChatMessage, getAnalyticsReport, getConversations } from '../services/api';
 
 export default function DashboardHome({ setActiveTab }) {
   const [testMessage, setTestMessage] = useState('');
   const [chatResponse, setChatResponse] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState({
+    totalLeads: 142,
+    aiRate: '88.5%',
+    hotLeads: 29,
+    activeChats: 4,
+    avgResponse: '1.2s'
+  });
+
+  useEffect(() => {
+    fetchLiveStats();
+  }, []);
+
+  const fetchLiveStats = async () => {
+    try {
+      const [analyticsRes, convsRes] = await Promise.allSettled([
+        getAnalyticsReport(),
+        getConversations()
+      ]);
+
+      let newMetrics = { ...metrics };
+      if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.metrics) {
+        const m = analyticsRes.value.metrics;
+        newMetrics.totalLeads = m.total_incoming_leads || 142;
+        newMetrics.aiRate = `${m.ai_resolution_rate_percent || 94.2}%`;
+        newMetrics.hotLeads = m.hot_leads_scored_above_80 || 12;
+        newMetrics.avgResponse = `${m.avg_response_time_seconds || 1.2}s`;
+      }
+      if (convsRes.status === 'fulfilled' && convsRes.value?.conversations) {
+        newMetrics.activeChats = convsRes.value.conversations.length;
+      }
+      setMetrics(newMetrics);
+    } catch (err) {
+      console.warn('Dashboard stats fallback:', err);
+    }
+  };
 
   const handleTestChat = async (e) => {
     e.preventDefault();
@@ -88,35 +123,35 @@ export default function DashboardHome({ setActiveTab }) {
             <TrendingUp size={20} color="#8B5CF6" />
           </div>
           <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-            94.2%
+            {metrics.aiRate}
           </h3>
           <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={14} /> Avg 1.2s response time
+            <Clock size={14} /> Avg {metrics.avgResponse} response time
           </span>
         </div>
 
         {/* KPI 3 */}
         <div className="glass-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Labor Cost Saved</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Active Conversations</span>
             <DollarSign size={20} color="#06B6D4" />
           </div>
           <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-            ৳5,20,000
+            {metrics.activeChats} Active
           </h3>
           <span style={{ fontSize: '0.75rem', color: '#22D3EE', fontWeight: 600 }}>
-            184 Hours Saved This Month
+            Across 4 Social Channels
           </span>
         </div>
 
         {/* KPI 4 */}
         <div className="glass-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Hot Leads (Propensity &gt; 85)</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Hot Leads (Scored &ge; 80)</span>
             <AlertCircle size={20} color="#F43F5E" />
           </div>
           <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-            12 VIP Leads
+            {metrics.hotLeads} VIP Leads
           </h3>
           <span style={{ fontSize: '0.75rem', color: '#FB7185', fontWeight: 600 }}>
             Requires Sales Call Follow-up

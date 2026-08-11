@@ -198,12 +198,13 @@ export async function sendCustomerMessage(convId, text, channel = 'website') {
 }
 
 /**
- * Delete a conversation
+ * Fetch executive analytics weekly report
  */
-export async function deleteConversation(convId) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}`, {
-    method: 'DELETE',
+export async function getAnalyticsReport() {
+  const response = await fetch(`${API_BASE_URL}/api/v1/analytics/weekly-digest`, {
+    method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       'X-Automation-Secret': 'glg-secret-key',
     },
   });
