@@ -21,7 +21,7 @@ import { sendChatMessage, getAnalyticsReport, getConversations } from '../servic
 
 export default function DashboardHome({ setActiveTab }) {
   const { user } = useAuth();
-  const userRole = user?.role || 'viewer';
+  const userRole = String(user?.role || 'viewer').toLowerCase();
 
   const [testMessage, setTestMessage] = useState('');
   const [chatResponse, setChatResponse] = useState(null);
