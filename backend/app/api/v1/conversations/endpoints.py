@@ -331,29 +331,54 @@ async def toggle_takeover(conv_id: str):
     raise HTTPException(status_code=404, detail="Conversation not found")
 
 
+from app.services.telegram import telegram_service
+
+
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")
 async def send_agent_reply(conv_id: str, body: dict):
-    """Post manual agent reply and broadcast message_received event."""
+    """Post manual agent reply, broadcast message_received event, and dispatch to real social channel."""
     reply_text = body.get("text", "")
     if not reply_text:
         raise HTTPException(status_code=400, detail="Text required")
 
-    for conv in IN_MEMORY_CONVERSATIONS:
-        if conv["id"] == conv_id:
-            msg_obj = {"sender": "human_agent", "text": reply_text, "time": "Just now"}
-            conv["messages"].append(msg_obj)
-            conv["lastMessage"] = reply_text
-            conv["time"] = "Just now"
+    conv = None
+    for c in IN_MEMORY_CONVERSATIONS:
+        if c["id"] == conv_id:
+            conv = c
+            break
 
-            # Broadcast message event
-            await broadcaster.broadcast("message_received", {
-                "conversation_id": conv_id,
-                "message": msg_obj,
-                "channel": conv["channel"],
-                "name": conv["name"]
-            })
+    if not conv:
+        conv = get_or_create_conversation(conv_id)
 
-            return {"success": True, "conversation_id": conv_id, "message": msg_obj}
+    msg_obj = {"sender": "human_agent", "text": reply_text, "time": "Just now"}
+    conv["messages"].append(msg_obj)
+    conv["lastMessage"] = reply_text
+    conv["time"] = "Just now"
 
-    raise HTTPException(status_code=404, detail="Conversation not found")
+    channel = conv.get("channel", "website")
+    delivery_status = "internal_dashboard"
+
+    # Dispatch reply to real Telegram user if channel is Telegram
+    if channel == "telegram" or conv_id.startswith("tg_"):
+        chat_id = conv_id.replace("tg_", "").strip()
+        if chat_id:
+            tg_res = await telegram_service.send_message(chat_id=chat_id, text=reply_text)
+            delivery_status = "sent_to_telegram" if tg_res.get("success") else f"telegram_error: {tg_res.get('error')}"
+
+    # Broadcast message event to dashboard SSE stream
+    await broadcaster.broadcast("message_received", {
+        "conversation_id": conv_id,
+        "message": msg_obj,
+        "channel": channel,
+        "name": conv["name"],
+        "delivery_status": delivery_status,
+    })
+
+    return {
+        "success": True,
+        "conversation_id": conv_id,
+        "channel": channel,
+        "delivery_status": delivery_status,
+        "message": msg_obj
+    }
 
