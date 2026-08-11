@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://real-state-automation.onrender.com';
+const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || 'glg-secret-key';
 
 /**
  * Helper to handle fetch responses and errors
@@ -19,7 +20,7 @@ export async function sendChatMessage(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify(payload),
   });
@@ -34,7 +35,7 @@ export async function generateContent(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify(payload),
   });
@@ -54,7 +55,7 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
   const response = await fetch(`${API_BASE_URL}/api/knowledge/upload`, {
     method: 'POST',
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: formData,
   });
@@ -67,7 +68,7 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
 export async function getKnowledgeDocuments() {
   const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents`, {
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);
@@ -81,7 +82,7 @@ export async function checkModeration(text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify({ text }),
   });
@@ -94,7 +95,7 @@ export async function checkModeration(text) {
 export async function getProjects() {
   const response = await fetch(`${API_BASE_URL}/api/projects`, {
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);
@@ -106,7 +107,7 @@ export async function getProjects() {
 export async function getProjectById(projectId) {
   const response = await fetch(`${API_BASE_URL}/api/project/${projectId}`, {
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);
@@ -120,7 +121,7 @@ export async function searchKnowledge(query, filter = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify({ query, filter }),
   });
@@ -133,7 +134,7 @@ export async function searchKnowledge(query, filter = {}) {
 export async function getConversations() {
   const response = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);
@@ -146,7 +147,7 @@ export async function toggleTakeover(convId) {
   const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}/takeover`, {
     method: 'POST',
     headers: {
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);
@@ -160,7 +161,7 @@ export async function sendAgentReply(convId, text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify({ text }),
   });
@@ -175,7 +176,7 @@ export async function createConversation(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify(payload),
   });
@@ -190,7 +191,7 @@ export async function sendCustomerMessage(convId, text, channel = 'website') {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
     body: JSON.stringify({ text, channel }),
   });
@@ -205,7 +206,20 @@ export async function getAnalyticsReport() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': 'glg-secret-key',
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Delete a conversation
+ */
+export async function deleteConversation(convId) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}`, {
+    method: 'DELETE',
+    headers: {
+      'X-Automation-Secret': AUTOMATION_SECRET,
     },
   });
   return handleResponse(response);

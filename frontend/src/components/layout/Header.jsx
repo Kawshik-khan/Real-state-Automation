@@ -43,12 +43,10 @@ export default function Header({ activeTabTitle = "Dashboard Overview" }) {
           padding: '6px 12px',
           borderRadius: '8px',
           background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          fontSize: '0.75rem',
           color: '#34D399'
         }}>
           <Activity size={14} color="#34D399" />
-          <span>pgvector: 45ms | LLM: 1.2s</span>
+          <span>Pinecone RAG &amp; pgvector Active</span>
         </div>
 
         <button className="glass-card" style={{ padding: '8px', borderRadius: '10px', color: 'var(--text-muted)', cursor: 'pointer' }}>
