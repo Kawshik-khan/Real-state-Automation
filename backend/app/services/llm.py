@@ -54,18 +54,40 @@ class LLMService:
             print(f"[LLMService Error] structured_chat failed: {e}")
             return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
 
-    async def embed(self, text: str) -> list[float]:
+    async def embed(self, text: str, input_type: str = "passage") -> list[float]:
+        target_dim = getattr(settings, "vector_dim", 1024)
+
+        # 1. Try OpenAI embeddings (supports text-embedding-3-large, text-embedding-3-small)
         client = self.get_client()
-        if not client:
-            return [0.0] * 1536
-        try:
-            resp = await client.embeddings.create(model="text-embedding-3-small", input=text)
-            return resp.data[0].embedding
-        except Exception as e:
-            print(f"[LLMService] Embedding API fallback: {e}")
-            import hashlib
-            h = hashlib.sha256(text.encode()).digest()
-            return [(h[i % 32] / 255.0) - 0.5 for i in range(1536)]
+        if client and "groq.com" not in (settings.openai_base_url or ""):
+            try:
+                emb_model = getattr(settings, "openai_embedding_model", None) or "text-embedding-3-large"
+                kwargs = {"model": emb_model, "input": text}
+                if "text-embedding-3" in emb_model:
+                    kwargs["dimensions"] = target_dim
+                resp = await client.embeddings.create(**kwargs)
+                return resp.data[0].embedding
+            except Exception as e:
+                print(f"[LLMService] OpenAI embedding failed: {e}")
+
+        # 2. Try Pinecone Inference API (multilingual-e5-large outputs 1024-dim)
+        if settings.pinecone_api_key:
+            try:
+                from pinecone import Pinecone
+                pc = Pinecone(api_key=settings.pinecone_api_key)
+                res = pc.inference.embed(
+                    model="multilingual-e5-large",
+                    inputs=[text],
+                    parameters={"input_type": input_type, "truncate": "END"}
+                )
+                return res[0]["values"]
+            except Exception as pe:
+                print(f"[LLMService] Pinecone Inference embedding failed: {pe}")
+
+        # 3. Fallback deterministic hash vector
+        import hashlib
+        h = hashlib.sha256(text.encode()).digest()
+        return [(h[i % 32] / 255.0) - 0.5 for i in range(target_dim)]
 
 
 llm_service = LLMService()

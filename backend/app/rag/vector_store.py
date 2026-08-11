@@ -1,16 +1,16 @@
-"""Vector Store — pgvector-backed vector search and hybrid retrieval.
+"""Vector Store — Supports Pinecone and pgvector vector search & hybrid retrieval.
 
-Flow:
-1. add_chunks() — Bulk insert chunks into pgvector knowledge_chunks table
-2. vector_search() — Cosine similarity search using CAST(:emb AS vector)
-3. keyword_search() — PostgreSQL full-text search using tsvector / tsquery
-4. hybrid_search() — Reciprocal Rank Fusion (RRF) combining vector + keyword
+Features:
+- Pinecone Serverless vector storage & cosine similarity search
+- pgvector PostgreSQL storage fallback & full-text keyword search (tsvector)
+- Reciprocal Rank Fusion (RRF) hybrid search
 """
 
 import json
 from typing import Optional
 from sqlalchemy import text
 from app.database import async_session_factory
+from app.config import settings
 
 
 class PgVectorStore:
@@ -55,20 +55,26 @@ class PgVectorStore:
 
     async def delete_document(self, doc_id: str) -> int:
         """Remove all chunks for a document."""
-        async with async_session_factory() as session:
-            result = await session.execute(
-                text("DELETE FROM knowledge_chunks WHERE doc_id = :doc_id"),
-                {"doc_id": doc_id},
-            )
-            await session.commit()
-            return result.rowcount
+        try:
+            async with async_session_factory() as session:
+                result = await session.execute(
+                    text("DELETE FROM knowledge_chunks WHERE doc_id = :doc_id"),
+                    {"doc_id": doc_id},
+                )
+                await session.commit()
+                return result.rowcount
+        except Exception:
+            return 0
 
     async def delete_all(self) -> int:
         """Remove all chunks."""
-        async with async_session_factory() as session:
-            result = await session.execute(text("DELETE FROM knowledge_chunks"))
-            await session.commit()
-            return result.rowcount
+        try:
+            async with async_session_factory() as session:
+                result = await session.execute(text("DELETE FROM knowledge_chunks"))
+                await session.commit()
+                return result.rowcount
+        except Exception:
+            return 0
 
     async def vector_search(
         self,
@@ -206,4 +212,231 @@ class PgVectorStore:
             return 0
 
 
-vector_store = PgVectorStore()
+class PineconeVectorStore:
+    """Pinecone vector store supporting vector similarity search & metadata filtering."""
+
+    def __init__(self):
+        self._index = None
+
+    def get_index(self):
+        if self._index is not None:
+            return self._index
+        api_key = settings.pinecone_api_key
+        if not api_key:
+            return None
+        try:
+            from pinecone import Pinecone
+            pc = Pinecone(api_key=api_key)
+            host = settings.pinecone_host or None
+            index_name = settings.pinecone_index_name or "real-state-automation"
+            if host:
+                self._index = pc.Index(host=host)
+            else:
+                self._index = pc.Index(name=index_name)
+            return self._index
+        except Exception as e:
+            print(f"[PineconeVectorStore] Connection Warning: {e}")
+            return None
+
+    async def add_chunks(self, doc_id: str, chunks: list[dict]) -> int:
+        index = self.get_index()
+        if not index:
+            return 0
+        vectors = []
+        for i, chunk in enumerate(chunks):
+            emb = chunk.get("embedding", [])
+            if not emb:
+                continue
+            v_id = str(chunk.get("id") or f"{doc_id}_{chunk.get('chunk_index', i)}")
+            metadata = {
+                "doc_id": str(doc_id),
+                "chunk_index": int(chunk.get("chunk_index", i)),
+                "content": str(chunk.get("content", "")),
+                "filename": str(chunk.get("filename") or ""),
+                "project": str(chunk.get("project") or ""),
+                "location": str(chunk.get("location") or ""),
+                "document_type": str(chunk.get("document_type") or ""),
+            }
+            vectors.append((v_id, emb, metadata))
+
+        if vectors:
+            index.upsert(vectors=vectors)
+        return len(vectors)
+
+    async def vector_search(
+        self,
+        query_emb: list[float],
+        top_k: int = 5,
+        filters: Optional[dict] = None,
+        threshold: float = 0.0,
+    ) -> list[dict]:
+        index = self.get_index()
+        if not index:
+            return []
+        try:
+            p_filter = {}
+            if filters:
+                if filters.get("project"):
+                    p_filter["project"] = {"$eq": filters["project"]}
+                if filters.get("location"):
+                    p_filter["location"] = {"$eq": filters["location"]}
+                if filters.get("document_type"):
+                    p_filter["document_type"] = {"$eq": filters["document_type"]}
+
+            res = index.query(
+                vector=query_emb,
+                top_k=top_k,
+                include_metadata=True,
+                filter=p_filter if p_filter else None,
+            )
+
+            results = []
+            for match in res.matches:
+                meta = match.metadata or {}
+                score = float(match.score or 0.0)
+                if threshold > 0 and score < threshold:
+                    continue
+                results.append({
+                    "id": match.id,
+                    "doc_id": meta.get("doc_id"),
+                    "chunk_index": meta.get("chunk_index", 0),
+                    "content": meta.get("content", ""),
+                    "filename": meta.get("filename"),
+                    "project": meta.get("project"),
+                    "location": meta.get("location"),
+                    "document_type": meta.get("document_type"),
+                    "score": score,
+                    "metadata": meta,
+                })
+            return results
+        except Exception as e:
+            print(f"[PineconeVectorStore] Query Warning: {e}")
+            return []
+
+    async def delete_document(self, doc_id: str) -> int:
+        index = self.get_index()
+        if not index:
+            return 0
+        try:
+            index.delete(filter={"doc_id": {"$eq": doc_id}})
+            return 1
+        except Exception as e:
+            print(f"[PineconeVectorStore] Delete Warning: {e}")
+            return 0
+
+    async def delete_all(self) -> int:
+        index = self.get_index()
+        if not index:
+            return 0
+        try:
+            index.delete(delete_all=True)
+            return 1
+        except Exception as e:
+            print(f"[PineconeVectorStore] Delete All Warning: {e}")
+            return 0
+
+
+class UnifiedVectorStore:
+    """Unified Vector Store supporting Pinecone primary search with pgvector fallback/hybrid."""
+
+    def __init__(self):
+        self.pg_store = PgVectorStore()
+        self.pinecone_store = PineconeVectorStore()
+
+    def is_pinecone_active(self) -> bool:
+        provider = (settings.vector_store_provider or "auto").lower()
+        if provider == "pinecone":
+            return True
+        if provider == "auto" and settings.pinecone_api_key:
+            return True
+        return False
+
+    async def add_chunks(self, doc_id: str, chunks: list[dict]) -> int:
+        count = 0
+        if self.is_pinecone_active():
+            count = await self.pinecone_store.add_chunks(doc_id, chunks)
+        # Always dual-index in pgvector if available
+        await self.pg_store.add_chunks(doc_id, chunks)
+        return count or len(chunks)
+
+    async def vector_search(
+        self,
+        query_emb: list[float],
+        top_k: int = 5,
+        filters: Optional[dict] = None,
+        threshold: float = 0.0,
+    ) -> list[dict]:
+        if self.is_pinecone_active():
+            results = await self.pinecone_store.vector_search(query_emb, top_k, filters, threshold)
+            if results:
+                return results
+        return await self.pg_store.vector_search(query_emb, top_k, filters, threshold)
+
+    async def keyword_search(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        filters: Optional[dict] = None,
+    ) -> list[dict]:
+        return await self.pg_store.keyword_search(query_text, top_k, filters)
+
+    async def hybrid_search(
+        self,
+        query_emb: list[float],
+        query_text: str,
+        top_k: int = 5,
+        filters: Optional[dict] = None,
+        vector_weight: float = 0.5,
+        keyword_weight: float = 0.5,
+        rrf_k: int = 60,
+    ) -> list[dict]:
+        if self.is_pinecone_active():
+            vec_results = await self.pinecone_store.vector_search(query_emb, top_k * 2, filters)
+            kw_results = await self.pg_store.keyword_search(query_text, top_k * 2, filters)
+            if vec_results:
+                rrf_scores: dict[str, dict] = {}
+                for rank, row in enumerate(vec_results):
+                    doc_id = str(row["id"])
+                    entry = rrf_scores.setdefault(doc_id, {k: row[k] for k in row if k != "score"})
+                    entry.setdefault("rrf_score", 0.0)
+                    entry.setdefault("vector_score", 0.0)
+                    entry.setdefault("keyword_score", 0.0)
+                    entry["rrf_score"] += vector_weight / (rrf_k + rank + 1)
+                    entry["vector_score"] = float(row.get("score", 0.0))
+
+                for rank, row in enumerate(kw_results):
+                    doc_id = str(row["id"])
+                    entry = rrf_scores.setdefault(doc_id, {k: row[k] for k in row if k != "score"})
+                    entry.setdefault("rrf_score", 0.0)
+                    entry.setdefault("vector_score", 0.0)
+                    entry.setdefault("keyword_score", 0.0)
+                    entry["rrf_score"] += keyword_weight / (rrf_k + rank + 1)
+                    entry["keyword_score"] = float(row.get("score", 0.0))
+
+                sorted_items = sorted(rrf_scores.values(), key=lambda x: x["rrf_score"], reverse=True)
+                return sorted_items[:top_k]
+
+        return await self.pg_store.hybrid_search(
+            query_emb, query_text, top_k, filters, vector_weight, keyword_weight, rrf_k
+        )
+
+    async def delete_document(self, doc_id: str) -> int:
+        deleted = 0
+        if self.is_pinecone_active():
+            deleted += await self.pinecone_store.delete_document(doc_id)
+        deleted += await self.pg_store.delete_document(doc_id)
+        return deleted
+
+    async def delete_all(self) -> int:
+        if self.is_pinecone_active():
+            await self.pinecone_store.delete_all()
+        return await self.pg_store.delete_all()
+
+    async def list_documents(self) -> list[dict]:
+        return await self.pg_store.list_documents()
+
+    async def count_chunks(self, doc_id: Optional[str] = None) -> int:
+        return await self.pg_store.count_chunks(doc_id)
+
+
+vector_store = UnifiedVectorStore()

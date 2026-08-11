@@ -19,7 +19,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 appuser
+    && useradd -m -u 1000 appuser \
+    && mkdir -p /app/data/knowledge \
+    && chown -R appuser:appuser /app
 
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .

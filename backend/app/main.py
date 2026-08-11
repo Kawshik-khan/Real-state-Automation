@@ -68,6 +68,10 @@ async def verify_automation_secret(
 
 # ---------- Health Probes ----------
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": settings.app_name, "docs": "/docs"}
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": settings.app_name}

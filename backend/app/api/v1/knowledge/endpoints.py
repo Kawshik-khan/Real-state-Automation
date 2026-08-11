@@ -113,11 +113,14 @@ async def knowledge_upload(
 
     await rag.add_document(final_doc_id, chunk_objects)
 
-    # Save to disk for persistence
-    base_dir = Path(settings.knowledge_base_dir)
-    base_dir.mkdir(parents=True, exist_ok=True)
-    save_path = base_dir / f"{final_doc_id}.txt"
-    save_path.write_text(text, encoding="utf-8")
+    # Save to disk for persistence (safely handled if storage permissions vary)
+    try:
+        base_dir = Path(settings.knowledge_base_dir).resolve()
+        base_dir.mkdir(parents=True, exist_ok=True)
+        save_path = base_dir / f"{final_doc_id}.txt"
+        save_path.write_text(text, encoding="utf-8")
+    except Exception as save_err:
+        print(f"[Knowledge Persistence Warning] Could not save raw text file: {save_err}")
 
     return {
         "success": True,

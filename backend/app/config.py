@@ -32,11 +32,16 @@ class Settings(BaseSettings):
     # OpenAI / LLM
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
+    openai_embedding_model: str = "text-embedding-3-large"
     openai_base_url: Optional[str] = None
 
-    # Knowledge Base
+    # Knowledge Base & Vector Store
     knowledge_base_dir: str = "data/knowledge"
-    vector_dim: int = 1536
+    vector_dim: int = 1024
+    vector_store_provider: str = "auto"  # "auto", "pinecone", "pgvector"
+    pinecone_api_key: Optional[str] = None
+    pinecone_index_name: str = "real-state-automation"
+    pinecone_host: Optional[str] = "https://real-state-automation-o25ptb6.svc.aped-4627-b74a.pinecone.io"
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
