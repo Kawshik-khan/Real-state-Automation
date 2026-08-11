@@ -62,6 +62,18 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
 }
 
 /**
+ * Fetch all indexed RAG documents from backend
+ */
+export async function getKnowledgeDocuments() {
+  const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents`, {
+    headers: {
+      'X-Automation-Secret': 'glg-secret-key',
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
  * Perform content moderation check
  */
 export async function checkModeration(text) {

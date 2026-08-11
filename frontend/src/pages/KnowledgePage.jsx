@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   UploadCloud, 
   FileText, 
@@ -12,7 +12,7 @@ import {
   Eye, 
   Plus
 } from 'lucide-react';
-import { uploadKnowledgeDocument, searchKnowledge } from '../services/api';
+import { uploadKnowledgeDocument, searchKnowledge, getKnowledgeDocuments } from '../services/api';
 
 const INITIAL_DOCS = [
   { id: 1, filename: 'GLG_Gulshan_Heights_Brochure.pdf', project: 'GLG Gulshan Heights', docType: 'Brochure & Catalog', chunks: 14, status: 'Completed', access: 'Public Customer', ocr: 'Text Extracted' },
@@ -27,6 +27,31 @@ export default function KnowledgePage() {
   const [accessLevel, setAccessLevel] = useState('Public Customer');
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
+
+  useEffect(() => {
+    fetchLiveDocs();
+  }, []);
+
+  const fetchLiveDocs = async () => {
+    try {
+      const res = await getKnowledgeDocuments();
+      if (res && res.documents && res.documents.length > 0) {
+        const mapped = res.documents.map((d, i) => ({
+          id: d.doc_id || i + 1,
+          filename: d.filename || 'Uploaded_Document.pdf',
+          project: d.project || 'Auto-Detected by AI',
+          docType: d.document_type || 'Brochure & Catalog',
+          chunks: d.chunk_count || d.chunks || 1,
+          status: 'Completed',
+          access: d.access || 'Public Customer',
+          ocr: 'Text Extracted'
+        }));
+        setDocs(mapped);
+      }
+    } catch (err) {
+      console.warn('Using static documents fallback:', err);
+    }
+  };
 
   // Modals & Panels State
   const [activeModal, setActiveModal] = useState(null); // 'chunk', 'conflict', 'faq', 'simulator'
@@ -52,19 +77,7 @@ export default function KnowledgePage() {
         document_type: docType 
       });
       setUploadSuccess(res);
-      setDocs(prev => [
-        {
-          id: Date.now(),
-          filename: selectedFile.name,
-          project: res.project || 'Auto-Detected by AI',
-          docType: docType,
-          chunks: res.chunks_indexed || 10,
-          status: 'Completed',
-          access: accessLevel,
-          ocr: 'Text Extracted'
-        },
-        ...prev
-      ]);
+      await fetchLiveDocs();
       setSelectedFile(null);
     } catch (err) {
       alert(`Upload Failed: ${err.message}`);
