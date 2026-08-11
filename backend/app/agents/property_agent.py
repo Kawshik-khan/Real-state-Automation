@@ -22,16 +22,33 @@ class PropertyAgent:
 
         projects = search_res.get("projects", [])
         if projects:
+            from app.utils.language import is_english_query
+            is_english = is_english_query(message)
+
             formatted = []
             for p in projects:
-                formatted.append(
-                    f"🏢 *{p['name']}*\n"
-                    f"📍 {p['location']}\n"
-                    f"💰 Price: {p['price']} ({p['bedrooms']} BHK)\n"
-                    f"📝 {p['description']}\n"
-                    f"✨ Amenities: {', '.join(p['amenities'])}"
-                )
-            reply_header = f"I found {len(projects)} project(s) matching your criteria:\n\n"
+                if is_english:
+                    formatted.append(
+                        f"🏢 *{p['name']}*\n"
+                        f"📍 {p['location']}\n"
+                        f"💰 Price: {p['price']} ({p['bedrooms']} BHK)\n"
+                        f"📝 {p['description']}\n"
+                        f"✨ Amenities: {', '.join(p['amenities'])}"
+                    )
+                else:
+                    formatted.append(
+                        f"🏢 *{p['name']}*\n"
+                        f"📍 লোকেশন: {p['location']}\n"
+                        f"💰 দাম: {p['price']} ({p['bedrooms']} BHK)\n"
+                        f"📝 বিস্তারিত: {p['description']}\n"
+                        f"✨ সুবিধাসমূহ: {', '.join(p['amenities'])}"
+                    )
+
+            if is_english:
+                reply_header = f"I found {len(projects)} project(s) matching your criteria:\n\n"
+            else:
+                reply_header = f"আপনার অনুসন্ধানের সাথে মিলে এমন {len(projects)} টি প্রজেক্ট পাওয়া গেছে:\n\n"
+
             return reply_header + "\n\n---\n\n".join(formatted)
 
         # Fallback to LLM with full context

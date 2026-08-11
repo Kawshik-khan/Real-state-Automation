@@ -191,11 +191,11 @@ async def content_agent_node(state: AIState) -> dict:
 
 
 async def greeting_handler_node(state: AIState) -> dict:
-    channel_names = {"whatsapp": "WhatsApp", "facebook": "Facebook Messenger",
-                     "instagram": "Instagram", "website": "our website"}
-    ch = channel_names.get(state.channel, "chat")
-    return {
-        "agent_reply": (
+    from app.utils.language import is_english_query
+
+    is_english = is_english_query(state.message) if state.message else False
+    if is_english:
+        reply = (
             f"👋 Welcome to *GLG Assets*! I'm your AI real estate assistant.\n\n"
             f"I can help you with:\n"
             f"🏢 *Property Search* — Find your dream home\n"
@@ -203,7 +203,19 @@ async def greeting_handler_node(state: AIState) -> dict:
             f"❓ *FAQs* — Answer your questions\n"
             f"📅 *Schedule Visit* — Book a site tour\n\n"
             f"How can I help you today? 😊"
-        ),
+        )
+    else:
+        reply = (
+            f"👋 *GLG Assets*-এ আপনাকে স্বাগতম! আমি আপনার AI রিয়েল এস্টেট অ্যাসিস্ট্যান্ট।\n\n"
+            f"আমি আপনাকে যেভাবে সাহায্য করতে পারি:\n"
+            f"🏢 *প্রপার্টি সার্চ* — আপনার স্বপ্নের বাড়ি খুঁজুন\n"
+            f"📋 *প্রজেক্ট তথ্য* — আমাদের প্রজেক্ট সমূহের বিস্তারিত\n"
+            f"❓ *FAQs* — যেকোনো প্রশ্নের উত্তর\n"
+            f"📅 *সাইট ভিজিট* — ভিজিট সিডিউল বুক করুন\n\n"
+            f"আজ আপনাকে কীভাবে সাহায্য করতে পারি? 😊"
+        )
+    return {
+        "agent_reply": reply,
         "agent_used": "greeting_handler",
         "agent_done": True,
         "requires_escalation": False,
@@ -211,13 +223,25 @@ async def greeting_handler_node(state: AIState) -> dict:
 
 
 async def booking_handler_node(state: AIState) -> dict:
-    return {
-        "agent_reply": (
+    from app.utils.language import is_english_query
+
+    is_english = is_english_query(state.message) if state.message else False
+    if is_english:
+        reply = (
             f"Thank you for your interest! 🎉\n\n"
             f"I'll connect you with our sales team who will follow up with personalized assistance. "
             f"In the meantime, feel free to ask me any questions about our projects!\n\n"
             f"📞 You can also reach us at +91-1800-GLG-ASSET"
-        ),
+        )
+    else:
+        reply = (
+            f"আমাদের প্রজেক্টে আগ্রহ প্রকাশের জন্য ধন্যবাদ! 🎉\n\n"
+            f"আপনাকে সাহায্য করার জন্য খুব শীঘ্রই আমাদের সেলস টিমের প্রতিনিধি যোগাযোগ করবেন। "
+            f"এর মধ্যে আমাদের প্রজেক্ট সম্পর্কিত যেকোনো প্রশ্ন করতে পারেন!\n\n"
+            f"📞 হেল্পলাইন: +91-1800-GLG-ASSET"
+        )
+    return {
+        "agent_reply": reply,
         "agent_actions": [Action(type="escalate", payload={"reason": state.intent.intent, "priority": "high"})],
         "agent_used": "booking_handler",
         "agent_done": True,
@@ -228,12 +252,14 @@ async def booking_handler_node(state: AIState) -> dict:
 
 async def fallback_handler_node(state: AIState) -> dict:
     from app.services.llm import llm_service
+    from app.prompts.base import LANGUAGE_POLICY_INSTRUCTION
 
     system_prompt = (
         f"You are a helpful real-estate assistant for GLG Assets. "
         f"You're chatting via {state.channel}. "
         f"Be friendly, professional, and concise. "
-        f"If the user asks something you can't answer, offer to connect them with a human agent."
+        f"If the user asks something you can't answer, offer to connect them with a human agent.\n"
+        f"{LANGUAGE_POLICY_INSTRUCTION}"
     )
 
     context_messages = [{"role": "system", "content": system_prompt}]
