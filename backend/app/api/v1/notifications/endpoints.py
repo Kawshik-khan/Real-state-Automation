@@ -29,12 +29,24 @@ async def notify_slack(body: dict, auth: dict = Depends(_auth)):
     }
 
 
+from app.config import settings
+from app.services.telegram import telegram_service
+
+
 @router.post("/telegram", summary="WS24 — Telegram Notification Adapter")
 async def notify_telegram(body: dict, auth: dict = Depends(_auth)):
+    chat_id = body.get("chat_id") or getattr(settings, "default_telegram_chat_id", None) or getattr(settings, "telegram_admin_chat_id", None)
+    text = body.get("message") or body.get("text") or "GLG Assets Automated Notification"
+    
+    if not chat_id:
+        return {"success": False, "error": "No chat_id specified or configured in env"}
+
+    res = await telegram_service.send_message(chat_id=chat_id, text=text)
     return {
-        "success": True,
+        "success": res.get("success", False),
         "channel": "telegram",
-        "chat_id": body.get("chat_id", "unknown"),
-        "status": "sent",
+        "chat_id": chat_id,
+        "status": "sent" if res.get("success") else "failed",
+        "response": res,
         "tenantId": auth["tenant_id"],
     }

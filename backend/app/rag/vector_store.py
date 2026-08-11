@@ -50,7 +50,8 @@ class PgVectorStore:
                     )
                 await session.commit()
         except Exception as err:
-            print(f"[PgVectorStore] DB Store Warning: {err}")
+            if getattr(settings, "debug", False):
+                print(f"[PgVectorStore] DB Store Warning: {err}")
         return len(chunks)
 
     async def delete_document(self, doc_id: str) -> int:

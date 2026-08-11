@@ -96,3 +96,84 @@ async def lead_capture(body: dict, auth: dict = Depends(_auth)):
         "stored_in": ["google_sheets", "supabase"],
         "tenantId": auth["tenant_id"],
     }
+
+
+from fastapi import Response, Query
+
+@router.get("/whatsapp/webhook", summary="Meta/WhatsApp Webhook Verification")
+@router.get("/whatsapp/incoming", summary="WhatsApp Webhook Verification")
+@router.get("/facebook/webhook", summary="Facebook Webhook Verification")
+@router.get("/instagram/webhook", summary="Instagram Webhook Verification")
+async def verify_meta_webhook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+):
+    """Handles Meta (Facebook/WhatsApp/Instagram) Webhook Subscription Verification."""
+    expected_token = getattr(settings, "whatsapp_verify_token", None) or "glg_wa_verify_2026"
+    if hub_mode == "subscribe" and hub_verify_token == expected_token:
+        return Response(content=str(hub_challenge or ""), media_type="text/plain")
+    return Response(content="Verification failed", status_code=403)
+
+
+from app.services.telegram import telegram_service
+from app.api.v1.ai.endpoints import ai_chat
+from app.schemas.chat import ChatRequest
+
+
+@router.post("/telegram", summary="Telegram Bot Webhook & AI RAG Processing")
+@router.post("/telegram/webhook", summary="Telegram Bot Webhook Endpoint")
+async def telegram_webhook(body: dict):
+    """Processes incoming Telegram updates, executes RAG + AI graph pipeline, and sends reply."""
+    message = body.get("message") or body.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    text = message.get("text", "").strip()
+
+    if not chat_id or not text:
+        return {"ok": True, "status": "ignored"}
+
+    conv_id = f"tg_{chat_id}"
+
+    try:
+        chat_req = ChatRequest(
+            message=text,
+            user_id=str(chat_id),
+            conversation_id=conv_id,
+            channel="telegram",
+        )
+        ai_response = await ai_chat(chat_req, auth={"tenant_id": "glg-assets-main"})
+        reply_text = ai_response.get("reply") if isinstance(ai_response, dict) else str(ai_response)
+    except Exception as err:
+        print(f"[Telegram Webhook AI Error]: {err}")
+        reply_text = "Thank you for reaching out to GLG Assets! A property consultant will contact you shortly."
+
+    # Send reply back to Telegram
+    await telegram_service.send_message(chat_id=chat_id, text=reply_text)
+
+    return {
+        "ok": True,
+        "chat_id": chat_id,
+        "incoming_text": text,
+        "reply": reply_text,
+    }
+
+
+@router.post("/telegram/setup-webhook", summary="Set Telegram Webhook URL")
+async def setup_telegram_webhook(body: dict):
+    """Register public HTTPS webhook URL with Telegram Bot API."""
+    url = body.get("url")
+    if not url:
+        return {"success": False, "error": "url parameter is required"}
+    return await telegram_service.set_webhook(url)
+
+
+@router.get("/telegram/status", summary="Get Telegram Bot & Webhook Status")
+async def telegram_status():
+    """Retrieve Bot Info and current Webhook configuration."""
+    bot_info = await telegram_service.get_me()
+    webhook_info = await telegram_service.get_webhook_info()
+    return {
+        "bot": bot_info,
+        "webhook": webhook_info,
+    }
