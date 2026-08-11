@@ -1,4 +1,14 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://real-state-automation.onrender.com';
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:8000';
+  }
+  return 'https://real-state-automation.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || 'glg-secret-key';
 
 /**
