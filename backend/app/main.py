@@ -158,7 +158,9 @@ async def api_search_handler(request: Request, body: dict, auth: dict = Depends(
 # ---------- Mount v1 Routers for Backward Compatibility ----------
 
 from app.api.v1.ws import ws_router
+from app.api.v1.auth.endpoints import router as auth_router
 
+app.include_router(auth_router,          prefix="/api/v1",              tags=["auth"])
 app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["ai"])
 app.include_router(notifications_router,prefix="/api/v1/notifications",tags=["notifications"])
 app.include_router(conversations_router,prefix="/api/v1/conversations",  tags=["conversations"])

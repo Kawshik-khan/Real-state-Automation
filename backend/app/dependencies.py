@@ -1,13 +1,13 @@
 """Shared auth dependencies for backend routers.
 
-All routers must use these dependencies instead of defining their own _fake_auth().
-This ensures consistent X-Automation-Secret validation across all endpoints.
+All routers use these dependencies for X-Automation-Secret validation and Role-Based Access Control (RBAC).
 """
 
-from fastapi import Depends, HTTPException, Header
-from typing import Optional
-
+from fastapi import Depends, HTTPException, Header, status
+from typing import Optional, List, Callable, Union
 from app.config import settings
+from app.core.security import decode_access_token
+from app.models.user import UserRole
 
 
 async def require_automation_secret(
@@ -20,6 +20,18 @@ async def require_automation_secret(
     if not secret and authorization and authorization.startswith("Bearer "):
         secret = authorization[7:]
 
+    # First try decoding as JWT token
+    if secret:
+        payload = decode_access_token(secret)
+        if payload and "role" in payload:
+            return {
+                "tenant_id": payload.get("tenant_id", settings.default_tenant_id),
+                "authenticated": True,
+                "user_id": payload.get("sub"),
+                "email": payload.get("email"),
+                "role": payload.get("role"),
+            }
+
     if not secret:
         raise HTTPException(status_code=401, detail="Authentication header required (X-Automation-Secret or Bearer token)")
 
@@ -30,8 +42,66 @@ async def require_automation_secret(
     }
     if secret not in valid_secrets:
         raise HTTPException(status_code=403, detail="Invalid automation secret")
-        
+
     return {
         "tenant_id": x_tenant_id or settings.default_tenant_id,
         "authenticated": True,
+        "role": UserRole.ADMIN.value,
     }
+
+
+async def get_current_user(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_automation_secret: Optional[str] = Header(None, alias="X-Automation-Secret"),
+) -> dict:
+    """Extract and decode current authenticated user from Bearer JWT token or automation secret."""
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    elif x_automation_secret:
+        token = x_automation_secret
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization token required",
+        )
+
+    payload = decode_access_token(token)
+    if payload:
+        return payload
+
+    # If valid secret passed, return system admin context
+    valid_secrets = {
+        getattr(settings, "automation_shared_secret", "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"),
+        "glg-secret-key",
+        "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
+    }
+    if token in valid_secrets:
+        return {
+            "sub": "sys-admin-000",
+            "email": "admin@glgassets.com",
+            "role": UserRole.ADMIN.value,
+            "tenant_id": getattr(settings, "default_tenant_id", "default-tenant"),
+        }
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired access token",
+    )
+
+
+def require_roles(allowed_roles: List[Union[UserRole, str]]) -> Callable:
+    """Dependency factory enforcing Role-Based Access Control (RBAC)."""
+    allowed_str_roles = [r.value if isinstance(r, UserRole) else str(r) for r in allowed_roles]
+
+    async def role_checker(current_user: dict = Depends(get_current_user)):
+        user_role = current_user.get("role", "")
+        if user_role not in allowed_str_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access forbidden: requires one of roles {allowed_str_roles}",
+            )
+        return current_user
+
+    return role_checker

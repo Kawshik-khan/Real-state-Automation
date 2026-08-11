@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 
@@ -9,8 +11,13 @@ import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 
-export default function App() {
+function DashboardApp() {
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   const getTabTitle = () => {
     switch (activeTab) {
@@ -49,5 +56,13 @@ export default function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <DashboardApp />
+    </AuthProvider>
   );
 }

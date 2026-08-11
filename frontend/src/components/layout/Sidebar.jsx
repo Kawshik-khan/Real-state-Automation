@@ -7,18 +7,25 @@ import {
   Building2, 
   BarChart3, 
   Sparkles,
-  Zap
+  Zap,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
+  const { user } = useAuth();
+  const userRole = user?.role || 'viewer';
+
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE' },
-    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
-    { id: 'content', label: 'Content Engine', icon: Share2 },
-    { id: 'properties', label: 'Properties', icon: Building2 },
-    { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, highlight: true },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'manager', 'agent', 'viewer'] },
+    { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', roles: ['admin', 'manager', 'agent'] },
+    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['admin', 'manager'] },
+    { id: 'content', label: 'Content Engine', icon: Share2, roles: ['admin', 'manager'] },
+    { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'manager', 'agent', 'viewer'] },
+    { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, highlight: true, roles: ['admin', 'manager'] },
   ];
+
+  const visibleNavItems = navItems.filter(item => item.roles.includes(userRole));
 
   return (
     <aside style={{
@@ -57,7 +64,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
       {/* Navigation Menu */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '24px' }}>
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
@@ -107,7 +114,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         })}
       </nav>
 
-      {/* System Status Footer */}
+      {/* Role Notice Footer */}
       <div style={{
         marginTop: 'auto',
         padding: '16px',
@@ -119,12 +126,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         gap: '8px'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span>FastAPI Endpoint</span>
-          <span style={{ color: '#34D399', fontWeight: 600 }}>Port 8000</span>
+          <span>Active Role</span>
+          <span style={{ color: '#C084FC', fontWeight: 700, textTransform: 'capitalize' }}>{userRole}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span>Local n8n MCP</span>
-          <span style={{ color: '#C084FC', fontWeight: 600 }}>Port 5678</span>
+          <span>RBAC Guard</span>
+          <span style={{ color: '#34D399', fontWeight: 600 }}>Enforced</span>
         </div>
       </div>
     </aside>
