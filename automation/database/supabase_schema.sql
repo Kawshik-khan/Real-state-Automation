@@ -199,7 +199,55 @@ CREATE TABLE IF NOT EXISTS analytics (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 14. Logs Table
+-- 14. Marketing Ad Campaigns Table (Manager Dashboard KPIs)
+CREATE TABLE IF NOT EXISTS ad_campaigns (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id VARCHAR(255) UNIQUE NOT NULL,
+    campaign_name VARCHAR(255) NOT NULL,
+    platform VARCHAR(50) NOT NULL,
+    ad_budget_spent DECIMAL(12,2) DEFAULT 0.00,
+    reach INTEGER DEFAULT 0,
+    impressions INTEGER DEFAULT 0,
+    messages_received INTEGER DEFAULT 0,
+    qualified_leads INTEGER DEFAULT 0,
+    cost_per_lead DECIMAL(10,2) DEFAULT 0.00,
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed Initial Ad Campaigns
+INSERT INTO ad_campaigns (campaign_id, campaign_name, platform, ad_budget_spent, reach, impressions, messages_received, qualified_leads, cost_per_lead, status)
+VALUES
+    ('cmp-001', 'GLG Sky Tower - Gulshan 3BHK', 'meta_whatsapp', 45000.00, 65000, 120000, 520, 58, 775.00, 'active'),
+    ('cmp-002', 'Palm Beach Villa - Coastal Luxury', 'instagram_reels', 38000.00, 52000, 98000, 410, 42, 904.00, 'active'),
+    ('cmp-003', 'Dhanmondi Heights - Residential', 'google_search', 24000.00, 38000, 72000, 310, 28, 857.00, 'active'),
+    ('cmp-004', 'Bandra Skyline - Investment Units', 'meta_lead_form', 18000.00, 30000, 50000, 180, 14, 1285.00, 'paused')
+ON CONFLICT (campaign_id) DO UPDATE SET 
+    ad_budget_spent = EXCLUDED.ad_budget_spent,
+    qualified_leads = EXCLUDED.qualified_leads;
+
+
+-- 15. Executive KPIs Telemetry Table (Admin Dashboard KPIs)
+CREATE TABLE IF NOT EXISTS executive_kpis (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    gdv_pipeline_value DECIMAL(15,2) DEFAULT 148000000.00,
+    ai_attributed_deal_value DECIMAL(15,2) DEFAULT 82000000.00,
+    autonomous_resolution_rate DECIMAL(5,2) DEFAULT 94.20,
+    human_escalation_rate DECIMAL(5,2) DEFAULT 5.80,
+    hot_leads_count INTEGER DEFAULT 12,
+    avg_qualification_speed_seconds INTEGER DEFAULT 45,
+    site_tour_booking_rate DECIMAL(5,2) DEFAULT 32.40,
+    vector_rag_precision DECIMAL(5,2) DEFAULT 98.40,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed Initial Executive Telemetry Snapshot
+INSERT INTO executive_kpis (gdv_pipeline_value, ai_attributed_deal_value, autonomous_resolution_rate, human_escalation_rate, hot_leads_count, avg_qualification_speed_seconds, site_tour_booking_rate, vector_rag_precision)
+VALUES (148000000.00, 82000000.00, 94.20, 5.80, 12, 45, 32.40, 98.40);
+
+
+-- 16. Logs Table
 CREATE TABLE IF NOT EXISTS logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     log_type VARCHAR(50) NOT NULL,
@@ -230,6 +278,7 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_documents_project ON knowledge_document
 CREATE INDEX IF NOT EXISTS idx_embeddings_document_id ON embeddings(document_id);
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_ad_campaigns_status ON ad_campaigns(status);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 
 -- Cosine Distance Vector Similarity Index for pgvector
@@ -282,6 +331,8 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE embeddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ad_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE executive_kpis ENABLE ROW LEVEL SECURITY;
 
 -- Allow full service_role access for backend & automated API calls
 CREATE POLICY "Service Role Full Access system_users" ON system_users FOR ALL USING (true);
@@ -293,6 +344,8 @@ CREATE POLICY "Service Role Full Access projects" ON projects FOR ALL USING (tru
 CREATE POLICY "Public Read Access knowledge_documents" ON knowledge_documents FOR SELECT USING (true);
 CREATE POLICY "Service Role Full Access knowledge_documents" ON knowledge_documents FOR ALL USING (true);
 CREATE POLICY "Service Role Full Access embeddings" ON embeddings FOR ALL USING (true);
+CREATE POLICY "Service Role Full Access ad_campaigns" ON ad_campaigns FOR ALL USING (true);
+CREATE POLICY "Service Role Full Access executive_kpis" ON executive_kpis FOR ALL USING (true);
 
 -- Updated_at Trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -310,4 +363,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_ad_campaigns_updated_at BEFORE UPDATE ON ad_campaigns
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
