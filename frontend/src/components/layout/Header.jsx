@@ -53,20 +53,22 @@ export default function Header({ activeTabTitle = "Dashboard Overview" }) {
           />
         </div>
 
-        {/* Telemetry Indicator */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 12px',
-          borderRadius: '8px',
-          background: 'rgba(16, 185, 129, 0.1)',
-          color: '#34D399',
-          fontSize: '0.8rem'
-        }}>
-          <Activity size={14} color="#34D399" />
-          <span>Pinecone RAG Active</span>
-        </div>
+        {/* Telemetry Indicator (Admin Only) */}
+        {user?.role === 'admin' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            background: 'rgba(16, 185, 129, 0.1)',
+            color: '#34D399',
+            fontSize: '0.8rem'
+          }}>
+            <Activity size={14} color="#34D399" />
+            <span>Pinecone RAG Active</span>
+          </div>
+        )}
 
         <button className="glass-card" style={{ padding: '8px', borderRadius: '10px', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <Bell size={18} />

@@ -155,62 +155,64 @@ export default function DashboardHome({ setActiveTab }) {
   return (
     <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* ── Realtime Ticker & Sync Status Bar ── */}
-      <div style={{
-        display: 'flex',
-        justify: 'space-between',
-        alignItems: 'center',
-        background: 'rgba(15, 23, 42, 0.6)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(139, 92, 246, 0.2)',
-        borderRadius: '14px',
-        padding: '10px 20px',
-        fontSize: '0.8rem',
-        color: '#D1D5DB'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: '#10B981',
-            boxShadow: '0 0 10px #10B981',
-            display: 'inline-block'
-          }} />
-          <span style={{ fontWeight: 700, color: '#34D399', letterSpacing: '0.5px' }}>REALTIME ENGINE ACTIVE</span>
-          <span style={{ color: '#6B7280' }}>|</span>
-          <span>Last Poll: <strong style={{ color: '#FFFFFF' }}>{lastSynced}</strong></span>
-        </div>
+      {/* ── Realtime Ticker & Sync Status Bar (Admin Only) ── */}
+      {userRole === 'admin' && (
+        <div style={{
+          display: 'flex',
+          justify: 'space-between',
+          alignItems: 'center',
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(139, 92, 246, 0.2)',
+          borderRadius: '14px',
+          padding: '10px 20px',
+          fontSize: '0.8rem',
+          color: '#D1D5DB'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: '#10B981',
+              boxShadow: '0 0 10px #10B981',
+              display: 'inline-block'
+            }} />
+            <span style={{ fontWeight: 700, color: '#34D399', letterSpacing: '0.5px' }}>REALTIME ENGINE ACTIVE</span>
+            <span style={{ color: '#6B7280' }}>|</span>
+            <span>Last Poll: <strong style={{ color: '#FFFFFF' }}>{lastSynced}</strong></span>
+          </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Activity size={14} color="#8B5CF6" /> Pinecone Vector: {pingStats.pinecone}ms
-          </span>
-          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Zap size={14} color="#34D399" /> Supabase DB: {pingStats.pgvector}ms
-          </span>
-          <button 
-            onClick={() => fetchLiveStats(false)} 
-            disabled={isRefreshing}
-            style={{
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.4)',
-              color: '#C084FC',
-              borderRadius: '8px',
-              padding: '4px 10px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <RefreshCw size={12} className={isRefreshing ? 'spin-anim' : ''} />
-            {isRefreshing ? 'Syncing...' : 'Sync Now'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Activity size={14} color="#8B5CF6" /> Pinecone Vector: {pingStats.pinecone}ms
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Zap size={14} color="#34D399" /> Supabase DB: {pingStats.pgvector}ms
+            </span>
+            <button 
+              onClick={() => fetchLiveStats(false)} 
+              disabled={isRefreshing}
+              style={{
+                background: 'rgba(139, 92, 246, 0.2)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                color: '#C084FC',
+                borderRadius: '8px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <RefreshCw size={12} className={isRefreshing ? 'spin-anim' : ''} />
+              {isRefreshing ? 'Syncing...' : 'Sync Now'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Dynamic Hero Banner ── */}
       <div className="glass-card" style={{

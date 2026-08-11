@@ -114,26 +114,28 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         })}
       </nav>
 
-      {/* Role Notice Footer */}
-      <div style={{
-        marginTop: 'auto',
-        padding: '16px',
-        background: 'rgba(15, 23, 42, 0.6)',
-        borderRadius: '14px',
-        border: '1px solid var(--border-glass)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span>Active Role</span>
-          <span style={{ color: '#C084FC', fontWeight: 700, textTransform: 'capitalize' }}>{userRole}</span>
+      {/* Role Notice Footer (Admin Only) */}
+      {userRole === 'admin' && (
+        <div style={{
+          marginTop: 'auto',
+          padding: '16px',
+          background: 'rgba(15, 23, 42, 0.6)',
+          borderRadius: '14px',
+          border: '1px solid var(--border-glass)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>Active Role</span>
+            <span style={{ color: '#C084FC', fontWeight: 700, textTransform: 'capitalize' }}>{userRole}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>RBAC Guard</span>
+            <span style={{ color: '#34D399', fontWeight: 600 }}>Enforced</span>
+          </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span>RBAC Guard</span>
-          <span style={{ color: '#34D399', fontWeight: 600 }}>Enforced</span>
-        </div>
-      </div>
+      )}
     </aside>
   );
 }
