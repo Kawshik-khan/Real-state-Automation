@@ -558,95 +558,47 @@ export default function DashboardHome({ setActiveTab }) {
         </div>
       )}
 
-      {/* MANAGER & ADMIN ROLE MAIN FEATURE: API Sandbox & Channel Health Status */}
+      {/* MANAGER & ADMIN ROLE MAIN FEATURE: Gateway Webhooks & Channel Status */}
       {(userRole === 'admin' || userRole === 'manager') && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+        <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Active Webhook Gateways &amp; Channel Status</h3>
+            <span className="badge badge-emerald">4 Channels Connected</span>
+          </div>
           
-          {/* Interactive Chat Sandbox */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Test AI Agent Engine (`POST /api/chat`)</h3>
-              <span className="badge badge-emerald">Connected to FastAPI</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            <div style={{ padding: '16px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF' }}>WhatsApp Business</span>
+                <span className="pulse-online" />
+              </div>
+              <span className="badge badge-emerald">{pingStats.whatsapp}ms latency</span>
             </div>
 
-            <form onSubmit={handleTestChat} style={{ display: 'flex', gap: '12px' }}>
-              <input
-                type="text"
-                className="glass-input"
-                style={{ flex: 1 }}
-                placeholder="e.g. Apartment in Gulshan under 1 crore"
-                value={testMessage}
-                onChange={(e) => setTestMessage(e.target.value)}
-              />
-              <button type="submit" className="btn-gradient" disabled={loading}>
-                <Send size={16} /> {loading ? 'Thinking...' : 'Test Send'}
-              </button>
-            </form>
-
-            {/* Response Container */}
-            {chatResponse && (
-              <div style={{
-                background: 'rgba(15, 23, 42, 0.7)',
-                padding: '16px',
-                borderRadius: '12px',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
-                  AI Assistant Response:
-                </div>
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
-                  {chatResponse.reply}
-                </p>
-
-                {chatResponse.actions && chatResponse.actions.length > 0 && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                    {chatResponse.actions.map((act, i) => (
-                      <span key={i} className="badge badge-amber">⚡ Trigger Action: {act}</span>
-                    ))}
-                  </div>
-                )}
+            <div style={{ padding: '16px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF' }}>Facebook Messenger</span>
+                <span className="pulse-online" />
               </div>
-            )}
-          </div>
+              <span className="badge badge-emerald">{pingStats.messenger}ms latency</span>
+            </div>
 
-          {/* Channel Health & Latency Monitor */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Gateway Webhooks &amp; Latency</h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="pulse-online" /> WhatsApp Business API
-                </span>
-                <span className="badge badge-emerald">{pingStats.whatsapp}ms</span>
+            <div style={{ padding: '16px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF' }}>Instagram DM</span>
+                <span className="pulse-online" />
               </div>
+              <span className="badge badge-emerald">{pingStats.instagram}ms latency</span>
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="pulse-online" /> Facebook Messenger
-                </span>
-                <span className="badge badge-emerald">{pingStats.messenger}ms</span>
+            <div style={{ padding: '16px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF' }}>Website Live Widget</span>
+                <span className="pulse-online" />
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="pulse-online" /> Instagram DM
-                </span>
-                <span className="badge badge-emerald">{pingStats.instagram}ms</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="pulse-online" /> Website Live Widget
-                </span>
-                <span className="badge badge-emerald">{pingStats.website}ms</span>
-              </div>
+              <span className="badge badge-emerald">{pingStats.website}ms latency</span>
             </div>
           </div>
-
         </div>
       )}
 
