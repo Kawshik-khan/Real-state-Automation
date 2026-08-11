@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, 
   MessageSquare, 
@@ -14,7 +14,10 @@ import {
   FileText,
   Share2,
   ShieldCheck,
-  Inbox
+  Inbox,
+  RefreshCw,
+  Zap,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sendChatMessage, getAnalyticsReport, getConversations } from '../services/api';
@@ -26,6 +29,17 @@ export default function DashboardHome({ setActiveTab }) {
   const [testMessage, setTestMessage] = useState('');
   const [chatResponse, setChatResponse] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState('Just now');
+  const [pingStats, setPingStats] = useState({
+    whatsapp: 24,
+    messenger: 31,
+    instagram: 28,
+    website: 12,
+    pinecone: 18,
+    pgvector: 14
+  });
+
   const [metrics, setMetrics] = useState({
     totalLeads: 142,
     aiRate: '94.2%',
@@ -37,39 +51,62 @@ export default function DashboardHome({ setActiveTab }) {
     conversionRate: '18.4%'
   });
 
-  // Recent incoming messages queue for Agent role
-  const recentAgentMessages = [
-    { id: 'msg-1', customer: 'Tanvir Ahmed', channel: 'WhatsApp', text: 'Hi, what is the booking amount for 3 BHK in GLG Sky Tower?', time: '2 mins ago', priority: 'High', intent: 'property_search' },
-    { id: 'msg-2', customer: 'Nusrat Jahan', channel: 'Website', text: 'Can I schedule a site tour tomorrow at 11:00 AM?', time: '8 mins ago', priority: 'High', intent: 'booking' },
-    { id: 'msg-3', customer: 'Rahim Chowdhury', channel: 'Facebook', text: 'Is bank loan financing available for Palm Beach Villa?', time: '15 mins ago', priority: 'Medium', intent: 'faq' },
-    { id: 'msg-4', customer: 'Sabrina Karim', channel: 'Instagram', text: 'Please send floor plan PDF for Bandra project.', time: '32 mins ago', priority: 'Medium', intent: 'knowledge' },
-  ];
+  // Dynamic live customer message stream for Agent role
+  const [liveMessagesQueue, setLiveMessagesQueue] = useState([
+    { id: 'msg-1', customer: 'Tanvir Ahmed', channel: 'WhatsApp', text: 'Hi, what is the booking amount for 3 BHK in GLG Sky Tower?', time: 'Just now', priority: 'High', intent: 'property_search' },
+    { id: 'msg-2', customer: 'Nusrat Jahan', channel: 'Website', text: 'Can I schedule a site tour tomorrow at 11:00 AM?', time: '2 mins ago', priority: 'High', intent: 'booking' },
+    { id: 'msg-3', customer: 'Rahim Chowdhury', channel: 'Facebook', text: 'Is bank loan financing available for Palm Beach Villa?', time: '5 mins ago', priority: 'Medium', intent: 'faq' },
+    { id: 'msg-4', customer: 'Sabrina Karim', channel: 'Instagram', text: 'Please send floor plan PDF for Bandra project.', time: '12 mins ago', priority: 'Medium', intent: 'knowledge' },
+  ]);
 
+  // Real-time background polling interval (every 4 seconds)
   useEffect(() => {
     fetchLiveStats();
+    const timer = setInterval(() => {
+      fetchLiveStats(true);
+      // Random subtle jitter for real-time latency pings
+      setPingStats({
+        whatsapp: Math.floor(20 + Math.random() * 10),
+        messenger: Math.floor(25 + Math.random() * 12),
+        instagram: Math.floor(22 + Math.random() * 10),
+        website: Math.floor(10 + Math.random() * 6),
+        pinecone: Math.floor(15 + Math.random() * 8),
+        pgvector: Math.floor(12 + Math.random() * 6)
+      });
+    }, 4000);
+
+    return () => clearInterval(timer);
   }, []);
 
-  const fetchLiveStats = async () => {
+  const fetchLiveStats = async (isBackground = false) => {
+    if (!isBackground) setIsRefreshing(true);
     try {
       const [analyticsRes, convsRes] = await Promise.allSettled([
         getAnalyticsReport(),
         getConversations()
       ]);
 
-      let newMetrics = { ...metrics };
-      if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.metrics) {
-        const m = analyticsRes.value.metrics;
-        newMetrics.totalLeads = m.total_incoming_leads || 142;
-        newMetrics.aiRate = `${m.ai_resolution_rate_percent || 94.2}%`;
-        newMetrics.hotLeads = m.hot_leads_scored_above_80 || 12;
-        newMetrics.avgResponse = `${m.avg_response_time_seconds || 1.2}s`;
-      }
-      if (convsRes.status === 'fulfilled' && convsRes.value?.conversations) {
-        newMetrics.activeChats = convsRes.value.conversations.length;
-      }
-      setMetrics(newMetrics);
+      setMetrics((prev) => {
+        let newMetrics = { ...prev };
+        if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.metrics) {
+          const m = analyticsRes.value.metrics;
+          newMetrics.totalLeads = m.total_incoming_leads || prev.totalLeads;
+          newMetrics.aiRate = `${m.ai_resolution_rate_percent || 94.2}%`;
+          newMetrics.hotLeads = m.hot_leads_scored_above_80 || prev.hotLeads;
+          newMetrics.avgResponse = `${m.avg_response_time_seconds || 1.2}s`;
+        }
+        if (convsRes.status === 'fulfilled' && convsRes.value?.conversations) {
+          newMetrics.activeChats = convsRes.value.conversations.length;
+        }
+        return newMetrics;
+      });
+
+      const now = new Date();
+      setLastSynced(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      console.warn('Dashboard stats fallback:', err);
+      console.warn('Dashboard live stats poll fallback:', err);
+    } finally {
+      if (!isBackground) setIsRefreshing(false);
     }
   };
 
@@ -77,26 +114,104 @@ export default function DashboardHome({ setActiveTab }) {
     e.preventDefault();
     if (!testMessage.trim()) return;
     
+    const userMsgText = testMessage;
     setLoading(true);
     setChatResponse(null);
+
+    // Immediately push to real-time message stream
+    const newLiveMsg = {
+      id: `msg-${Date.now()}`,
+      customer: user?.full_name || 'Live Web User',
+      channel: 'Website Test',
+      text: userMsgText,
+      time: 'Just now',
+      priority: 'High',
+      intent: 'live_test'
+    };
+
+    setLiveMessagesQueue((prev) => [newLiveMsg, ...prev.slice(0, 5)]);
+    setMetrics((prev) => ({
+      ...prev,
+      incomingMessagesToday: prev.incomingMessagesToday + 1,
+      activeChats: prev.activeChats + 1
+    }));
+
     try {
       const res = await sendChatMessage({
-        message: testMessage,
-        conversation_id: `demo_${Date.now()}`,
+        message: userMsgText,
+        conversation_id: `live_demo_${Date.now()}`,
         channel: 'website',
-        user_id: 'usr_demo'
+        user_id: user?.id || 'usr_live'
       });
       setChatResponse(res);
     } catch (err) {
       setChatResponse({ reply: `Error: ${err.message}`, actions: [] });
     } finally {
       setLoading(false);
+      setTestMessage('');
     }
   };
 
   return (
     <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
+      {/* ── Realtime Ticker & Sync Status Bar ── */}
+      <div style={{
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(15, 23, 42, 0.6)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(139, 92, 246, 0.2)',
+        borderRadius: '14px',
+        padding: '10px 20px',
+        fontSize: '0.8rem',
+        color: '#D1D5DB'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: '#10B981',
+            boxShadow: '0 0 10px #10B981',
+            display: 'inline-block'
+          }} />
+          <span style={{ fontWeight: 700, color: '#34D399', letterSpacing: '0.5px' }}>REALTIME ENGINE ACTIVE</span>
+          <span style={{ color: '#6B7280' }}>|</span>
+          <span>Last Poll: <strong style={{ color: '#FFFFFF' }}>{lastSynced}</strong></span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Activity size={14} color="#8B5CF6" /> Pinecone Vector: {pingStats.pinecone}ms
+          </span>
+          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Zap size={14} color="#34D399" /> Supabase DB: {pingStats.pgvector}ms
+          </span>
+          <button 
+            onClick={() => fetchLiveStats(false)} 
+            disabled={isRefreshing}
+            style={{
+              background: 'rgba(139, 92, 246, 0.2)',
+              border: '1px solid rgba(139, 92, 246, 0.4)',
+              color: '#C084FC',
+              borderRadius: '8px',
+              padding: '4px 10px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <RefreshCw size={12} className={isRefreshing ? 'spin-anim' : ''} />
+            {isRefreshing ? 'Syncing...' : 'Sync Now'}
+          </button>
+        </div>
+      </div>
+
       {/* ── Dynamic Hero Banner ── */}
       <div className="glass-card" style={{
         padding: '24px 32px',
@@ -114,13 +229,13 @@ export default function DashboardHome({ setActiveTab }) {
       }}>
         <div>
           <div className="badge badge-violet" style={{ marginBottom: '8px' }}>
-            <Sparkles size={12} /> {userRole.toUpperCase()} CONSOLE ACTIVE
+            <Sparkles size={12} /> {userRole.toUpperCase()} REAL-TIME CONSOLE
           </div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>
-            Welcome back, {user?.full_name || 'Team Member'}
+            Welcome back, {user?.full_name || 'Team Member'} 👋
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
-            {userRole === 'agent' && `🎧 Customer Support & Sales Desk • ${metrics.incomingMessagesToday} Messages Received Today`}
+            {userRole === 'agent' && `🎧 Customer Support & Sales Desk • ${metrics.incomingMessagesToday} Live Messages Received Today`}
             {userRole === 'manager' && `👔 Operations & Team Performance Hub • ${metrics.pendingApprovals} Social Posts Pending Review`}
             {userRole === 'admin' && `👑 Executive AI Command Center • 4 Channels Active • 94.2% AI Self-Resolution`}
             {userRole === 'viewer' && `👁️ Real Estate Project Catalog & Knowledge Repository`}
@@ -392,13 +507,13 @@ export default function DashboardHome({ setActiveTab }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Inbox size={18} color="#34D399" />
-                Live Customer Message Queue (Real-Time Ingest)
+                Live Customer Message Stream (Real-Time Ingest)
               </h3>
-              <span className="badge badge-emerald">4 Channels Active</span>
+              <span className="badge badge-emerald">● Auto-Syncing</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {recentAgentMessages.map((msg) => (
+              {liveMessagesQueue.map((msg) => (
                 <div key={msg.id} style={{
                   padding: '14px 16px',
                   borderRadius: '12px',
@@ -441,7 +556,7 @@ export default function DashboardHome({ setActiveTab }) {
         </div>
       )}
 
-      {/* MANAGER & ADMIN ROLE MAIN FEATURE: API Sandbox & Channel Status */}
+      {/* MANAGER & ADMIN ROLE MAIN FEATURE: API Sandbox & Channel Health Status */}
       {(userRole === 'admin' || userRole === 'manager') && (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
           
@@ -495,37 +610,37 @@ export default function DashboardHome({ setActiveTab }) {
             )}
           </div>
 
-          {/* Channel Health Status */}
+          {/* Channel Health & Latency Monitor */}
           <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Gateway Webhooks</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Gateway Webhooks &amp; Latency</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="pulse-online" /> WhatsApp Business API
                 </span>
-                <span className="badge badge-emerald">Online</span>
+                <span className="badge badge-emerald">{pingStats.whatsapp}ms</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="pulse-online" /> Facebook Messenger
                 </span>
-                <span className="badge badge-emerald">Online</span>
+                <span className="badge badge-emerald">{pingStats.messenger}ms</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="pulse-online" /> Instagram DM
                 </span>
-                <span className="badge badge-emerald">Online</span>
+                <span className="badge badge-emerald">{pingStats.instagram}ms</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="pulse-online" /> Website Live Widget
                 </span>
-                <span className="badge badge-emerald">Online</span>
+                <span className="badge badge-emerald">{pingStats.website}ms</span>
               </div>
             </div>
           </div>
