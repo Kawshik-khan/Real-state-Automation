@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://real-state-automation.onrender.com';
 
 /**
  * Helper to handle fetch responses and errors
@@ -206,6 +206,8 @@ export function getConversationsStreamUrl() {
 }
 
 export function getWebSocketUrl() {
-  return `ws://localhost:8000/api/v1/ws/chat`;
+  const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss:' : 'ws:';
+  const cleanHost = API_BASE_URL.replace(/^https?:\/\//, '');
+  return `${wsProtocol}//${cleanHost}/api/v1/ws/chat`;
 }
 
