@@ -21,14 +21,15 @@ chat-response-format-fix.md
 supabase-migration-plan.txt
 
 # Temporary Test & Utility Scripts (Local execution only)
-test_chat_response_format.py
-test_telegram_grok.py
+/test_chat_response_format.py
+/test_telegram_grok.py
 mcp_login_test.sh
 tmp_get_n8n_key.sh
 automation/test_telegram_n8n.py
 automation/get_telegram_chat_id.py
 backend/scripts/test_supabase_rest_vector.py
-test_*.py
+/test_*.py
+!backend/tests/
 
 # Python Caches & Environments
 __pycache__/
