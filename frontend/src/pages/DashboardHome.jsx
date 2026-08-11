@@ -387,9 +387,10 @@ export default function DashboardHome({ setActiveTab }) {
         {/* ADMIN ROLE KPIS */}
         {userRole === 'admin' && (
           <>
+            {/* KPI 1: Active Pipeline Value */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Active Pipeline Value</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Active Pipeline Value (GDV)</span>
                 <DollarSign size={20} color="#10B981" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
@@ -400,42 +401,101 @@ export default function DashboardHome({ setActiveTab }) {
               </span>
             </div>
 
+            {/* KPI 2: AI-Attributed Deal Value */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>AI Resolution %</span>
-                <TrendingUp size={20} color="#8B5CF6" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>AI-Attributed Deal Value</span>
+                <Sparkles size={20} color="#8B5CF6" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                ৳8.2 Crore
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
+                55.4% AI-Driven Pipeline
+              </span>
+            </div>
+
+            {/* KPI 3: Autonomous Resolution % */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Autonomous AI Self-Resolution</span>
+                <TrendingUp size={20} color="#34D399" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
                 {metrics.aiRate}
               </h3>
-              <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
-                Avg {metrics.avgResponse} response speed
+              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600 }}>
+                5.8% Human Escalation Rate
               </span>
             </div>
 
+            {/* KPI 4: VIP Hot Leads Scored */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Active Conversations</span>
-                <MessageSquare size={20} color="#06B6D4" />
-              </div>
-              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
-                {metrics.activeChats} Active
-              </h3>
-              <span style={{ fontSize: '0.75rem', color: '#22D3EE', fontWeight: 600 }}>
-                Across 4 Social Channels
-              </span>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Hot Leads (&ge; 80)</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Hot Leads (Score &ge; 80)</span>
                 <AlertCircle size={20} color="#F43F5E" />
               </div>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
                 {metrics.hotLeads} VIP Leads
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#FB7185', fontWeight: 600 }}>
-                Sales Follow-up Priority
+                Requires Phone Call Follow-up
+              </span>
+            </div>
+
+            {/* KPI 5: Avg Lead Qualification Speed */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Avg Qualification Speed</span>
+                <Clock size={20} color="#06B6D4" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                45 Seconds
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#22D3EE', fontWeight: 600 }}>
+                Real-Time AI Scoring
+              </span>
+            </div>
+
+            {/* KPI 6: Site Tour Booking Rate */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Site Tour Booking Rate</span>
+                <UserCheck size={20} color="#FBBF24" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                32.4%
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#FBBF24', fontWeight: 600 }}>
+                Confirmed Property Visits
+              </span>
+            </div>
+
+            {/* KPI 7: Knowledge Vector Precision */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Vector RAG Precision</span>
+                <ShieldCheck size={20} color="#A78BFA" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                98.4%
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#A78BFA', fontWeight: 600 }}>
+                Pinecone + pgvector Accuracy
+              </span>
+            </div>
+
+            {/* KPI 8: System SLA Response Latency */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>System SLA &amp; Response Speed</span>
+                <Zap size={20} color="#34D399" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                {metrics.avgResponse}
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600 }}>
+                End-to-End API SLA
               </span>
             </div>
           </>
