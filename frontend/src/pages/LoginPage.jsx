@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Zap, Lock, Mail, ArrowRight, UserCheck, KeyRound, Sparkles } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('admin@glgassets.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,16 +16,10 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.message || 'Login failed. Please verify credentials.');
+      setError(err.message || 'Login failed. Please verify email and password.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const fillDemoAccount = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setError('');
   };
 
   return (
@@ -67,8 +61,8 @@ export default function LoginPage() {
       {/* Main Login Card */}
       <div style={{
         width: '100%',
-        maxWidth: '460px',
-        background: 'rgba(15, 23, 42, 0.75)',
+        maxWidth: '440px',
+        background: 'rgba(15, 23, 42, 0.8)',
         backdropFilter: 'blur(24px)',
         border: '1px solid rgba(139, 92, 246, 0.3)',
         borderRadius: '24px',
@@ -103,7 +97,7 @@ export default function LoginPage() {
             GLG Assets AI OS
           </h1>
           <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginTop: '6px' }}>
-            Real Estate AI Automation &amp; Role-Based Platform
+            Enter your credentials to access your workspace
           </p>
         </div>
 
@@ -130,7 +124,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#D1D5DB', marginBottom: '8px', display: 'block' }}>
-              User Email Address
+              Email Address
             </label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} color="#9CA3AF" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -157,7 +151,7 @@ export default function LoginPage() {
 
           <div>
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#D1D5DB', marginBottom: '8px', display: 'block' }}>
-              Account Password
+              Password
             </label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} color="#9CA3AF" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -204,90 +198,14 @@ export default function LoginPage() {
               marginTop: '8px'
             }}
           >
-            {isSubmitting ? 'Authenticating...' : (
+            {isSubmitting ? 'Verifying & Logging in...' : (
               <>
-                <span>Sign In to Dashboard</span>
+                <span>Sign In to Account</span>
                 <ArrowRight size={18} />
               </>
             )}
           </button>
         </form>
-
-        {/* Demo Accounts Quick Pre-fill Selector */}
-        <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-            <Sparkles size={14} color="#C084FC" /> Quick 1-Click Role Login:
-          </span>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              onClick={() => fillDemoAccount('admin@glgassets.com', 'admin123')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                background: 'rgba(139, 92, 246, 0.15)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                color: '#C084FC',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              👑 Admin (Full)
-            </button>
-
-            <button
-              onClick={() => fillDemoAccount('manager@glgassets.com', 'manager123')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                background: 'rgba(59, 130, 246, 0.15)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                color: '#60A5FA',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              👔 Manager (Ops)
-            </button>
-
-            <button
-              onClick={() => fillDemoAccount('agent@glgassets.com', 'agent123')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                color: '#34D399',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              🎧 Agent (Chats)
-            </button>
-
-            <button
-              onClick={() => fillDemoAccount('viewer@glgassets.com', 'viewer123')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                background: 'rgba(156, 163, 175, 0.15)',
-                border: '1px solid rgba(156, 163, 175, 0.3)',
-                color: '#E5E7EB',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              👁️ Viewer (Read)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

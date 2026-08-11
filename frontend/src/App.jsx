@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/layout/Sidebar';
@@ -11,9 +11,30 @@ import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 
+const getDefaultTabForRole = (role) => {
+  switch (role) {
+    case 'agent':
+      return 'conversations'; // Forward Agents directly to Live Conversations
+    case 'viewer':
+      return 'properties'; // Forward Viewers directly to Properties
+    case 'manager':
+      return 'overview'; // Forward Managers to Overview
+    case 'admin':
+    default:
+      return 'overview'; // Forward Admins to Overview
+  }
+};
+
 function DashboardApp() {
-  const { isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const { user, isAuthenticated } = useAuth();
+  const [activeTab, setActiveTab] = useState(() => getDefaultTabForRole(user?.role));
+
+  // Automatically verify role on login and forward user to their role location
+  useEffect(() => {
+    if (user?.role) {
+      setActiveTab(getDefaultTabForRole(user.role));
+    }
+  }, [user?.role]);
 
   if (!isAuthenticated) {
     return <LoginPage />;
