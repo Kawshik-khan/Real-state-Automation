@@ -28,6 +28,18 @@ services:
         value: llama-3.3-70b-versatile
       - key: OPENAI_BASE_URL
         value: https://api.groq.com/openai/v1
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-large
+      - key: VECTOR_DIM
+        value: "1024"
+      - key: VECTOR_STORE_PROVIDER
+        value: pinecone
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        value: real-state-automation
+      - key: PINECONE_HOST
+        value: https://real-state-automation-o25ptb6.svc.aped-4627-b74a.pinecone.io
 
   # ── React Frontend Static Site ──
   - type: web
