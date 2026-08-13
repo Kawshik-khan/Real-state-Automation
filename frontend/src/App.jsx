@@ -6,6 +6,7 @@ import Header from './components/layout/Header';
 
 import DashboardHome from './pages/DashboardHome';
 import ConversationsPage from './pages/ConversationsPage';
+import EmailInboxPage from './pages/EmailInboxPage';
 import KnowledgePage from './pages/KnowledgePage';
 import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
@@ -44,6 +45,7 @@ function DashboardApp() {
     switch (activeTab) {
       case 'overview': return 'Dashboard Overview';
       case 'conversations': return 'Live Customer Conversations & Takeover';
+      case 'email_inbox': return 'AI Email Inbox & n8n Reply Approval Center';
       case 'knowledge': return 'Knowledge Base & PDF OCR Manager';
       case 'content': return 'Social Content Generator & Approval Engine';
       case 'properties': return 'Property Inventory & Media Catalog';
@@ -56,6 +58,7 @@ function DashboardApp() {
     switch (activeTab) {
       case 'overview': return <DashboardHome setActiveTab={setActiveTab} />;
       case 'conversations': return <ConversationsPage />;
+      case 'email_inbox': return <EmailInboxPage />;
       case 'knowledge': return <KnowledgePage />;
       case 'content': return <ContentGeneratorPage />;
       case 'properties': return <PropertiesPage />;

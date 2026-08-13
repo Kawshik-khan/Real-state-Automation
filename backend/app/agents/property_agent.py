@@ -24,32 +24,72 @@ class PropertyAgent:
         if projects:
             from app.utils.language import is_english_query
             is_english = is_english_query(message)
+            msg_lower = message.lower()
+
+            # Aspect detection
+            wants_payment = any(kw in msg_lower for kw in ["payment", "installment", "kisti", "down payment", "pament", "taka koto", "booking amount"])
+            wants_price = any(kw in msg_lower for kw in ["price", "dam koto", "cost", "rate", "taka"]) and not wants_payment
+            wants_location = any(kw in msg_lower for kw in ["location", "address", "kothay", "where"])
+            wants_amenities = any(kw in msg_lower for kw in ["amenities", "facility", "facilities", "features", "ki ki ache"])
 
             formatted = []
             for p in projects:
-                if is_english:
-                    formatted.append(
-                        f"🏢 *{p['name']}*\n"
-                        f"📍 {p['location']}\n"
-                        f"💰 Price: {p['price']} ({p['bedrooms']} BHK)\n"
-                        f"📝 {p['description']}\n"
-                        f"✨ Amenities: {', '.join(p['amenities'])}"
-                    )
+                # 1. Targeted Payment Response
+                if wants_payment:
+                    if is_english:
+                        formatted.append(
+                            f"💳 *{p['name']} — Payment Terms & Plan*:\n"
+                            f"• 10% Booking Amount upon reservation\n"
+                            f"• 30% Milestone Construction Payments (spread over 36 months)\n"
+                            f"• 60% Final Payment upon handover/possession\n"
+                            f"• Pre-approved home loan financing available through partner banks."
+                        )
+                    else:
+                        formatted.append(
+                            f"💳 *{p['name']} — পেমেন্ট টার্মস ও কিস্তি সুবিধা*:\n"
+                            f"• ১০% বুকিং মানি রেজারভেশনের সময়\n"
+                            f"• ৩০% কনস্ট্রাকশন ভিত্তিক কিস্তি (৩৬ মাস মেয়াদী)\n"
+                            f"• ৬০% হ্যান্ডওভার / পজেশনের সময়\n"
+                            f"• পার্টনার ব্যাংকসমূহের মাধ্যমে সহজ হোম লোন সুবিধা রয়েছে।"
+                        )
+                # 2. Targeted Price Response
+                elif wants_price:
+                    if is_english:
+                        formatted.append(f"💰 *{p['name']} — Pricing*: {p['price']} ({p['bedrooms']} BHK Luxury Suite).")
+                    else:
+                        formatted.append(f"💰 *{p['name']} — প্রাইজ লিস্ট*: {p['price']} ({p['bedrooms']} BHK লক্সারি অ্যাপার্টমেন্ট)।")
+                # 3. Targeted Location Response
+                elif wants_location:
+                    if is_english:
+                        formatted.append(f"📍 *{p['name']} — Location*: {p['location']}.")
+                    else:
+                        formatted.append(f"📍 *{p['name']} — লোকেশন*: {p['location']}।")
+                # 4. Targeted Amenities Response
+                elif wants_amenities:
+                    if is_english:
+                        formatted.append(f"✨ *{p['name']} — Key Amenities*: {', '.join(p['amenities'])}.")
+                    else:
+                        formatted.append(f"✨ *{p['name']} — সুবিধাসমূহ*: {', '.join(p['amenities'])}।")
+                # 5. Full Overview Response (default)
                 else:
-                    formatted.append(
-                        f"🏢 *{p['name']}*\n"
-                        f"📍 লোকেশন: {p['location']}\n"
-                        f"💰 দাম: {p['price']} ({p['bedrooms']} BHK)\n"
-                        f"📝 বিস্তারিত: {p['description']}\n"
-                        f"✨ সুবিধাসমূহ: {', '.join(p['amenities'])}"
-                    )
+                    if is_english:
+                        formatted.append(
+                            f"🏢 *{p['name']}*\n"
+                            f"📍 Location: {p['location']}\n"
+                            f"💰 Price: {p['price']} ({p['bedrooms']} BHK)\n"
+                            f"📝 Overview: {p['description']}\n"
+                            f"✨ Amenities: {', '.join(p['amenities'])}"
+                        )
+                    else:
+                        formatted.append(
+                            f"🏢 *{p['name']}*\n"
+                            f"📍 লোকেশন: {p['location']}\n"
+                            f"💰 দাম: {p['price']} ({p['bedrooms']} BHK)\n"
+                            f"📝 বিস্তারিত: {p['description']}\n"
+                            f"✨ সুবিধাসমূহ: {', '.join(p['amenities'])}"
+                        )
 
-            if is_english:
-                reply_header = f"I found {len(projects)} project(s) matching your criteria:\n\n"
-            else:
-                reply_header = f"আপনার অনুসন্ধানের সাথে মিলে এমন {len(projects)} টি প্রজেক্ট পাওয়া গেছে:\n\n"
-
-            return reply_header + "\n\n---\n\n".join(formatted)
+            return "\n\n---\n\n".join(formatted)
 
         # Fallback to LLM with full context
         system_content = PROPERTY_AGENT_PROMPT + f"\n\nAvailable projects catalog: {PROJECTS_DATABASE}"

@@ -96,7 +96,20 @@ const INITIAL_CONVERSATIONS = [
     confidence: 0.88,
     intent: 'faq',
     messages: [
-      { sender: 'user', text: 'Is payment schedule flexible over 3 years?', time: '09:12 AM' }
+  {
+    id: 'email_thread_101',
+    name: 'Rahim Chowdhury',
+    phone: 'rahim.chowdhury@gmail.com',
+    channel: 'email',
+    lastMessage: 'Inquiry regarding 3 BHK Apartment - GLG Gulshan Heights',
+    time: 'Just now',
+    status: 'escalated',
+    aiPaused: true,
+    confidence: 0.78,
+    intent: 'property_inquiry',
+    messages: [
+      { sender: 'user', text: 'Hello GLG Team, I am interested in purchasing a 3 BHK apartment in Gulshan Heights. Could you please send me the latest price list, available floor plans, and site visit availability?', time: '10:15 AM' },
+      { sender: 'ai', text: 'Staged AI Reply Draft generated & pending agent approval. [n8n email node trigger ready]', time: '10:15 AM' }
     ]
   }
 ];
@@ -579,7 +592,7 @@ export default function ConversationsPage() {
 
           {/* Channel Filters */}
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
-            {['all', 'whatsapp', 'telegram', 'facebook', 'instagram', 'website'].map(ch => (
+            {['all', 'email', 'whatsapp', 'telegram', 'facebook', 'instagram', 'website'].map(ch => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
@@ -595,7 +608,7 @@ export default function ConversationsPage() {
                   whiteSpace: 'nowrap'
                 }}
               >
-                {ch}
+                {ch === 'email' ? '✉️ Email' : ch}
               </button>
             ))}
           </div>

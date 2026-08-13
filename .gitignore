@@ -14,6 +14,8 @@ n8n-token.txt
 
 # Generated PDFs & Assets
 *.pdf
+*.docx
+*.doc
 
 # Temporary & Local Scratch/Fix Notes
 chat-response-format-fix.md
@@ -21,6 +23,7 @@ chat-response-format-fix.md
 supabase-migration-plan.txt
 
 # Temporary Test & Utility Scripts (Local execution only)
+test.txt
 /test_chat_response_format.py
 /test_telegram_grok.py
 mcp_login_test.sh
@@ -31,7 +34,7 @@ backend/scripts/test_supabase_rest_vector.py
 /test_*.py
 !backend/tests/
 
-# Python Caches & Environments
+# Python Caches, Coverage & Test Outputs
 __pycache__/
 *.py[cod]
 *$py.class
@@ -40,6 +43,11 @@ venv/
 ENV/
 .pytest_cache/
 .benchmarks/
+.coverage
+htmlcov/
+*.log
+*.tmp
+*.temp
 *.egg-info/
 .eggs/
 

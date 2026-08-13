@@ -61,6 +61,27 @@ async def blocked_node(state: AIState) -> dict:
 async def supervisor_node(state: AIState) -> dict:
     from app.services.llm import llm_service
 
+    # Banglish / Bangla property inquiry safeguard
+    msg_lower = state.message.lower() if state.message else ""
+    property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
+    is_pure_greeting = any(g in msg_lower for g in ["hello", "hi ", "hey", "assalamu", "slam"]) and not any(kw in msg_lower for kw in ["banani", "gulshan", "uttara", "flat", "project", "ki ache", "konta ache"])
+
+    if any(kw in msg_lower for kw in property_keywords) and not is_pure_greeting:
+        loc = ""
+        for known_loc in ["banani", "gulshan", "uttara", "dhanmondi", "mumbai", "bandra"]:
+            if known_loc in msg_lower:
+                loc = known_loc.capitalize()
+                break
+        return {
+            "intent": IntentResult(
+                intent="property_search",
+                confidence=0.95,
+                entities={"location": loc, "project": "", "bedrooms": 0, "budget": ""}
+            ),
+            "intent_classified": True,
+            "messages_used": state.messages_used + 1
+        }
+
     history_context = ""
     if state.history:
         entries = state.history[-5:]
@@ -128,6 +149,23 @@ async def property_agent_node(state: AIState) -> dict:
     try:
         entities = state.intent.entities or {}
         agent_context = f"Looking for: {state.message}\n"
+        
+        # Include conversation history for context continuity
+        if state.history:
+            history_lines = [f"{h['role'].upper()}: {h['content']}" for h in state.history[-6:]]
+            agent_context += "\n--- CONVERSATION HISTORY ---\n" + "\n".join(history_lines) + "\n"
+            
+            # Carry over location entity from history if not present in current query
+            if not entities.get("location"):
+                for turn in reversed(state.history):
+                    content_lower = turn.get("content", "").lower()
+                    for known_loc in ["banani", "gulshan", "uttara", "dhanmondi", "mumbai", "bandra"]:
+                        if known_loc in content_lower:
+                            entities["location"] = known_loc.capitalize()
+                            break
+                    if entities.get("location"):
+                        break
+
         if entities.get("project"):
             agent_context += f"Project: {entities['project']}\n"
         if entities.get("location"):
@@ -446,7 +484,7 @@ def build_ai_graph() -> CompiledStateGraph:
 
 SUPERVISOR_PROMPT = """You are an intent classifier for a real-estate company called GLG Assets.
 Analyze the user's message and classify their intent into exactly one of these categories:
-- property_search: Looking for properties, units, inventory, projects, or asking about available real estate
+- property_search: Looking for properties, units, inventory, projects, or asking about available real estate (e.g., "Banani te ki ache", "Gulshan e flat ache?", "What 3BHK units are available?")
 - faq: General question about the company, services, process, documentation requirements
 - content_request: Asking to create content like captions, descriptions, social media posts
 - booking: Wants to schedule a site visit, tour, or meeting
@@ -455,6 +493,7 @@ Analyze the user's message and classify their intent into exactly one of these c
 - greeting: Saying hello or starting a conversation
 - chitchat: General conversation not related to real estate
 - other: None of the above
+CRITICAL RULE FOR BANGLISH: If the message asks "ki ache", "konta ache", or specifies a location like "Banani", classify as property_search.
 Respond as JSON:
 {"intent": "one_of_the_above", "confidence": 0.0-1.0, "entities": {"project": "", "location": "", "bedrooms": 0, "budget": ""}, "requires_escalation": false, "escalation_reason": ""}"""
 

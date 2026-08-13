@@ -45,13 +45,19 @@ async def ai_chat(
     
     # Broadcast live SSE message events & update conversations store
     try:
+        from app.services.memory import conversation_memory
+        from app.schemas.chat import MemoryEntry
         from app.api.v1.conversations.endpoints import add_message_to_conversation
         requires_esc = bool(extracted_data.get("requires_escalation", False))
         reply_text = extracted_data.get("agent_reply", "")
         confidence = extracted_data.get("confidence", 0.90)
-        intent = str(extracted_data.get("agent_used", extracted.get("intent", "property_inquiry") if 'extracted' in locals() else "property_inquiry"))
+        intent = str(extracted_data.get("agent_used", "property_inquiry"))
 
-        # Save user message
+        # Save user message to memory store & DB
+        await conversation_memory.add(
+            body.conversation_id,
+            MemoryEntry(role="user", content=body.message)
+        )
         await add_message_to_conversation(
             conv_id=body.conversation_id,
             sender="user",
@@ -59,8 +65,12 @@ async def ai_chat(
             channel=body.channel,
         )
 
-        # Save AI reply message if present
+        # Save AI reply message to memory store & DB if present
         if reply_text:
+            await conversation_memory.add(
+                body.conversation_id,
+                MemoryEntry(role="assistant", content=reply_text)
+            )
             await add_message_to_conversation(
                 conv_id=body.conversation_id,
                 sender="ai",

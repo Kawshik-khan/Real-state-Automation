@@ -1,0 +1,149 @@
+{
+  "name": "GLG Email Reply Automation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {}
+      },
+      "name": "On New Incoming Email (Gmail/IMAP)",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/email/incoming",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Automation-Secret",
+              "value": "change-me-in-production"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message_id\": \"{{ $json.id || $json.messageId }}\",\n  \"thread_id\": \"{{ $json.threadId }}\",\n  \"in_reply_to\": \"{{ $json.inReplyTo }}\",\n  \"sender_email\": \"{{ $json.from.address || $json.from }}\",\n  \"sender_name\": \"{{ $json.from.name || $json.from }}\",\n  \"subject\": \"{{ $json.subject }}\",\n  \"body_text\": \"{{ $json.text || $json.snippet }}\",\n  \"body_html\": \"{{ $json.html }}\"\n}",
+        "options": {}
+      },
+      "name": "Send to GLG AI Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.action }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "AUTO_SEND",
+              "output": 0
+            },
+            {
+              "value2": "REQUIRES_APPROVAL",
+              "output": 1
+            }
+          ]
+        }
+      },
+      "name": "Check Action Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender_email }}",
+        "subject": "={{ $json.ai_draft.subject }}",
+        "message": "={{ $json.ai_draft.body }}",
+        "options": {}
+      },
+      "name": "Send Outbound Email Node",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "text": "=📩 *GLG Email Draft Pending Approval*\n*Lead*: {{ $json.sender_email }}\n*Subject*: {{ $json.ai_draft.subject }}\n*Priority*: {{ $json.lead_priority }}\n*Confidence*: {{ Math.round($json.confidence_score * 100) }}%\n\nPlease review and approve in GLG Real Estate Dashboard."
+      },
+      "name": "Notify Agent via Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "On New Incoming Email (Gmail/IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Send to GLG AI Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to GLG AI Backend": {
+      "main": [
+        [
+          {
+            "node": "Check Action Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Action Type": {
+      "main": [
+        [
+          {
+            "node": "Send Outbound Email Node",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Agent via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
+    n8n_email_webhook_url: Optional[str] = "http://localhost:5678/webhook/email-send"
     default_slack_channel: str = "#leads"
     default_telegram_chat_id: Optional[str] = None
     telegram_bot_token: Optional[str] = None

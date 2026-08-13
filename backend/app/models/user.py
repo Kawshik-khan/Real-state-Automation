@@ -4,10 +4,7 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
-try:
-    from pydantic import EmailStr
-except ImportError:
-    EmailStr = str
+EmailStr = str
 
 
 class UserRole(str, Enum):
@@ -18,7 +15,7 @@ class UserRole(str, Enum):
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     role: UserRole = UserRole.AGENT
     tenant_id: str = "default-tenant"

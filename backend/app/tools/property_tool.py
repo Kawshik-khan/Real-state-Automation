@@ -44,12 +44,12 @@ PROJECTS_DATABASE = [
     {
         "id": "proj_mumbai_luxe",
         "name": "GLG Luxe Heights",
-        "location": "Bandra West, Mumbai",
-        "price": "1.8 Crore INR",
+        "location": "Baridhara Diplomatic Zone, Dhaka",
+        "price": "1.8 Crore BDT",
         "price_val": 18000000,
         "bedrooms": 3,
-        "description": "Premium luxury apartments with sea view and smart home automation.",
-        "amenities": ["Sea View", "Infinity Pool", "Smart Home"],
+        "description": "Premium luxury apartments with panoramic city view and smart home automation.",
+        "amenities": ["Lake View", "Infinity Pool", "Smart Home Automation", "24/7 Security"],
         "brochure_url": "https://example.com/brochures/luxe_heights.pdf",
         "images": ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800"]
     }
@@ -88,14 +88,28 @@ class PropertySearchTool:
                     search_loc = loc_name
                     break
 
+        # Check if user specifically requested a project by name
+        target_project_keywords = []
+        for proj in PROJECTS_DATABASE:
+            proj_name_lower = proj["name"].lower()
+            # Match project name keywords e.g. "luxe heights", "banani crest", "gulshan heights", "grand residency"
+            clean_proj_words = [w for w in proj_name_lower.split() if w != "glg"]
+            phrase = " ".join(clean_proj_words)
+            if phrase in query_lower or proj_name_lower in query_lower:
+                target_project_keywords.append(proj["id"])
+
         for proj in PROJECTS_DATABASE:
             match = True
-            if search_loc and search_loc not in proj["location"].lower() and search_loc not in proj["name"].lower():
-                match = False
-            if parsed_budget and proj["price_val"] > parsed_budget:
-                match = False
-            if bedrooms and proj["bedrooms"] != bedrooms:
-                match = False
+            if target_project_keywords:
+                if proj["id"] not in target_project_keywords:
+                    match = False
+            else:
+                if search_loc and search_loc not in proj["location"].lower() and search_loc not in proj["name"].lower():
+                    match = False
+                if parsed_budget and proj["price_val"] > parsed_budget:
+                    match = False
+                if bedrooms and proj["bedrooms"] != bedrooms:
+                    match = False
 
             if match:
                 results.append(proj)

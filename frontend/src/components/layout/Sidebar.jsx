@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -8,7 +7,8 @@ import {
   BarChart3, 
   Sparkles,
   Zap,
-  Lock
+  Lock,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,6 +19,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'manager', 'agent', 'viewer'] },
     { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', roles: ['admin', 'manager', 'agent'] },
+    { id: 'email_inbox', label: 'Email Inbox', icon: Mail, badge: 'AI DRAFT', roles: ['admin', 'manager', 'agent'] },
     { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['admin', 'manager'] },
     { id: 'content', label: 'Content Engine', icon: Share2, roles: ['admin', 'manager'] },
     { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'manager', 'agent', 'viewer'] },
