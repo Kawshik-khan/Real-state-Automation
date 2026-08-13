@@ -248,3 +248,44 @@ export function getWebSocketUrl() {
   return `${wsProtocol}//${cleanHost}/api/v1/ws/chat`;
 }
 
+/**
+ * Fetch n8n Workflow & Node Health Telemetry
+ */
+export async function getN8nTelemetry() {
+  const response = await fetch(`${API_BASE_URL}/api/v1/automation/n8n/health`, {
+    headers: {
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Enable or disable an n8n workflow
+ */
+export async function toggleN8nWorkflow(workflowId, active) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/automation/n8n/workflows/${workflowId}/toggle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify({ active }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Run latency ping test on an n8n workflow
+ */
+export async function testN8nWorkflow(workflowId) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/automation/n8n/workflows/${workflowId}/test`, {
+    method: 'POST',
+    headers: {
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+
