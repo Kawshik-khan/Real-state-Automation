@@ -87,6 +87,8 @@ async def health_live():
 
 # ---------- Import Sub-Routers ----------
 
+from app.api.v1.auth.endpoints import router as auth_router
+from app.api.v1.email.endpoints import router as email_router
 from app.api.v1.ai.endpoints import ai_chat, router as ai_router
 from app.api.v1.content.endpoints import generate_content, router as content_router
 from app.api.v1.knowledge.endpoints import knowledge_upload, router as knowledge_router
@@ -100,6 +102,7 @@ from app.api.v1.escalations import router as escalations_router
 from app.api.v1.media import router as media_router
 from app.api.v1.notifications.endpoints import router as notifications_router
 from app.api.v1.conversations.endpoints import router as conversations_router
+from app.api.v1.ws import ws_router
 
 from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form, Request
 
@@ -156,8 +159,6 @@ async def api_search_handler(request: Request, body: dict, auth: dict = Depends(
 
 
 # ---------- Mount v1 Routers for Backward Compatibility ----------
-
-from app.api.v1.email.endpoints import router as email_router
 
 app.include_router(auth_router,          prefix="/api/v1",              tags=["auth"])
 app.include_router(email_router,         prefix="/api/v1/email",        tags=["email"])
