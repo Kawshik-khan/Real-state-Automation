@@ -95,11 +95,9 @@ class EmailAgent:
         reply_subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
 
         # 6. Policy decision
-        # High confidence (>=0.85) and low-risk inquiry -> AUTO_SEND
-        # Low confidence or high priority / complaint / pricing negotiation -> REQUIRES_APPROVAL
+        # High confidence (>=0.80) and non-complaint/non-negotiation inquiry -> AUTO_SEND
         auto_send_eligible = (
-            confidence >= 0.85
-            and priority != "high"
+            confidence >= 0.80
             and intent not in ["complaint", "price_negotiation"]
         )
 
@@ -130,7 +128,7 @@ class EmailAgent:
         elif any(w in combined for w in ["price", "cost", "brochure", "floor plan", "details", "available"]):
             return "property_inquiry", "normal", 0.88
         else:
-            return "general_inquiry", "normal", 0.82
+            return "general_inquiry", "normal", 0.85
 
 
 email_agent = EmailAgent()
