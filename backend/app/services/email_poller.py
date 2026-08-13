@@ -40,107 +40,129 @@ def _decode_str(header_value: Optional[str]) -> str:
     return decoded_res
 
 
-async def poll_gmail_inbox_once():
-    """Polls Gmail IMAP once for unread emails and processes customer inquiries."""
+def _fetch_unseen_messages_sync(gmail_user: str, gmail_pass: str):
+    """Synchronous helper to fetch unseen messages from Gmail IMAP."""
+    fetched_messages = []
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+        mail.login(gmail_user, gmail_pass)
+        mail.select("inbox")
+
+        status, response = mail.search(None, "UNSEEN")
+        if status != "OK" or not response[0]:
+            mail.logout()
+            return [], None
+
+        msg_ids = response[0].split()
+        for msg_id in msg_ids:
+            try:
+                res, data = mail.fetch(msg_id, "(RFC822)")
+                if res != "OK":
+                    continue
+
+                raw_email = data[0][1]
+                msg = email.message_from_bytes(raw_email)
+
+                sender_header = _decode_str(msg.get("From"))
+                subject = _decode_str(msg.get("Subject", "Property Inquiry"))
+                message_id = msg.get("Message-ID", f"msg-imap-{msg_id.decode()}")
+                in_reply_to = msg.get("In-Reply-To")
+
+                # Skip promotional / bot senders
+                sender_lower = sender_header.lower()
+                if any(pat in sender_lower for pat in IGNORE_SENDER_PATTERNS):
+                    mail.store(msg_id, "+FLAGS", "\\Seen")
+                    continue
+
+                # Extract sender email address from "Name <email@domain.com>"
+                sender_email = sender_header
+                sender_name = "Valued Lead"
+                if "<" in sender_header and ">" in sender_header:
+                    sender_name = sender_header.split("<")[0].strip('" ')
+                    sender_email = sender_header.split("<")[1].split(">")[0].strip()
+
+                # Extract body text
+                body_text = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        content_type = part.get_content_type()
+                        content_disposition = str(part.get("Content-Disposition"))
+                        if content_type == "text/plain" and "attachment" not in content_disposition:
+                            payload_bytes = part.get_payload(decode=True)
+                            if payload_bytes:
+                                body_text = payload_bytes.decode(errors="replace")
+                                break
+                else:
+                    payload_bytes = msg.get_payload(decode=True)
+                    if payload_bytes:
+                        body_text = payload_bytes.decode(errors="replace")
+
+                if not body_text:
+                    body_text = subject
+
+                fetched_messages.append({
+                    "msg_id": msg_id,
+                    "message_id": message_id,
+                    "in_reply_to": in_reply_to,
+                    "sender_email": sender_email,
+                    "sender_name": sender_name,
+                    "subject": subject,
+                    "body_text": body_text,
+                })
+            except Exception as ex:
+                logger.error(f"[IMAP POLLER] Error reading message {msg_id}: {ex}")
+
+        return fetched_messages, mail
+    except Exception as e:
+        logger.error(f"[IMAP POLLER] Connection error: {e}")
+        return [], None
+
+
+async def poll_gmail_inbox_once() -> int:
+    """Polls Gmail IMAP once for unread emails and processes customer inquiries async."""
     gmail_user = settings.gmail_user_email
     gmail_pass = settings.gmail_app_password
 
     if not gmail_user or not gmail_pass:
-        return
+        return 0
 
-    def sync_fetch_and_process():
-        processed_count = 0
+    messages, mail_handle = await asyncio.to_thread(_fetch_unseen_messages_sync, gmail_user, gmail_pass)
+    if not messages:
+        return 0
+
+    processed_count = 0
+    auth = {"tenant_id": settings.default_tenant_id}
+
+    for item in messages:
         try:
-            mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
-            mail.login(gmail_user, gmail_pass)
-            mail.select("inbox")
+            payload = IncomingEmailPayload(
+                message_id=item["message_id"],
+                thread_id=f"thread-{item['message_id'].replace('<','').replace('>','').replace('@','-')[:30]}",
+                in_reply_to=item["in_reply_to"],
+                sender_email=item["sender_email"],
+                sender_name=item["sender_name"],
+                subject=item["subject"],
+                body_text=item["body_text"],
+            )
 
-            status, response = mail.search(None, "UNSEEN")
-            if status != "OK" or not response[0]:
-                mail.logout()
-                return 0
-
-            msg_ids = response[0].split()
-            for msg_id in msg_ids:
-                try:
-                    res, data = mail.fetch(msg_id, "(RFC822)")
-                    if res != "OK":
-                        continue
-
-                    raw_email = data[0][1]
-                    msg = email.message_from_bytes(raw_email)
-
-                    sender_header = _decode_str(msg.get("From"))
-                    subject = _decode_str(msg.get("Subject", "Property Inquiry"))
-                    message_id = msg.get("Message-ID", f"msg-imap-{msg_id.decode()}")
-                    in_reply_to = msg.get("In-Reply-To")
-
-                    # Skip promotional / bot senders
-                    sender_lower = sender_header.lower()
-                    if any(pat in sender_lower for pat in IGNORE_SENDER_PATTERNS):
-                        # Mark as seen so we don't re-process spam
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        continue
-
-                    # Extract sender email address from "Name <email@domain.com>"
-                    sender_email = sender_header
-                    sender_name = "Valued Lead"
-                    if "<" in sender_header and ">" in sender_header:
-                        sender_name = sender_header.split("<")[0].strip('" ')
-                        sender_email = sender_header.split("<")[1].split(">")[0].strip()
-
-                    # Extract body text
-                    body_text = ""
-                    if msg.is_multipart():
-                        for part in msg.walk():
-                            content_type = part.get_content_type()
-                            content_disposition = str(part.get("Content-Disposition"))
-                            if content_type == "text/plain" and "attachment" not in content_disposition:
-                                payload_bytes = part.get_payload(decode=True)
-                                if payload_bytes:
-                                    body_text = payload_bytes.decode(errors="replace")
-                                    break
-                    else:
-                        payload_bytes = msg.get_payload(decode=True)
-                        if payload_bytes:
-                            body_text = payload_bytes.decode(errors="replace")
-
-                    if not body_text:
-                        body_text = subject
-
-                    payload = IncomingEmailPayload(
-                        message_id=message_id,
-                        thread_id=f"thread-{message_id.replace('<','').replace('>','').replace('@','-')[:30]}",
-                        in_reply_to=in_reply_to,
-                        sender_email=sender_email,
-                        sender_name=sender_name,
-                        subject=subject,
-                        body_text=body_text,
-                    )
-
-                    # Trigger asyncio incoming email processing
-                    loop = asyncio.get_event_loop()
-                    future = asyncio.run_coroutine_threadsafe(
-                        incoming_email_webhook(payload, auth={"tenant_id": settings.default_tenant_id}),
-                        loop
-                    )
-                    res = future.result(timeout=20)
-                    logger.info(f"[IMAP POLLER] Processed incoming email from {sender_email}: {res.get('action')}")
-
-                    # Mark email as seen in Gmail inbox
-                    mail.store(msg_id, "+FLAGS", "\\Seen")
-                    processed_count += 1
-                except Exception as ex:
-                    logger.error(f"[IMAP POLLER] Error processing message {msg_id}: {ex}")
-
-            mail.logout()
+            res = await incoming_email_webhook(payload, auth=auth)
+            logger.info(f"[IMAP POLLER SUCCESS] Processed email from {item['sender_email']}: {res.get('action')}")
+            processed_count += 1
         except Exception as e:
-            logger.error(f"[IMAP POLLER] Connection error: {e}")
+            logger.error(f"[IMAP POLLER FAIL] Failed processing email {item['message_id']}: {e}")
 
-        return processed_count
+    # Mark processed emails as seen
+    def mark_seen_sync():
+        try:
+            if mail_handle:
+                for item in messages:
+                    mail_handle.store(item["msg_id"], "+FLAGS", "\\Seen")
+                mail_handle.logout()
+        except Exception:
+            pass
 
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, sync_fetch_and_process)
+    await asyncio.to_thread(mark_seen_sync)
+    return processed_count
 
 
 async def email_poller_worker(interval_seconds: int = 15):
