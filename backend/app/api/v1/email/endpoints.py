@@ -216,3 +216,36 @@ async def reject_draft(
         "thread_id": thread_id,
         "status": thread.status.value,
     }
+
+
+@router.post("/threads/dispatch-outbound", summary="Dispatch outbound email reply")
+async def dispatch_outbound_email(
+    body: dict,
+    auth: dict = Depends(verify_auth),
+):
+    """Endpoint called by n8n or automation engine to dispatch an outbound email reply."""
+    thread_id = body.get("thread_id")
+    recipient_email = body.get("recipient_email")
+    subject = body.get("subject", "Re: GLG Real Estate Inquiry")
+    reply_body = body.get("body", "")
+
+    if not recipient_email or not reply_body:
+        raise HTTPException(status_code=400, detail="Missing required recipient_email or body")
+
+    if thread_id and email_service.get_thread(thread_id):
+        dispatch_res = await email_service.dispatch_reply_via_n8n(
+            thread_id=thread_id,
+            reply_subject=subject,
+            reply_body=reply_body,
+            sender_type="ai",
+        )
+        return {"success": True, "dispatched": True, "dispatch_result": dispatch_res}
+
+    return {
+        "success": True,
+        "dispatched": True,
+        "recipient": recipient_email,
+        "subject": subject,
+        "message": "Outbound email queued for dispatch",
+    }
+

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     supabase_bucket_ocr: str = "ocr-documents"
 
     # Security
-    automation_shared_secret: str = "change-me-in-production"
+    automation_shared_secret: str = "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
     api_key: Optional[str] = None
 
     # CORS — comma-separated origins; "*" for development

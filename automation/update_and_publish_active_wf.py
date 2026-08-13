@@ -1,4 +1,4 @@
-"""Upload GLG Email Reply Automation Workflow to Cloud n8n using .env environment variables exclusively."""
+"""Update and activate active Cloud n8n workflow with HTTP POST Webhook support."""
 
 import json
 import requests
@@ -27,9 +27,8 @@ def call_mcp(method, arguments):
     return json.loads(text)
 
 
-print("Uploading 'GLG Email Reply Automation Workflow' (Using .env variables)...")
-
-code = """
+def update_and_publish():
+    code = """
 import { workflow, node, trigger } from '@n8n/workflow-sdk';
 
 const triggerNode = trigger({
@@ -38,7 +37,8 @@ const triggerNode = trigger({
   config: {
     name: 'Incoming Email Webhook',
     parameters: {
-      path: 'glg-email-incoming',
+      httpMethod: 'POST',
+      path: 'glg-email-webhook',
       responseMode: 'onReceived',
       options: {}
     }
@@ -125,25 +125,28 @@ export default workflow('wf-email-reply-automation', 'GLG Email Reply Automation
   .add(telegramNotifyNode)
   .to(triggerNode, backendNode)
   .to(backendNode, switchNode)
-  .to(switchNode, sendEmailNode, 0, 0)
-  .to(switchNode, telegramNotifyNode, 1, 0);
+  .to(switchNode, sendEmailNode)
+  .to(switchNode, telegramNotifyNode);
 """
 
-res = call_mcp("create_workflow_from_code", {
-    "code": code,
-    "name": "GLG Email Reply Automation Workflow",
-    "versionName": "1.3.0-connected-outputs"
-})
+    res = call_mcp("create_workflow_from_code", {
+        "code": code,
+        "name": "GLG Email Reply Automation Workflow",
+        "versionName": "1.4.0-post-webhook"
+    })
 
-print("Creation Result:", json.dumps(res, indent=2))
+    print("Creation Result:", json.dumps(res, indent=2))
+    content_txt = res.get("result", {}).get("content", [{}])[0].get("text", "{}")
+    try:
+        parsed = json.loads(content_txt)
+        wf_id = parsed.get("workflowId")
+        if wf_id:
+            print(f"\n[*] Publishing workflow {wf_id} on Cloud n8n...")
+            pub_res = call_mcp("publish_workflow", {"workflowId": wf_id})
+            print("Publish Result:", json.dumps(pub_res, indent=2))
+    except Exception as e:
+        print("Error parsing result:", e)
 
-content_txt = res.get("result", {}).get("content", [{}])[0].get("text", "{}")
-try:
-    parsed = json.loads(content_txt)
-    wf_id = parsed.get("workflowId")
-    if wf_id:
-        print(f"\n[*] Publishing workflow {wf_id} on Cloud n8n...")
-        pub_res = call_mcp("publish_workflow", {"workflowId": wf_id})
-        print("Publish Result:", json.dumps(pub_res, indent=2))
-except Exception as e:
-    print("Error parsing result:", e)
+
+if __name__ == "__main__":
+    update_and_publish()
