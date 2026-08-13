@@ -172,6 +172,37 @@ class EmailService:
             except Exception as e:
                 logger.error(f"Failed to trigger n8n email send webhook: {e}")
 
+        # Real Gmail SMTP dispatch if credentials available
+        if not sent_successfully and settings.gmail_user_email and settings.gmail_app_password:
+            try:
+                import smtplib
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+
+                msg = MIMEMultipart("alternative")
+                msg["From"] = f"GLG Assets Real Estate <{settings.gmail_user_email}>"
+                msg["To"] = thread.customer_email
+                msg["Subject"] = reply_subject or f"Re: {thread.subject}"
+                if in_reply_to_header:
+                    msg["In-Reply-To"] = in_reply_to_header
+                    msg["References"] = in_reply_to_header
+
+                part_text = MIMEText(reply_body, "plain", "utf-8")
+                part_html = MIMEText(self._format_html_email(reply_body, thread.customer_name), "html", "utf-8")
+                msg.attach(part_text)
+                msg.attach(part_html)
+
+                with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                    server.starttls()
+                    server.login(settings.gmail_user_email, settings.gmail_app_password)
+                    server.sendmail(settings.gmail_user_email, [thread.customer_email], msg.as_string())
+
+                sent_successfully = True
+                n8n_response_data = {"channel": "gmail_smtp", "status": "sent"}
+                logger.info(f"[GMAIL SMTP DISPATCH SUCCESS] Real email delivered to {thread.customer_email}")
+            except Exception as e:
+                logger.error(f"Failed to send email via Gmail SMTP: {e}")
+
         # Fallback simulation if webhook endpoint is offline or local dev
         if not sent_successfully:
             logger.info(f"[SIMULATED N8N EMAIL DISPATCH] Sent to {thread.customer_email}: {reply_subject}")

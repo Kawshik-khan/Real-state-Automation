@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     telegram_bot_token: Optional[str] = None
     whatsapp_verify_token: Optional[str] = None
 
+    # Gmail SMTP / IMAP Settings
+    gmail_user_email: Optional[str] = "kawshikkhan25@gmail.com"
+    gmail_app_password: Optional[str] = "sfnn btmk hvfk tixq"
+
     @property
     def allowed_origins(self) -> list[str]:
         """Parse CORS_ORIGINS into a list; handles '*' for development."""
