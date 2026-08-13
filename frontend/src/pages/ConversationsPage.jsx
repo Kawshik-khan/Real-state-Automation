@@ -96,6 +96,10 @@ const INITIAL_CONVERSATIONS = [
     confidence: 0.88,
     intent: 'faq',
     messages: [
+      { sender: 'user', text: 'Is payment schedule flexible over 3 years?', time: '09:12 AM' },
+      { sender: 'ai', text: 'Hello Anisur! Yes, GLG Assets offers up to 36-month flexible installment plans.', time: '09:13 AM' }
+    ]
+  },
   {
     id: 'email_thread_101',
     name: 'Rahim Chowdhury',
