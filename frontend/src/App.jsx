@@ -11,6 +11,7 @@ import KnowledgePage from './pages/KnowledgePage';
 import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import N8nMonitoringPage from './pages/N8nMonitoringPage';
 
 const getDefaultTabForRole = (role) => {
   switch (role) {
@@ -50,6 +51,7 @@ function DashboardApp() {
       case 'content': return 'Social Content Generator & Approval Engine';
       case 'properties': return 'Property Inventory & Media Catalog';
       case 'analytics': return 'Analytics & Executive Command Center';
+      case 'n8n_monitoring': return 'n8n Workflow & Node Health Command';
       default: return 'Dashboard Overview';
     }
   };
@@ -63,6 +65,7 @@ function DashboardApp() {
       case 'content': return <ContentGeneratorPage />;
       case 'properties': return <PropertiesPage />;
       case 'analytics': return <AnalyticsPage />;
+      case 'n8n_monitoring': return <N8nMonitoringPage />;
       default: return <DashboardHome setActiveTab={setActiveTab} />;
     }
   };

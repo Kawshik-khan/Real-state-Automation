@@ -291,3 +291,36 @@ async def record_idempotency(
         "message_id": message_id,
         "tenantId": auth["tenant_id"],
     }
+
+
+# ==========================================================
+#  N8N WORKFLOW & NODE HEALTH MONITORING
+# ==========================================================
+
+@router.get("/n8n/health", summary="Get n8n workflow execution status, node health, and latency metrics")
+async def get_n8n_monitoring_health():
+    """Returns telemetry metrics for all n8n workflows, node health, latencies, and node processing errors."""
+    from app.services.n8n_monitoring import N8nMonitoringService
+    return await N8nMonitoringService.get_system_telemetry()
+
+
+@router.post("/n8n/workflows/{workflow_id}/toggle", summary="Enable or disable an n8n workflow")
+async def toggle_n8n_workflow(workflow_id: str, body: dict):
+    """Toggles active state of an n8n workflow."""
+    from app.services.n8n_monitoring import N8nMonitoringService
+    active = body.get("active", True)
+    try:
+        return await N8nMonitoringService.toggle_workflow(workflow_id, active)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/n8n/workflows/{workflow_id}/test", summary="Run a latency ping test on an n8n workflow and its nodes")
+async def test_n8n_workflow(workflow_id: str):
+    """Executes a real-time latency ping test across all nodes in the workflow."""
+    from app.services.n8n_monitoring import N8nMonitoringService
+    try:
+        return await N8nMonitoringService.test_workflow(workflow_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+

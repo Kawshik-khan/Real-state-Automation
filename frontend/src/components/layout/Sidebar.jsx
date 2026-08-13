@@ -8,7 +8,8 @@ import {
   Sparkles,
   Zap,
   Lock,
-  Mail
+  Mail,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -24,6 +25,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'content', label: 'Content Engine', icon: Share2, roles: ['admin', 'manager'] },
     { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'manager', 'agent', 'viewer'] },
     { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, highlight: true, roles: ['admin', 'manager'] },
+    { id: 'n8n_monitoring', label: 'n8n Health', icon: Activity, badge: 'NODES', roles: ['admin', 'manager'] },
   ];
 
   const visibleNavItems = navItems.filter(item => item.roles.includes(userRole));
