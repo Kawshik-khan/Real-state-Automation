@@ -27,7 +27,11 @@ from app.dependencies import require_automation_secret as _auth
 async def lifespan(app: FastAPI):
     print(f"[startup] {settings.app_name} — MVP routes registered at /api/")
     print(f"[startup] Docs available at http://localhost:8000/docs")
+    import asyncio
+    from app.services.email_poller import email_poller_worker, stop_email_poller
+    poller_task = asyncio.create_task(email_poller_worker(interval_seconds=15))
     yield
+    stop_email_poller()
     print(f"[shutdown] {settings.app_name} — Shutting down gracefully")
 
 
