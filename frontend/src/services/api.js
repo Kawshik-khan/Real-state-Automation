@@ -368,4 +368,44 @@ export async function getCrossRoleSummaryReport(period = '7d') {
   return handleResponse(response);
 }
 
+/**
+ * Fetch real-time system logs from live buffer (Developer only)
+ */
+export async function getDeveloperLogs(params = {}) {
+  const token = localStorage.getItem('glg_token');
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/logs${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Clear live system log buffer (Developer only)
+ */
+export async function clearDeveloperLogs() {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/logs`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Get SSE URL for live log streaming
+ */
+export function getDeveloperLogsStreamUrl() {
+  return `${API_BASE_URL}/api/v1/developer/logs/stream`;
+}
+
 

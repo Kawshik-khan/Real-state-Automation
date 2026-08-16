@@ -209,3 +209,13 @@ class TestAnalytics:
         response = client.post("/api/v1/analytics/daily", json={}, headers=self.headers)
         assert response.status_code == 200
         assert response.json()["success"] is True
+
+    def test_cross_role_summary(self):
+        response = client.get("/api/v1/analytics/cross-role-summary?period=7d", headers=self.headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "agent_operations" in data["summary"]
+        assert "manager_operations" in data["summary"]
+        assert "marketing_content" in data["summary"]
+        assert "engineering_infrastructure" in data["summary"]

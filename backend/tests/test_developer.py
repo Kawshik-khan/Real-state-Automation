@@ -96,3 +96,26 @@ def test_developer_sync_databases():
     assert data["success"] is True
     assert "stats" in data
     assert data["stats"]["pinecone_upserted"] > 0
+
+
+def test_developer_realtime_logs():
+    """Developer can fetch real-time log buffer and clear logs."""
+    dev_token = get_token_for_user("developer@glgassets.com", "dev123")
+    headers = {"Authorization": f"Bearer {dev_token}"}
+    
+    # 1. Trigger an API call that gets logged
+    client.get("/health")
+    
+    # 2. Query logs
+    res = client.get("/api/v1/developer/logs?limit=50", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "logs" in data
+    assert len(data["logs"]) > 0
+    assert any(log.get("module") in ("FastAPI", "LogStreamer") for log in data["logs"])
+    
+    # 3. Clear logs
+    del_res = client.delete("/api/v1/developer/logs", headers=headers)
+    assert del_res.status_code == 200
+    assert del_res.json()["success"] is True

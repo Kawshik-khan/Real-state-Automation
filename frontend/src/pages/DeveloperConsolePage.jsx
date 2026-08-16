@@ -41,7 +41,10 @@ import {
   generateContent,
   getProjects,
   checkModeration,
-  getN8nTelemetry
+  getN8nTelemetry,
+  getDeveloperLogs,
+  clearDeveloperLogs,
+  getDeveloperLogsStreamUrl
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -86,18 +89,71 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
   // Live Logs State
   const [logFilter, setLogFilter] = useState('ALL');
   const [logsSearch, setLogsSearch] = useState('');
-  const [logs, setLogs] = useState([
-    { id: 1, time: new Date(Date.now() - 15000).toLocaleTimeString(), level: 'INFO', module: 'AuthEngine', msg: `User ${user?.email || 'developer'} authenticated via JWT RBAC [role: developer]` },
-    { id: 2, time: new Date(Date.now() - 12000).toLocaleTimeString(), level: 'DEBUG', module: 'SupervisorGraph', msg: 'Graph compiled with state checkpointing & multi-turn memory' },
-    { id: 3, time: new Date(Date.now() - 9000).toLocaleTimeString(), level: 'INFO', module: 'PineconeStore', msg: 'Index "real-state-automation" online (86 vectors indexed, 1024-dim cosine)' },
-    { id: 4, time: new Date(Date.now() - 6000).toLocaleTimeString(), level: 'INFO', module: 'SupabaseStorage', msg: 'Connected to Supabase buckets: brochures, floorplans, ocr-documents' },
-    { id: 5, time: new Date(Date.now() - 2000).toLocaleTimeString(), level: 'INFO', module: 'FastAPI', msg: 'CORS & Rate Limiter middleware active (20 req/min for RAG & Chat)' },
-  ]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [logs, setLogs] = useState([]);
 
-  // Load system health on mount
+  // Fetch initial logs and health on mount + establish live SSE stream
   useEffect(() => {
     fetchHealthData();
+    fetchLiveLogs();
+
+    // Connect to live SSE log stream
+    let eventSource = null;
+    try {
+      eventSource = new EventSource(getDeveloperLogsStreamUrl());
+      
+      eventSource.onopen = () => {
+        setSseConnected(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.event === 'connected' && payload.backlog) {
+            setLogs(payload.backlog);
+          } else if (payload.event === 'log' && payload.log) {
+            setLogs((prev) => [payload.log, ...prev.slice(0, 199)]);
+          }
+        } catch (e) {
+          // ignore non-json ping ticks
+        }
+      };
+
+      eventSource.onerror = () => {
+        setSseConnected(false);
+      };
+    } catch (err) {
+      console.warn('SSE EventSource setup error:', err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, []);
+
+  const fetchLiveLogs = async () => {
+    try {
+      const res = await getDeveloperLogs({ limit: 50 });
+      if (res.success && res.logs?.length > 0) {
+        setLogs(res.logs);
+      }
+    } catch (err) {
+      console.warn('Fallback live logs fetch:', err);
+    }
+  };
+
+  const handleClearServerLogs = async () => {
+    try {
+      await clearDeveloperLogs();
+      setLogs([]);
+      addLog('INFO', 'LogStreamer', 'Live terminal logs cleared by developer');
+    } catch (err) {
+      setLogs([]);
+    }
+  };
 
   const fetchHealthData = async () => {
     setHealthLoading(true);
@@ -1956,10 +2012,32 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
       {/* ── TAB 5: LIVE LOGS STREAM ── */}
       {activeTab === 'logs' && (
         <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Terminal size={16} color="#38BDF8" /> Real-time System Terminal
+              </span>
+
+              <span style={{
+                fontSize: '0.72rem',
+                padding: '3px 10px',
+                borderRadius: '20px',
+                background: sseConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                border: sseConnected ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
+                color: sseConnected ? '#34D399' : '#FBBF24',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: sseConnected ? '#10B981' : '#F59E0B',
+                  boxShadow: sseConnected ? '0 0 8px #10B981' : 'none'
+                }} />
+                {sseConnected ? 'LIVE REALTIME SSE STREAM' : 'POLLING SERVER LOGS'}
               </span>
               
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -1984,26 +2062,46 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input
                 type="text"
-                placeholder="Filter logs..."
+                placeholder="Search live logs..."
                 value={logsSearch}
                 onChange={(e) => setLogsSearch(e.target.value)}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   background: 'rgba(15, 23, 42, 0.8)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   color: '#FFFFFF',
                   fontSize: '0.75rem',
-                  outline: 'none'
+                  outline: 'none',
+                  width: '160px'
                 }}
               />
               <button
-                onClick={() => setLogs([])}
+                onClick={fetchLiveLogs}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <RefreshCw size={13} />
+                <span>Fetch</span>
+              </button>
+              <button
+                onClick={handleClearServerLogs}
+                style={{
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   background: 'rgba(239, 68, 68, 0.2)',
                   border: '1px solid rgba(239, 68, 68, 0.4)',
@@ -2013,13 +2111,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   cursor: 'pointer'
                 }}
               >
-                Clear
+                Clear Buffer
               </button>
             </div>
           </div>
 
           <div style={{
-            height: '380px',
+            height: '420px',
             padding: '14px',
             borderRadius: '8px',
             background: 'rgba(11, 15, 25, 0.95)',
@@ -2031,21 +2129,35 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             flexDirection: 'column',
             gap: '6px'
           }}>
-            {filteredLogs.map((log) => {
-              const levelColor = 
-                log.level === 'ERROR' ? '#F87171' :
-                log.level === 'WARN' ? '#FBBF24' :
-                log.level === 'DEBUG' ? '#38BDF8' : '#34D399';
+            {filteredLogs.length === 0 ? (
+              <div style={{ color: '#64748B', textAlign: 'center', padding: '40px 0' }}>
+                No log entries found. Perform actions in the dashboard or API playground to watch live telemetry stream here.
+              </div>
+            ) : (
+              filteredLogs.map((log, idx) => {
+                const levelColor = 
+                  log.level === 'ERROR' ? '#F87171' :
+                  log.level === 'WARN' ? '#FBBF24' :
+                  log.level === 'DEBUG' ? '#38BDF8' : '#34D399';
+                
+                const timeStr = log.timestamp || log.time || 'now';
+                const msgStr = log.message || log.msg || '';
 
-              return (
-                <div key={log.id} style={{ display: 'flex', gap: '10px', alignItems: 'baseline' }}>
-                  <span style={{ color: '#64748B', fontSize: '0.72rem' }}>[{log.time}]</span>
-                  <span style={{ color: levelColor, fontWeight: 700, minWidth: '46px' }}>[{log.level}]</span>
-                  <span style={{ color: '#C084FC', fontWeight: 600 }}>{log.module}:</span>
-                  <span style={{ color: '#E2E8F0' }}>{log.msg}</span>
-                </div>
-              );
-            })}
+                return (
+                  <div key={log.id || idx} style={{ display: 'flex', gap: '10px', alignItems: 'baseline', borderBottom: '1px solid rgba(255, 255, 255, 0.03)', paddingBottom: '3px' }}>
+                    <span style={{ color: '#64748B', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>[{timeStr}]</span>
+                    <span style={{ color: levelColor, fontWeight: 700, minWidth: '46px' }}>[{log.level}]</span>
+                    <span style={{ color: '#C084FC', fontWeight: 600, whiteSpace: 'nowrap' }}>{log.module}:</span>
+                    <span style={{ color: '#E2E8F0', flex: 1, wordBreak: 'break-word' }}>{msgStr}</span>
+                    {log.latency_ms !== undefined && log.latency_ms !== null && (
+                      <span style={{ color: '#38BDF8', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(14, 165, 233, 0.15)', whiteSpace: 'nowrap' }}>
+                        {log.latency_ms}ms
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

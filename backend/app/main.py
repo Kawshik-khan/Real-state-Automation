@@ -56,6 +56,72 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Request
+import time
+from app.services.log_streamer import log_streamer, setup_live_logging
+
+setup_live_logging()
+
+
+@app.middleware("http")
+async def live_telemetry_logging_middleware(request: Request, call_next):
+    """Real-time HTTP Request/Response telemetry logging middleware."""
+    start_time = time.time()
+    path = request.url.path
+    method = request.method
+    client_ip = request.client.host if request.client else "unknown"
+
+    try:
+        response = await call_next(request)
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        
+        # Don't log spammy continuous SSE streams or favicon
+        if not path.endswith("/stream") and not path.endswith("/favicon.ico"):
+            level = "WARN" if response.status_code >= 400 else "INFO"
+            module = "FastAPI"
+            if "/developer" in path:
+                module = "DeveloperAPI"
+            elif "/auth" in path:
+                module = "AuthEngine"
+            elif "/chat" in path or "/conversations" in path:
+                module = "SupervisorGraph"
+            elif "/knowledge" in path:
+                module = "RAGVectorDB"
+            elif "/automation" in path or "/social" in path:
+                module = "n8nWebhook"
+
+            log_streamer.record_log(
+                level=level,
+                module=module,
+                message=f"{method} {path} -> HTTP {response.status_code} [{latency_ms}ms]",
+                path=path,
+                method=method,
+                status_code=response.status_code,
+                latency_ms=latency_ms,
+                client_ip=client_ip
+            )
+
+            # Dynamically update n8n workflow telemetry counter on live traffic
+            try:
+                from app.services.n8n_monitoring import N8nMonitoringService
+                N8nMonitoringService.record_live_trigger(path, latency_ms)
+            except Exception:
+                pass
+        return response
+    except Exception as exc:
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        log_streamer.record_log(
+            level="ERROR",
+            module="FastAPI",
+            message=f"{method} {path} unhandled exception: {str(exc)}",
+            path=path,
+            method=method,
+            status_code=500,
+            latency_ms=latency_ms,
+            client_ip=client_ip
+        )
+        raise exc
+
 
 # ---------- Global Auth Dependency ----------
 

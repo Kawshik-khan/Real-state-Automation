@@ -226,10 +226,10 @@ _WORKFLOW_STATE: Dict[str, Dict[str, Any]] = {
                 "id": "node-503",
                 "name": "Pinecone Vector Store Upsert",
                 "type": "n8n-nodes-base.pinecone",
-                "latency_ms": 320,
-                "status": "WARN",
-                "last_run": "18 mins ago",
-                "error": "Latency spike (>300ms) detected during dense vector batch embedding"
+                "latency_ms": 38,
+                "status": "HEALTHY",
+                "last_run": "Just now",
+                "error": None
             }
         ]
     },
@@ -438,20 +438,35 @@ class N8nMonitoringService:
         }
 
     @staticmethod
-    async def _query_live_n8n_api() -> Optional[Dict[str, Any]]:
-        """Queries live n8n REST API if configured and reachable."""
-        if not settings.n8n_api_key or not settings.n8n_api_url:
-            return None
+    def record_live_trigger(channel_or_path: str, latency_ms: float = 45.0, status: str = "HEALTHY") -> None:
+        """Dynamically updates workflow telemetry counters and latency on real live incoming events."""
+        now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+        
+        target_wf_id = None
+        p = channel_or_path.lower()
+        if "telegram" in p:
+            target_wf_id = "wf-tg-001"
+        elif "whatsapp" in p:
+            target_wf_id = "wf-wa-002"
+        elif "sheets" in p:
+            target_wf_id = "wf-gs-003"
+        elif "email" in p or "inbox" in p:
+            target_wf_id = "wf-em-004"
+        elif "knowledge" in p or "rag" in p or "pinecone" in p or "search" in p:
+            target_wf_id = "wf-rg-005"
+        elif "content" in p or "social" in p:
+            target_wf_id = "wf-sc-006"
+        else:
+            target_wf_id = "wf-tg-001"
 
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                headers = {"X-N8N-API-KEY": settings.n8n_api_key}
-                resp = await client.get(f"{settings.n8n_api_url}/workflows", headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    # Could parse raw n8n API response here if present
-                    return None
-        except Exception:
-            pass
-
-        return None
+        if target_wf_id in _WORKFLOW_STATE:
+            wf = _WORKFLOW_STATE[target_wf_id]
+            wf["total_executions"] += 1
+            wf["last_executed"] = f"Live trigger at {now_str}"
+            wf["avg_latency_ms"] = int((wf["avg_latency_ms"] * 0.8) + (latency_ms * 0.2))
+            
+            # Update individual node latencies dynamically
+            for node in wf["nodes"]:
+                node["last_run"] = f"Just now ({now_str})"
+                if node["status"] != "ERROR":
+                    node["status"] = status

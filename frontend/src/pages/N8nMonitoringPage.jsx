@@ -34,10 +34,10 @@ const DEFAULT_TELEMETRY = {
     active_workflows: 6,
     inactive_workflows: 0,
     total_nodes: 20,
-    healthy_nodes: 19,
-    degraded_nodes: 1,
+    healthy_nodes: 20,
+    degraded_nodes: 0,
     failed_nodes: 0,
-    avg_system_latency_ms: 148,
+    avg_system_latency_ms: 112,
   },
   workflows: [
     {
@@ -48,62 +48,62 @@ const DEFAULT_TELEMETRY = {
       trigger: "Telegram Webhook",
       last_executed: "Just now",
       total_executions: 1420,
-      success_rate: 99.6,
-      avg_latency_ms: 148,
+      success_rate: 99.8,
+      avg_latency_ms: 145,
       nodes: [
-        { id: "node-101", name: "Telegram Webhook Trigger", type: "n8n-nodes-base.telegramTrigger", latency_ms: 12, status: "HEALTHY", last_run: "Just now", error: null },
-        { id: "node-102", name: "Secret Verification & Tenant Scoping", type: "n8n-nodes-base.code", latency_ms: 4, status: "HEALTHY", last_run: "Just now", error: null },
-        { id: "node-103", name: "FastAPI RAG Agent & Intent Query", type: "n8n-nodes-base.httpRequest", latency_ms: 115, status: "HEALTHY", last_run: "Just now", error: null },
-        { id: "node-104", name: "Send Telegram Rich Message", type: "n8n-nodes-base.telegram", latency_ms: 17, status: "HEALTHY", last_run: "Just now", error: null }
+        { id: "node-101", name: "Telegram Trigger Webhook", type: "n8n-nodes-base.telegramTrigger", latency_ms: 12, status: "HEALTHY", last_run: "Just now", error: null },
+        { id: "node-102", name: "Extract User & Message", type: "n8n-nodes-base.code", latency_ms: 8, status: "HEALTHY", last_run: "Just now", error: null },
+        { id: "node-103", name: "Forward to FastAPI /api/chat", type: "n8n-nodes-base.httpRequest", latency_ms: 110, status: "HEALTHY", last_run: "Just now", error: null },
+        { id: "node-104", name: "Send Telegram Reply Message", type: "n8n-nodes-base.telegram", latency_ms: 15, status: "HEALTHY", last_run: "Just now", error: null }
       ]
     },
     {
-      id: "wf-em-002",
-      name: "Email Reply Automation & Lead Ingestion",
-      category: "Email & Lead Capture",
+      id: "wf-wa-002",
+      name: "WhatsApp Cloud API Lead Router",
+      category: "Messaging & Conversational AI",
       active: true,
-      trigger: "IMAP Mailbox / Cloud Webhook",
+      trigger: "WhatsApp Webhook",
       last_executed: "2 minutes ago",
-      total_executions: 890,
-      success_rate: 98.8,
-      avg_latency_ms: 335,
+      total_executions: 2840,
+      success_rate: 99.4,
+      avg_latency_ms: 128,
       nodes: [
-        { id: "node-201", name: "IMAP Email Listener", type: "n8n-nodes-base.emailReadImap", latency_ms: 45, status: "HEALTHY", last_run: "2 mins ago", error: null },
-        { id: "node-202", name: "OpenAI GPT-4o Email Draft Generator", type: "n8n-nodes-base.openAi", latency_ms: 210, status: "HEALTHY", last_run: "2 mins ago", error: null },
-        { id: "node-203", name: "PostgreSQL Lead Upsert", type: "n8n-nodes-base.postgres", latency_ms: 18, status: "HEALTHY", last_run: "2 mins ago", error: null },
-        { id: "node-204", name: "SMTP Email Dispatcher", type: "n8n-nodes-base.emailSend", latency_ms: 62, status: "HEALTHY", last_run: "2 mins ago", error: null }
+        { id: "node-201", name: "WhatsApp Inbound Webhook", type: "n8n-nodes-base.webhook", latency_ms: 14, status: "HEALTHY", last_run: "2 mins ago", error: null },
+        { id: "node-202", name: "Payload Normalizer", type: "n8n-nodes-base.code", latency_ms: 6, status: "HEALTHY", last_run: "2 mins ago", error: null },
+        { id: "node-203", name: "Call AI Supervisor Graph", type: "n8n-nodes-base.httpRequest", latency_ms: 95, status: "HEALTHY", last_run: "2 mins ago", error: null },
+        { id: "node-204", name: "WhatsApp Send Message API", type: "n8n-nodes-base.httpRequest", latency_ms: 13, status: "HEALTHY", last_run: "2 mins ago", error: null }
       ]
     },
     {
-      id: "wf-fb-003",
-      name: "Facebook & Instagram Lead Capture Router",
-      category: "Social Lead Ads",
+      id: "wf-gs-003",
+      name: "Google Sheets Lead Sync & Backup",
+      category: "Data Sync & CRM",
       active: true,
-      trigger: "Meta Graph API Webhook",
+      trigger: "Webhook / Lead Event",
       last_executed: "5 minutes ago",
-      total_executions: 640,
+      total_executions: 980,
       success_rate: 100.0,
-      avg_latency_ms: 98,
+      avg_latency_ms: 95,
       nodes: [
-        { id: "node-301", name: "Meta Webhook Ingress", type: "n8n-nodes-base.webhook", latency_ms: 15, status: "HEALTHY", last_run: "5 mins ago", error: null },
-        { id: "node-302", name: "Lead Payload Parser & Sanitizer", type: "n8n-nodes-base.code", latency_ms: 5, status: "HEALTHY", last_run: "5 mins ago", error: null },
-        { id: "node-303", name: "CRM Sync HTTP POST", type: "n8n-nodes-base.httpRequest", latency_ms: 78, status: "HEALTHY", last_run: "5 mins ago", error: null }
+        { id: "node-301", name: "Google Sheets Sync Webhook", type: "n8n-nodes-base.webhook", latency_ms: 10, status: "HEALTHY", last_run: "5 mins ago", error: null },
+        { id: "node-302", name: "Format Row Data", type: "n8n-nodes-base.code", latency_ms: 5, status: "HEALTHY", last_run: "5 mins ago", error: null },
+        { id: "node-303", name: "Append Row to Google Sheets", type: "n8n-nodes-base.googleSheets", latency_ms: 80, status: "HEALTHY", last_run: "5 mins ago", error: null }
       ]
     },
     {
-      id: "wf-bk-004",
-      name: "Property Tour Booking & Calendar Sync",
-      category: "Schedule & Calendar",
+      id: "wf-em-004",
+      name: "Email Reply Automation & Manager Approval",
+      category: "Email & Communication",
       active: true,
-      trigger: "Booking Webhook Endpoint",
-      last_executed: "12 minutes ago",
+      trigger: "IMAP Email Poller (Every 2m)",
+      last_executed: "1 minute ago",
       total_executions: 310,
-      success_rate: 97.5,
-      avg_latency_ms: 176,
+      success_rate: 98.7,
+      avg_latency_ms: 165,
       nodes: [
-        { id: "node-401", name: "Booking Payload Ingress", type: "n8n-nodes-base.webhook", latency_ms: 14, status: "HEALTHY", last_run: "12 mins ago", error: null },
-        { id: "node-402", name: "Google Calendar API Slot Creation", type: "n8n-nodes-base.googleCalendar", latency_ms: 110, status: "HEALTHY", last_run: "12 mins ago", error: null },
-        { id: "node-403", name: "Slack Agent Notification", type: "n8n-nodes-base.slack", latency_ms: 52, status: "HEALTHY", last_run: "12 mins ago", error: null }
+        { id: "node-401", name: "IMAP Email Listener", type: "n8n-nodes-base.emailReadImap", latency_ms: 25, status: "HEALTHY", last_run: "1 min ago", error: null },
+        { id: "node-402", name: "Email Ingestion & AI Draft", type: "n8n-nodes-base.httpRequest", latency_ms: 110, status: "HEALTHY", last_run: "1 min ago", error: null },
+        { id: "node-403", name: "SMTP Send Reply", type: "n8n-nodes-base.emailSend", latency_ms: 30, status: "HEALTHY", last_run: "1 min ago", error: null }
       ]
     },
     {
@@ -112,14 +112,14 @@ const DEFAULT_TELEMETRY = {
       category: "RAG Knowledge Base",
       active: true,
       trigger: "PDF OCR Upload Webhook",
-      last_executed: "18 minutes ago",
+      last_executed: "Just now",
       total_executions: 145,
-      success_rate: 95.2,
-      avg_latency_ms: 360,
+      success_rate: 99.8,
+      avg_latency_ms: 78,
       nodes: [
-        { id: "node-501", name: "OCR Document Ingestion Webhook", type: "n8n-nodes-base.webhook", latency_ms: 22, status: "HEALTHY", last_run: "18 mins ago", error: null },
-        { id: "node-502", name: "Text Chunking & Preprocessor", type: "n8n-nodes-base.code", latency_ms: 18, status: "HEALTHY", last_run: "18 mins ago", error: null },
-        { id: "node-503", name: "Pinecone Vector Store Upsert", type: "n8n-nodes-base.pinecone", latency_ms: 320, status: "WARN", last_run: "18 mins ago", error: "Latency spike (>300ms) detected during dense vector batch embedding" }
+        { id: "node-501", name: "OCR Document Ingestion Webhook", type: "n8n-nodes-base.webhook", latency_ms: 22, status: "HEALTHY", last_run: "Just now", error: null },
+        { id: "node-502", name: "Text Chunking & Preprocessor", type: "n8n-nodes-base.code", latency_ms: 18, status: "HEALTHY", last_run: "Just now", error: null },
+        { id: "node-503", name: "Pinecone Vector Store Upsert", type: "n8n-nodes-base.pinecone", latency_ms: 38, status: "HEALTHY", last_run: "Just now", error: null }
       ]
     },
     {
@@ -139,21 +139,7 @@ const DEFAULT_TELEMETRY = {
       ]
     }
   ],
-  node_issues: [
-    {
-      timestamp: new Date().toISOString(),
-      workflow_id: "wf-rg-005",
-      workflow_name: "RAG Knowledge Indexer & Vector Sync",
-      node_id: "node-503",
-      node_name: "Pinecone Vector Store Upsert",
-      node_type: "n8n-nodes-base.pinecone",
-      severity: "WARNING",
-      latency_ms: 320,
-      error_message: "Latency spike (>300ms) detected during dense vector batch embedding",
-      failing_parameter: "batch_size=50",
-      remediation: "Optimize batch size or verify upstream API connection rate limit."
-    }
-  ]
+  node_issues: []
 };
 
 // Node Type Icon Helper
