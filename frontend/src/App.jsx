@@ -65,7 +65,7 @@ function DashboardApp() {
       case 'overview': return <DashboardHome setActiveTab={setActiveTab} />;
       case 'developer_console': 
         return user?.role === 'developer' 
-          ? <DeveloperConsolePage /> 
+          ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> 
           : <DashboardHome setActiveTab={setActiveTab} />;
       case 'conversations': return <ConversationsPage />;
       case 'email_inbox': return <EmailInboxPage />;
