@@ -352,4 +352,20 @@ export async function syncDeveloperDatabases() {
   return handleResponse(response);
 }
 
+/**
+ * Fetch Executive Cross-Role Summary Intelligence Report
+ */
+export async function getCrossRoleSummaryReport(period = '7d') {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/analytics/cross-role-summary?period=${encodeURIComponent(period)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
 
