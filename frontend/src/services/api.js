@@ -408,4 +408,21 @@ export function getDeveloperLogsStreamUrl() {
   return `${API_BASE_URL}/api/v1/developer/logs/stream`;
 }
 
+/**
+ * Fetch Social Media KPI Analytics for Admin Command Center
+ */
+export async function getSocialAnalyticsKPIs(params = {}) {
+  const token = localStorage.getItem('glg_token');
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(`${API_BASE_URL}/api/v1/analytics/social-kpis${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
 

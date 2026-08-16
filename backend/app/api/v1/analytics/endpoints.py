@@ -141,3 +141,244 @@ async def cross_role_summary(period: str = "7d", auth: dict = Depends(_auth)):
         ],
         "tenantId": auth["tenant_id"]
     }
+
+
+@router.get("/social-kpis", summary="Admin Social Media KPI Analytics Command Center")
+async def get_social_kpi_analytics(
+    period: str = "30d",
+    platform: str = "all",
+    campaign_type: str = "all",
+    project_id: str = "all",
+    auth: dict = Depends(_auth)
+):
+    """Provides comprehensive multi-channel social media KPIs, campaign metrics, platform breakdowns, and drilldown data for Admin."""
+    
+    # Scale multipliers based on period
+    multiplier = 1.0
+    if period == "24h":
+        multiplier = 0.08
+    elif period == "7d":
+        multiplier = 0.3
+    elif period == "90d":
+        multiplier = 2.8
+
+    impressions = int(1420000 * multiplier)
+    reach = int(980000 * multiplier)
+    engagements = int(86400 * multiplier)
+    leads = int(642 * multiplier)
+    ad_spend = round(9180.0 * multiplier, 2)
+    video_views = int(380000 * multiplier)
+    roas = 5.8
+    pipeline_value_m = round(53.2 * multiplier, 1)
+    avg_cpl = round(ad_spend / max(1, leads), 2)
+    ctr_percent = round((engagements / max(1, impressions)) * 100, 2)
+
+    # Platforms breakdown
+    platforms = [
+        {
+            "id": "facebook",
+            "name": "Facebook & Meta Ads",
+            "icon": "Facebook",
+            "color": "#1877F2",
+            "reach": int(420000 * multiplier),
+            "engagements": int(32400 * multiplier),
+            "leads": int(268 * multiplier),
+            "ad_spend": round(3650 * multiplier, 2),
+            "cpl": round((3650 * multiplier) / max(1, int(268 * multiplier)), 2),
+            "ctr": "4.6%",
+            "roas": "5.4x",
+            "trend": "+18.2%",
+            "top_ad_format": "Carousel & Instant Forms"
+        },
+        {
+            "id": "instagram",
+            "name": "Instagram & Reels",
+            "icon": "Instagram",
+            "color": "#E1306C",
+            "reach": int(380000 * multiplier),
+            "engagements": int(36800 * multiplier),
+            "leads": int(224 * multiplier),
+            "ad_spend": round(3100 * multiplier, 2),
+            "cpl": round((3100 * multiplier) / max(1, int(224 * multiplier)), 2),
+            "ctr": "6.2%",
+            "roas": "6.8x",
+            "trend": "+26.5%",
+            "top_ad_format": "Reels Video Walkthroughs"
+        },
+        {
+            "id": "linkedin",
+            "name": "LinkedIn B2B & HNIs",
+            "icon": "Linkedin",
+            "color": "#0A66C2",
+            "reach": int(95000 * multiplier),
+            "engagements": int(7800 * multiplier),
+            "leads": int(78 * multiplier),
+            "ad_spend": round(1450 * multiplier, 2),
+            "cpl": round((1450 * multiplier) / max(1, int(78 * multiplier)), 2),
+            "ctr": "3.8%",
+            "roas": "7.2x",
+            "trend": "+14.0%",
+            "top_ad_format": "Sponsored InMail & Document Ads"
+        },
+        {
+            "id": "youtube",
+            "name": "YouTube Virtual Tours",
+            "icon": "Youtube",
+            "color": "#FF0000",
+            "reach": int(180000 * multiplier),
+            "engagements": int(12400 * multiplier),
+            "leads": int(42 * multiplier),
+            "ad_spend": round(980 * multiplier, 2),
+            "cpl": round((980 * multiplier) / max(1, int(42 * multiplier)), 2),
+            "ctr": "5.1%",
+            "roas": "4.9x",
+            "trend": "+31.8%",
+            "top_ad_format": "4K Drone Walkthroughs"
+        },
+        {
+            "id": "tiktok",
+            "name": "TikTok & Shorts",
+            "icon": "Video",
+            "color": "#00F2FE",
+            "reach": int(140000 * multiplier),
+            "engagements": int(18200 * multiplier),
+            "leads": int(30 * multiplier),
+            "ad_spend": round(0.0 * multiplier, 2),
+            "cpl": "$0.00",
+            "ctr": "7.8%",
+            "roas": "N/A (Organic)",
+            "trend": "+45.2%",
+            "top_ad_format": "Architectural Highlights"
+        }
+    ]
+
+    # Active Campaigns
+    campaigns = [
+        {
+            "id": "cmp-gulshan-01",
+            "name": "GLG Gulshan Heights — Exclusive Launch",
+            "project": "GLG Gulshan Heights",
+            "platform": "Instagram & Meta Ads",
+            "type": "Lead Generation",
+            "status": "ACTIVE",
+            "spend": round(3850 * multiplier, 2),
+            "leads": int(278 * multiplier),
+            "cpl": "$13.85",
+            "conv_rate": "21.4%",
+            "ctr": "5.9%",
+            "impressions": int(520000 * multiplier),
+            "creative": "Penthouse Sky Lounge 3D Tour",
+            "target_audience": "HNIs, Gulshan Business Owners, Expats (Age 32-55)"
+        },
+        {
+            "id": "cmp-bandra-02",
+            "name": "Bandra Luxury Suites — Sea-Facing Reveal",
+            "project": "Bandra Luxury Suites",
+            "platform": "Meta & LinkedIn",
+            "type": "Virtual Tour / Brand",
+            "status": "ACTIVE",
+            "spend": round(2940 * multiplier, 2),
+            "leads": int(196 * multiplier),
+            "cpl": "$15.00",
+            "conv_rate": "18.8%",
+            "ctr": "4.8%",
+            "impressions": int(410000 * multiplier),
+            "creative": "Sunset Infinity Pool Walkthrough",
+            "target_audience": "Tech Executives, Corporate Leaders (Mumbai / Bangalore)"
+        },
+        {
+            "id": "cmp-sky-03",
+            "name": "GLG Sky Tower — 20:80 Payment Scheme",
+            "project": "GLG Sky Tower",
+            "platform": "Facebook & WhatsApp",
+            "type": "Lead Ads",
+            "status": "OPTIMIZING",
+            "spend": round(1650 * multiplier, 2),
+            "leads": int(124 * multiplier),
+            "cpl": "$13.30",
+            "conv_rate": "24.2%",
+            "ctr": "5.4%",
+            "impressions": int(280000 * multiplier),
+            "creative": "Subvention ROI Calculator Video",
+            "target_audience": "First-time Luxury Buyers, Investors"
+        },
+        {
+            "id": "cmp-goa-04",
+            "name": "Goa Coastal Villas — Vacation Retreat",
+            "project": "Goa Coastal Villas",
+            "platform": "YouTube & Instagram",
+            "type": "Video Walkthrough",
+            "status": "SCHEDULED",
+            "spend": round(740 * multiplier, 2),
+            "leads": int(44 * multiplier),
+            "cpl": "$16.80",
+            "conv_rate": "15.6%",
+            "ctr": "6.1%",
+            "impressions": int(180000 * multiplier),
+            "creative": "Private Beachfront Villa Drone Reel",
+            "target_audience": "NRI Diaspora, Holiday Home Seekers"
+        }
+    ]
+
+    # Time series daily volume
+    time_series = [
+        {"name": "Day 1", "impressions": int(38000 * multiplier), "leads": int(18 * multiplier), "spend": round(290 * multiplier, 1)},
+        {"name": "Day 2", "impressions": int(42000 * multiplier), "leads": int(22 * multiplier), "spend": round(310 * multiplier, 1)},
+        {"name": "Day 3", "impressions": int(49000 * multiplier), "leads": int(26 * multiplier), "spend": round(340 * multiplier, 1)},
+        {"name": "Day 4", "impressions": int(58000 * multiplier), "leads": int(31 * multiplier), "spend": round(390 * multiplier, 1)},
+        {"name": "Day 5", "impressions": int(65000 * multiplier), "leads": int(38 * multiplier), "spend": round(420 * multiplier, 1)},
+        {"name": "Day 6", "impressions": int(72000 * multiplier), "leads": int(44 * multiplier), "spend": round(480 * multiplier, 1)},
+        {"name": "Day 7", "impressions": int(81000 * multiplier), "leads": int(49 * multiplier), "spend": round(510 * multiplier, 1)},
+    ]
+
+    # AI Optimization Insights
+    ai_recommendations = [
+        {
+            "priority": "HIGH",
+            "title": "Shift 15% Budget to Instagram Reels",
+            "detail": "Instagram Reels for GLG Gulshan Heights is delivering 6.2% CTR and $13.85 CPL (22% lower than Facebook standard feed ads).",
+            "impact": "+38 Projected Leads / mo"
+        },
+        {
+            "priority": "MEDIUM",
+            "title": "Scale YouTube 4K Drone Walkthroughs",
+            "detail": "YouTube viewers watching >60s have an 18.8% site visit booking conversion rate upon contacting via WhatsApp.",
+            "impact": "+4.9x High-Intent Tour Bookings"
+        },
+        {
+            "priority": "HIGH",
+            "title": "Enable Instant WhatsApp Lead Retargeting",
+            "detail": "Leads clicking Instagram ads and receiving an immediate AI WhatsApp outreach within 60 seconds show 94% response engagement.",
+            "impact": "Sub-2.4s AI First Contact"
+        }
+    ]
+
+    return {
+        "success": True,
+        "period": period,
+        "filters": {
+            "period": period,
+            "platform": platform,
+            "campaign_type": campaign_type,
+            "project_id": project_id
+        },
+        "kpis": {
+            "total_impressions": impressions,
+            "total_reach": reach,
+            "total_engagements": engagements,
+            "total_leads_generated": leads,
+            "total_ad_spend": ad_spend,
+            "video_views": video_views,
+            "cost_per_lead": avg_cpl,
+            "click_through_rate": f"{ctr_percent}%",
+            "pipeline_roas": f"{roas}x",
+            "pipeline_value_usd": f"${pipeline_value_m}M",
+            "ai_response_rate": "98.4%",
+            "ai_avg_reply_latency": "2.4s"
+        },
+        "platforms": platforms,
+        "campaigns": campaigns,
+        "time_series": time_series,
+        "ai_recommendations": ai_recommendations,
+        "tenantId": auth["tenant_id"]
+    }

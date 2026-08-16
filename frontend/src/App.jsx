@@ -6,11 +6,11 @@ import Header from './components/layout/Header';
 
 import DashboardHome from './pages/DashboardHome';
 import ConversationsPage from './pages/ConversationsPage';
-import EmailInboxPage from './pages/EmailInboxPage';
 import KnowledgePage from './pages/KnowledgePage';
 import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import SocialAnalyticsPage from './pages/SocialAnalyticsPage';
 import N8nMonitoringPage from './pages/N8nMonitoringPage';
 import DeveloperConsolePage from './pages/DeveloperConsolePage';
 import RoleReportsPage from './pages/RoleReportsPage';
@@ -50,13 +50,13 @@ function DashboardApp() {
     switch (activeTab) {
       case 'overview': return 'Dashboard Overview';
       case 'developer_console': return 'Engineering & Developer Console';
+      case 'analytics': return 'Analytics & Executive Command Center';
+      case 'social_analytics': return 'Social Media KPI & Campaign Analytics';
       case 'role_reports': return 'Executive Cross-Role Operational Reports';
       case 'conversations': return 'Live Customer Conversations & Takeover';
-      case 'email_inbox': return 'AI Email Inbox & n8n Reply Approval Center';
       case 'knowledge': return 'Knowledge Base & PDF OCR Manager';
       case 'content': return 'Social Content Generator & Approval Engine';
       case 'properties': return 'Property Inventory & Media Catalog';
-      case 'analytics': return 'Analytics & Executive Command Center';
       case 'n8n_monitoring': return 'n8n Workflow & Node Health Command';
       default: return 'Dashboard Overview';
     }
@@ -65,46 +65,51 @@ function DashboardApp() {
   const renderActivePage = () => {
     const isDev = user?.role === 'developer';
     const isAdmin = user?.role === 'admin';
+    const isManager = user?.role === 'manager';
+    const isAgent = user?.role === 'agent';
+    const isViewer = user?.role === 'viewer';
 
     switch (activeTab) {
       case 'overview': 
-        return <DashboardHome setActiveTab={setActiveTab} />;
+        return (isAdmin || isManager || isViewer)
+          ? <DashboardHome setActiveTab={setActiveTab} />
+          : <DeveloperConsolePage setActiveParentTab={setActiveTab} />;
       case 'developer_console': 
         return isDev 
           ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> 
+          : <DashboardHome setActiveTab={setActiveTab} />;
+      case 'social_analytics': 
+        return isAdmin 
+          ? <SocialAnalyticsPage /> 
           : <DashboardHome setActiveTab={setActiveTab} />;
       case 'role_reports': 
         return isAdmin 
           ? <RoleReportsPage /> 
           : <DashboardHome setActiveTab={setActiveTab} />;
       case 'analytics': 
-        return isDev 
-          ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> 
-          : <AnalyticsPage />;
+        return (isAdmin || isManager)
+          ? <AnalyticsPage />
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'conversations': 
-        return (isDev || isAdmin) 
-          ? (isDev ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> : <DashboardHome setActiveTab={setActiveTab} />) 
-          : <ConversationsPage />;
-      case 'email_inbox': 
-        return (isDev || isAdmin) 
-          ? (isDev ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> : <DashboardHome setActiveTab={setActiveTab} />) 
-          : <EmailInboxPage />;
+        return (isManager || isAgent) 
+          ? <ConversationsPage />
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'knowledge': 
-        return isAdmin 
-          ? <DashboardHome setActiveTab={setActiveTab} /> 
-          : <KnowledgePage />;
+        return (isManager || isDev) 
+          ? <KnowledgePage /> 
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'content': 
-        return (isDev || isAdmin) 
-          ? (isDev ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> : <DashboardHome setActiveTab={setActiveTab} />) 
-          : <ContentGeneratorPage />;
+        return isManager 
+          ? <ContentGeneratorPage />
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'properties': 
-        return isDev 
-          ? <DeveloperConsolePage setActiveParentTab={setActiveTab} /> 
-          : <PropertiesPage />;
+        return (isManager || isAgent || isViewer) 
+          ? <PropertiesPage /> 
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'n8n_monitoring': 
-        return isAdmin 
-          ? <DashboardHome setActiveTab={setActiveTab} /> 
-          : <N8nMonitoringPage />;
+        return isDev 
+          ? <N8nMonitoringPage /> 
+          : <DashboardHome setActiveTab={setActiveTab} />;
       default: 
         return <DashboardHome setActiveTab={setActiveTab} />;
     }

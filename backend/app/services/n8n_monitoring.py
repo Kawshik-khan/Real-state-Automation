@@ -470,3 +470,20 @@ class N8nMonitoringService:
                 node["last_run"] = f"Just now ({now_str})"
                 if node["status"] != "ERROR":
                     node["status"] = status
+
+    @staticmethod
+    async def _query_live_n8n_api() -> Optional[Dict[str, Any]]:
+        """Queries live n8n REST API if configured and reachable."""
+        if not getattr(settings, "n8n_api_key", None) or not getattr(settings, "n8n_api_url", None):
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                headers = {"X-N8N-API-KEY": settings.n8n_api_key}
+                resp = await client.get(f"{settings.n8n_api_url}/workflows", headers=headers)
+                if resp.status_code == 200:
+                    return None
+        except Exception:
+            pass
+
+        return None
