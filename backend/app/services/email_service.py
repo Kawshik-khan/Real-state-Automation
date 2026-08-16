@@ -172,8 +172,10 @@ class EmailService:
             except Exception as e:
                 logger.error(f"Failed to trigger n8n email send webhook: {e}")
 
-        # Real Gmail SMTP dispatch if credentials available
-        if not sent_successfully and settings.gmail_user_email and settings.gmail_app_password:
+        # Real Gmail SMTP dispatch if credentials available and recipient is a real email address
+        is_dummy_test_domain = any(domain in thread.customer_email.lower() for domain in ["@example.com", "@test.com", "@domain.com", "@localhost"])
+
+        if not sent_successfully and not is_dummy_test_domain and settings.gmail_user_email and settings.gmail_app_password:
             try:
                 import smtplib
                 from email.mime.text import MIMEText

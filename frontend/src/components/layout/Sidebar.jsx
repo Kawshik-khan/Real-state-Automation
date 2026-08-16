@@ -9,7 +9,8 @@ import {
   Zap,
   Lock,
   Mail,
-  Activity
+  Activity,
+  Terminal
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -18,14 +19,15 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const userRole = user?.role || 'viewer';
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'manager', 'agent', 'viewer'] },
-    { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', roles: ['admin', 'manager', 'agent'] },
-    { id: 'email_inbox', label: 'Email Inbox', icon: Mail, badge: 'AI DRAFT', roles: ['admin', 'manager', 'agent'] },
-    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['admin', 'manager'] },
-    { id: 'content', label: 'Content Engine', icon: Share2, roles: ['admin', 'manager'] },
-    { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'manager', 'agent', 'viewer'] },
-    { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, highlight: true, roles: ['admin', 'manager'] },
-    { id: 'n8n_monitoring', label: 'n8n Health', icon: Activity, badge: 'NODES', roles: ['admin', 'manager'] },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'manager', 'agent', 'developer', 'viewer'] },
+    { id: 'developer_console', label: 'Dev Console', icon: Terminal, badge: 'DEV ONLY', roles: ['developer'] },
+    { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', roles: ['admin', 'manager', 'agent', 'developer'] },
+    { id: 'email_inbox', label: 'Email Inbox', icon: Mail, badge: 'AI DRAFT', roles: ['admin', 'manager', 'agent', 'developer'] },
+    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['admin', 'manager', 'developer'] },
+    { id: 'content', label: 'Content Engine', icon: Share2, roles: ['admin', 'manager', 'developer'] },
+    { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'manager', 'agent', 'developer', 'viewer'] },
+    { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, highlight: true, roles: ['admin', 'manager', 'developer'] },
+    { id: 'n8n_monitoring', label: 'n8n Health', icon: Activity, badge: 'NODES', roles: ['admin', 'manager', 'developer'] },
   ];
 
   const visibleNavItems = navItems.filter(item => item.roles.includes(userRole));
@@ -117,8 +119,8 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         })}
       </nav>
 
-      {/* Role Notice Footer (Admin Only) */}
-      {userRole === 'admin' && (
+      {/* Role Notice Footer (Admin & Developer) */}
+      {(userRole === 'admin' || userRole === 'developer') && (
         <div style={{
           marginTop: 'auto',
           padding: '16px',
@@ -131,7 +133,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             <span>Active Role</span>
-            <span style={{ color: '#C084FC', fontWeight: 700, textTransform: 'capitalize' }}>{userRole}</span>
+            <span style={{ color: userRole === 'developer' ? '#38BDF8' : '#C084FC', fontWeight: 700, textTransform: 'capitalize' }}>
+              {userRole === 'developer' ? '🛠️ Developer' : userRole}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             <span>RBAC Guard</span>

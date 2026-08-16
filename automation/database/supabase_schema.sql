@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS system_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'manager', 'agent', 'viewer')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'developer', 'manager', 'agent', 'viewer')),
     hashed_password TEXT NOT NULL,
     tenant_id VARCHAR(255) DEFAULT 'glg-default',
     is_active BOOLEAN DEFAULT TRUE,
@@ -20,10 +20,11 @@ CREATE TABLE IF NOT EXISTS system_users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed Initial System Demo Accounts (Password: admin123, manager123, agent123, viewer123)
+-- Seed Initial System Demo Accounts (Password: admin123, dev123, manager123, agent123, viewer123)
 INSERT INTO system_users (id, email, full_name, role, hashed_password, tenant_id)
 VALUES 
     ('00000000-0000-0000-0000-000000000001', 'admin@glgassets.com', 'Alex Mercer (Admin)', 'admin', '8b48a1262d1d07c08e50b181b5d153213c3b06316279f187a4d5e9b33a5957d1', 'glg-default'),
+    ('00000000-0000-0000-0000-000000000005', 'developer@glgassets.com', 'Alex Chen (Developer)', 'developer', '4c995cfbfda287f3414995f36e8fa134d1ebcc86c2d1b7d5e48356f916be9946', 'glg-default'),
     ('00000000-0000-0000-0000-000000000002', 'manager@glgassets.com', 'Sarah Connor (Manager)', 'manager', '4b3226db9ebc0e0b3554d19d6ebfb937d5c9523f2f84260a95f9c47012354c41', 'glg-default'),
     ('00000000-0000-0000-0000-000000000003', 'agent@glgassets.com', 'Rahul Sharma (Agent)', 'agent', '5b927e1f486a4574972d5c07b76735515bf61b7f0e6b5278c66e2c38865e94b2', 'glg-default'),
     ('00000000-0000-0000-0000-000000000004', 'viewer@glgassets.com', 'Guest Stakeholder (Viewer)', 'viewer', '3c89d2d09e530b1b11b59cf9cf90538a08d2983584824361541484400e998782', 'glg-default')

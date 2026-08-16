@@ -206,6 +206,101 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+
+        {/* Demo Fast Login Pills */}
+        <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '10px', textAlign: 'center' }}>
+            ⚡ QUICK DEMO CREDENTIALS
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => { setEmail('developer@glgassets.com'); setPassword('dev123'); }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(14, 165, 233, 0.15)',
+                border: '1px solid rgba(14, 165, 233, 0.35)',
+                color: '#38BDF8',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'center',
+                gridColumn: 'span 2'
+              }}
+            >
+              🛠️ Developer: developer@glgassets.com (dev123)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEmail('admin@glgassets.com'); setPassword('admin123'); }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(139, 92, 246, 0.15)',
+                border: '1px solid rgba(139, 92, 246, 0.35)',
+                color: '#C084FC',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              👑 Admin (admin123)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEmail('manager@glgassets.com'); setPassword('manager123'); }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                color: '#60A5FA',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              👔 Manager (manager123)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEmail('agent@glgassets.com'); setPassword('agent123'); }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#34D399',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              🎧 Agent (agent123)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEmail('viewer@glgassets.com'); setPassword('viewer123'); }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(156, 163, 175, 0.15)',
+                border: '1px solid rgba(156, 163, 175, 0.35)',
+                color: '#9CA3AF',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              👁️ Viewer (viewer123)
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

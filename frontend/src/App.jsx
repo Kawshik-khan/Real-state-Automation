@@ -12,9 +12,12 @@ import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import N8nMonitoringPage from './pages/N8nMonitoringPage';
+import DeveloperConsolePage from './pages/DeveloperConsolePage';
 
 const getDefaultTabForRole = (role) => {
   switch (role) {
+    case 'developer':
+      return 'developer_console'; // Forward Developer directly to Developer Console
     case 'agent':
       return 'conversations'; // Forward Agents directly to Live Conversations
     case 'viewer':
@@ -45,6 +48,7 @@ function DashboardApp() {
   const getTabTitle = () => {
     switch (activeTab) {
       case 'overview': return 'Dashboard Overview';
+      case 'developer_console': return 'Engineering & Developer Console';
       case 'conversations': return 'Live Customer Conversations & Takeover';
       case 'email_inbox': return 'AI Email Inbox & n8n Reply Approval Center';
       case 'knowledge': return 'Knowledge Base & PDF OCR Manager';
@@ -59,6 +63,10 @@ function DashboardApp() {
   const renderActivePage = () => {
     switch (activeTab) {
       case 'overview': return <DashboardHome setActiveTab={setActiveTab} />;
+      case 'developer_console': 
+        return user?.role === 'developer' 
+          ? <DeveloperConsolePage /> 
+          : <DashboardHome setActiveTab={setActiveTab} />;
       case 'conversations': return <ConversationsPage />;
       case 'email_inbox': return <EmailInboxPage />;
       case 'knowledge': return <KnowledgePage />;

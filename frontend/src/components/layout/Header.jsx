@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Bell, Activity, ShieldCheck, LogOut, User } from 'lucide-react';
+import { Search, Bell, Activity, ShieldCheck, LogOut, User, Cpu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Header({ activeTabTitle = "Dashboard Overview" }) {
@@ -9,6 +9,8 @@ export default function Header({ activeTabTitle = "Dashboard Overview" }) {
     switch (role) {
       case 'admin':
         return { bg: 'rgba(139, 92, 246, 0.2)', border: '1px solid rgba(139, 92, 246, 0.4)', color: '#C084FC', label: '👑 Admin' };
+      case 'developer':
+        return { bg: 'rgba(14, 165, 233, 0.2)', border: '1px solid rgba(14, 165, 233, 0.4)', color: '#38BDF8', label: '🛠️ Developer' };
       case 'manager':
         return { bg: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60A5FA', label: '👔 Manager' };
       case 'agent':
@@ -53,7 +55,7 @@ export default function Header({ activeTabTitle = "Dashboard Overview" }) {
           />
         </div>
 
-        {/* Telemetry Indicator (Admin Only) */}
+        {/* Telemetry Indicator (Admin & Developer) */}
         {user?.role === 'admin' && (
           <div style={{
             display: 'flex',
@@ -67,6 +69,24 @@ export default function Header({ activeTabTitle = "Dashboard Overview" }) {
           }}>
             <Activity size={14} color="#34D399" />
             <span>Pinecone RAG Active</span>
+          </div>
+        )}
+
+        {user?.role === 'developer' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            background: 'rgba(14, 165, 233, 0.12)',
+            border: '1px solid rgba(14, 165, 233, 0.3)',
+            color: '#38BDF8',
+            fontSize: '0.8rem',
+            fontWeight: 600
+          }}>
+            <Cpu size={14} color="#38BDF8" />
+            <span>Dev Diagnostics Online</span>
           </div>
         )}
 

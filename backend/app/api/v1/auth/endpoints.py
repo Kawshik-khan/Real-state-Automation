@@ -42,6 +42,16 @@ USERS_DB: dict[str, UserInDB] = {
         hashed_password=hash_password("agent123"),
         created_at=datetime.utcnow().isoformat(),
     ),
+    "developer@glgassets.com": UserInDB(
+        id="usr-dev-005",
+        email="developer@glgassets.com",
+        full_name="Alex Chen (Dev Lead)",
+        role=UserRole.DEVELOPER,
+        tenant_id="glg-default",
+        is_active=True,
+        hashed_password=hash_password("dev123"),
+        created_at=datetime.utcnow().isoformat(),
+    ),
     "viewer@glgassets.com": UserInDB(
         id="usr-viewer-004",
         email="viewer@glgassets.com",
@@ -114,8 +124,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/users", response_model=List[UserResponse])
-async def list_users(current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.MANAGER]))):
-    """List all registered platform users (Admin & Manager only)."""
+async def list_users(current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER]))):
+    """List all registered platform users (Admin, Manager & Developer)."""
     return [
         UserResponse(
             id=u.id,

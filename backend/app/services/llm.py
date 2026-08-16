@@ -54,40 +54,66 @@ class LLMService:
             print(f"[LLMService Error] structured_chat failed: {e}")
             return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
 
+    def __init__(self):
+        self._pinecone_client = None
+
+    def get_pinecone_client(self):
+        if self._pinecone_client is None and settings.pinecone_api_key:
+            try:
+                from pinecone import Pinecone
+                self._pinecone_client = Pinecone(api_key=settings.pinecone_api_key)
+            except Exception as e:
+                print(f"[LLMService] Failed initializing Pinecone client: {e}")
+        return self._pinecone_client
+
     async def embed(self, text: str, input_type: str = "passage") -> list[float]:
+        results = await self.embed_batch([text], input_type=input_type)
+        return results[0] if results else [(0.0) for _ in range(getattr(settings, "vector_dim", 1024))]
+
+    async def embed_batch(self, texts: list[str], input_type: str = "passage") -> list[list[float]]:
+        if not texts:
+            return []
+
         target_dim = getattr(settings, "vector_dim", 1024)
 
-        # 1. Try OpenAI embeddings (supports text-embedding-3-large, text-embedding-3-small)
+        # 1. Try OpenAI embeddings
         client = self.get_client()
         if client and "groq.com" not in (settings.openai_base_url or ""):
             try:
                 emb_model = getattr(settings, "openai_embedding_model", None) or "text-embedding-3-large"
-                kwargs = {"model": emb_model, "input": text}
+                kwargs = {"model": emb_model, "input": texts}
                 if "text-embedding-3" in emb_model:
                     kwargs["dimensions"] = target_dim
                 resp = await client.embeddings.create(**kwargs)
-                return resp.data[0].embedding
+                return [d.embedding for d in resp.data]
             except Exception as e:
-                print(f"[LLMService] OpenAI embedding failed: {e}")
+                print(f"[LLMService] OpenAI batch embedding failed: {e}")
 
         # 2. Try Pinecone Inference API (multilingual-e5-large outputs 1024-dim)
-        if settings.pinecone_api_key:
+        pc = self.get_pinecone_client()
+        if pc:
             try:
-                from pinecone import Pinecone
-                pc = Pinecone(api_key=settings.pinecone_api_key)
-                res = pc.inference.embed(
-                    model="multilingual-e5-large",
-                    inputs=[text],
-                    parameters={"input_type": input_type, "truncate": "END"}
-                )
-                return res[0]["values"]
+                all_vectors = []
+                batch_size = 96
+                for i in range(0, len(texts), batch_size):
+                    batch = texts[i:i + batch_size]
+                    res = pc.inference.embed(
+                        model="multilingual-e5-large",
+                        inputs=batch,
+                        parameters={"input_type": input_type, "truncate": "END"}
+                    )
+                    all_vectors.extend([r["values"] for r in res])
+                return all_vectors
             except Exception as pe:
-                print(f"[LLMService] Pinecone Inference embedding failed: {pe}")
+                print(f"[LLMService] Pinecone Inference batch embedding failed: {pe}")
 
-        # 3. Fallback deterministic hash vector
+        # 3. Fallback deterministic hash vectors
         import hashlib
-        h = hashlib.sha256(text.encode()).digest()
-        return [(h[i % 32] / 255.0) - 0.5 for i in range(target_dim)]
+        fallback_vecs = []
+        for text in texts:
+            h = hashlib.sha256(text.encode()).digest()
+            fallback_vecs.append([(h[i % 32] / 255.0) - 0.5 for i in range(target_dim)])
+        return fallback_vecs
 
 
 llm_service = LLMService()

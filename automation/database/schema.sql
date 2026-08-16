@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS system_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'manager', 'agent', 'viewer')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'developer', 'manager', 'agent', 'viewer')),
     hashed_password TEXT NOT NULL,
     tenant_id VARCHAR(255) DEFAULT 'glg-default',
     is_active BOOLEAN DEFAULT TRUE,

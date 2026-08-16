@@ -9,6 +9,7 @@ EmailStr = str
 
 class UserRole(str, Enum):
     ADMIN = "admin"
+    DEVELOPER = "developer"
     MANAGER = "manager"
     AGENT = "agent"
     VIEWER = "viewer"

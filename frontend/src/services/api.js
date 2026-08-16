@@ -288,4 +288,68 @@ export async function testN8nWorkflow(workflowId) {
   return handleResponse(response);
 }
 
+/**
+ * Fetch Developer System Health diagnostics
+ */
+export async function getDeveloperSystemHealth() {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/system-health`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Simulate Webhook Payload through AI Pipeline (Developer only)
+ */
+export async function simulateDeveloperWebhook(payload) {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/simulate-webhook`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Run RAG Vector Search Benchmark (Developer only)
+ */
+export async function benchmarkDeveloperRAG(payload) {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/rag-benchmark`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+ 
+/**
+ * Trigger live Supabase and Pinecone database & vector sync (Developer only)
+ */
+export async function syncDeveloperDatabases() {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/sync-databases`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
 

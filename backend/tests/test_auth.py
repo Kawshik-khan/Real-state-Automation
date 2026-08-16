@@ -40,6 +40,17 @@ def test_login_success_agent():
     assert data["user"]["role"] == "agent"
 
 
+def test_login_success_developer():
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "developer@glgassets.com", "password": "dev123"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user"]["role"] == "developer"
+    assert data["user"]["email"] == "developer@glgassets.com"
+
+
 def test_login_invalid_password():
     response = client.post(
         "/api/v1/auth/login",

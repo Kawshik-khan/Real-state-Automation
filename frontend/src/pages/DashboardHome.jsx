@@ -17,7 +17,10 @@ import {
   Inbox,
   RefreshCw,
   Zap,
-  Activity
+  Activity,
+  Terminal,
+  Cpu,
+  Database
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sendChatMessage, getAnalyticsReport, getConversations } from '../services/api';
@@ -217,26 +220,29 @@ export default function DashboardHome({ setActiveTab }) {
       {/* ── Dynamic Hero Banner ── */}
       <div className="glass-card" style={{
         padding: '24px 32px',
-        background: userRole === 'agent'
+        background: userRole === 'developer'
+          ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.7), rgba(17, 24, 39, 0.9))'
+          : userRole === 'agent'
           ? 'linear-gradient(135deg, rgba(6, 78, 59, 0.7), rgba(17, 24, 39, 0.9))'
           : userRole === 'manager'
           ? 'linear-gradient(135deg, rgba(30, 58, 138, 0.7), rgba(17, 24, 39, 0.9))'
           : userRole === 'admin'
           ? 'linear-gradient(135deg, rgba(88, 28, 135, 0.7), rgba(17, 24, 39, 0.9))'
           : 'linear-gradient(135deg, rgba(31, 41, 55, 0.7), rgba(17, 24, 39, 0.9))',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
+        border: userRole === 'developer' ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid rgba(139, 92, 246, 0.3)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
         <div>
-          <div className="badge badge-violet" style={{ marginBottom: '8px' }}>
+          <div className="badge badge-violet" style={{ marginBottom: '8px', background: userRole === 'developer' ? 'rgba(14, 165, 233, 0.25)' : undefined, color: userRole === 'developer' ? '#38BDF8' : undefined }}>
             <Sparkles size={12} /> {userRole.toUpperCase()} REAL-TIME CONSOLE
           </div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>
             Welcome back, {user?.full_name || 'Team Member'} 👋
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
+            {userRole === 'developer' && `🛠️ Engineering Control Deck • Full API, Webhook & RAG Diagnostics Engine Active`}
             {userRole === 'agent' && `🎧 Customer Support & Sales Desk • ${metrics.incomingMessagesToday} Live Messages Received Today`}
             {userRole === 'manager' && `👔 Operations & Team Performance Hub • ${metrics.pendingApprovals} Social Posts Pending Review`}
             {userRole === 'admin' && `👑 Executive AI Command Center • 4 Channels Active • 94.2% AI Self-Resolution`}
@@ -245,6 +251,11 @@ export default function DashboardHome({ setActiveTab }) {
         </div>
 
         {/* Dynamic Action Button */}
+        {userRole === 'developer' && (
+          <button className="btn-gradient" onClick={() => setActiveTab('developer_console')} style={{ background: 'linear-gradient(135deg, #0EA5E9, #2563EB)' }}>
+            <Terminal size={16} /> Open Developer Console
+          </button>
+        )}
         {userRole === 'agent' && (
           <button className="btn-gradient" onClick={() => setActiveTab('conversations')}>
             <MessageSquare size={16} /> Takeover Live Chats
@@ -270,6 +281,63 @@ export default function DashboardHome({ setActiveTab }) {
       {/* ── Dynamic KPI Grid ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
         
+        {/* DEVELOPER ROLE KPIS */}
+        {userRole === 'developer' && (
+          <>
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Active API Routes</span>
+                <Terminal size={20} color="#38BDF8" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                28 Registered
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                FastAPI v1.0.0 Online
+              </span>
+            </div>
+
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Pinecone Vector Index</span>
+                <Database size={20} color="#34D399" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                1536-dim Cosine
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600 }}>
+                {pingStats.pinecone}ms Search Latency
+              </span>
+            </div>
+
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>n8n Monitored Workflows</span>
+                <Activity size={20} color="#C084FC" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                6 Active Pipelines
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600 }}>
+                20 Monitored Nodes
+              </span>
+            </div>
+
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>System Uptime &amp; Health</span>
+                <Cpu size={20} color="#FBBF24" />
+              </div>
+              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '8px 0', color: '#FFFFFF' }}>
+                99.98% / Healthy
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#FBBF24', fontWeight: 600 }}>
+                {pingStats.pgvector}ms DB Ping
+              </span>
+            </div>
+          </>
+        )}
+
         {/* AGENT ROLE KPIS */}
         {userRole === 'agent' && (
           <>
@@ -593,6 +661,136 @@ export default function DashboardHome({ setActiveTab }) {
       </div>
 
       {/* ── Main Grid Content by Role ── */}
+
+      {/* DEVELOPER ROLE MAIN FEATURE: Engineering Console Quick Launch & Diagnostics */}
+      {userRole === 'developer' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '24px' }}>
+          
+          {/* Engineering Hub Overview */}
+          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: '#FFFFFF' }}>
+                <Terminal size={18} color="#38BDF8" />
+                Developer Engineering &amp; Diagnostic Suite
+              </h3>
+              <span className="badge" style={{ background: 'rgba(14, 165, 233, 0.2)', color: '#38BDF8', border: '1px solid rgba(14, 165, 233, 0.4)' }}>
+                ● Active Workspace
+              </span>
+            </div>
+
+            <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: 0, lineHeight: 1.6 }}>
+              You are signed in with the exclusive Developer role. Access the interactive API Request Runner, multi-channel webhook dispatcher, RAG vector database benchmark, and real-time backend telemetry engine.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '8px' }}>
+              <div 
+                onClick={() => setActiveTab('developer_console')}
+                style={{
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid rgba(14, 165, 233, 0.3)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Play size={14} /> API Playground
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px', margin: 0 }}>
+                  Test /api/chat, /api/search &amp; /api/content
+                </p>
+              </div>
+
+              <div 
+                onClick={() => setActiveTab('developer_console')}
+                style={{
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34D399', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Database size={14} /> RAG Benchmark
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px', margin: 0 }}>
+                  Pinecone &amp; Cosine similarity diagnostics
+                </p>
+              </div>
+
+              <div 
+                onClick={() => setActiveTab('n8n_monitoring')}
+                style={{
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid rgba(192, 132, 252, 0.3)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#C084FC', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={14} /> n8n Telemetry
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px', margin: 0 }}>
+                  Inspect 20 live workflow nodes
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button 
+                onClick={() => setActiveTab('developer_console')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #0EA5E9, #2563EB)',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Terminal size={14} /> Open Developer Console
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Real-Time Ping Card */}
+          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color="#FBBF24" /> Microservice Latencies
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.6)' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Pinecone Vector Search</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34D399' }}>{pingStats.pinecone}ms</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.6)' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Supabase PostgreSQL</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38BDF8' }}>{pingStats.pgvector}ms</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.6)' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>WhatsApp Webhook Gateway</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FBBF24' }}>{pingStats.whatsapp}ms</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.6)' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>FastAPI LangGraph Engine</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#C084FC' }}>{pingStats.website}ms</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* AGENT ROLE MAIN FEATURE: Live Incoming Customer Message Queue Stream */}
       {userRole === 'agent' && (
