@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     telegram_bot_token: Optional[str] = None
     whatsapp_verify_token: Optional[str] = None
 
+    # Meta / Facebook / Instagram Graph API Settings
+    facebook_page_id: Optional[str] = None
+    facebook_page_access_token: Optional[str] = None
+    facebook_app_secret: Optional[str] = None
+    instagram_account_id: Optional[str] = None
+    meta_graph_api_version: str = "v19.0"
+    social_auto_dm_enabled: bool = True
+
     # Gmail SMTP / IMAP Settings
     gmail_user_email: Optional[str] = "kawshikkhan25@gmail.com"
     gmail_app_password: Optional[str] = "sfnn btmk hvfk tixq"

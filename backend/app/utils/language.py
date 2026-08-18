@@ -6,7 +6,7 @@ BANGLISH_KEYWORDS = {
     "kemon", "koto", "kothay", "koi", "apnader", "amar", "amader", "dam", "dham",
     "lagbe", "chai", "chahi", "achhen", "achen", "achena", "bhai", "bhaiya", "vai",
     "vaiya", "bhalo", "valo", "ache", "ase", "korben", "janan", "bolun", "dhaka",
-    "barier", "jomi", "flat", "flats", "dorkar", "apni", "tumi", "ke"
+    "barier", "jomi", "dorkar", "apni", "tumi", "ke", "konta", "kisu"
 }
 
 

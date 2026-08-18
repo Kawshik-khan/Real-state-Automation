@@ -87,7 +87,7 @@ async def get_developer_system_health(
             "llm_orchestrator": {
                 "openai_active": has_openai,
                 "gemini_active": has_gemini,
-                "default_model": getattr(settings, "openai_model", "llama-3.3-70b-versatile"),
+                "default_model": getattr(settings, "openai_model", "openai/gpt-oss-120b"),
                 "status": "READY",
             },
             "n8n_telemetry_engine": {

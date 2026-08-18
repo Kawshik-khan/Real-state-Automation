@@ -61,12 +61,25 @@ async def blocked_node(state: AIState) -> dict:
 async def supervisor_node(state: AIState) -> dict:
     from app.services.llm import llm_service
 
-    # Banglish / Bangla property inquiry safeguard
     msg_lower = state.message.lower() if state.message else ""
-    property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
-    is_pure_greeting = any(g in msg_lower for g in ["hello", "hi ", "hey", "assalamu", "slam"]) and not any(kw in msg_lower for kw in ["banani", "gulshan", "uttara", "flat", "project", "ki ache", "konta ache"])
+    # Direct greeting safeguard
+    msg_trimmed = msg_lower.strip()
+    if msg_trimmed in ["hi", "hello", "hey", "salam", "assalamu alaikum", "assalamualaykum", "good morning", "good evening", "good afternoon"] or (
+        any(msg_trimmed.startswith(gw) for gw in ["hi ", "hello ", "hey ", "good morning", "good evening", "assalamu alaikum"]) and not any(kw in msg_lower for kw in ["banani", "gulshan", "uttara", "flat", "project", "ki ache", "price", "dam"])
+    ):
+        return {
+            "intent": IntentResult(
+                intent="greeting",
+                confidence=0.98,
+                entities={"location": "", "project": "", "bedrooms": 0, "budget": ""}
+            ),
+            "intent_classified": True,
+            "messages_used": state.messages_used + 1
+        }
 
-    if any(kw in msg_lower for kw in property_keywords) and not is_pure_greeting:
+    # Banglish / Bangla property inquiry safeguard
+    property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
+    if any(kw in msg_lower for kw in property_keywords):
         loc = ""
         for known_loc in ["banani", "gulshan", "uttara", "dhanmondi", "mumbai", "bandra"]:
             if known_loc in msg_lower:

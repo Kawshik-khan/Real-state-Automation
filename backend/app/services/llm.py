@@ -15,7 +15,7 @@ class LLMService:
 
     @property
     def model(self) -> str:
-        return settings.openai_model or "llama-3.3-70b-versatile"
+        return settings.openai_model or "openai/gpt-oss-120b"
 
     async def chat(self, messages: list, response_format: Optional[dict] = None, temperature: float = 0.3) -> str:
         client = self.get_client()

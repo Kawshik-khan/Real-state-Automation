@@ -12,15 +12,31 @@ n8n-token.txt
 *.sqlite
 *.sqlite3
 
-# Generated PDFs & Assets
+# Generated PDFs, Documents & Presentations
 *.pdf
 *.docx
 *.doc
+*.pptx
+*.ppt
+*.key
+*Presentation*
+*presentation*
+GLG_Assets_Developer_Presentation.*
+GLG_Assets_Developer_System_Design_and_Technical_Report.*
+GLG_Assets_System_Design_and_Report.*
+AI_AUTOMATION_SYSTEM_EXPLAINER_AND_MEETING_PREP.md
+*Teoritycal*
+docs/*Presentation*
+docs/*System_Design*
+docs/*Technical_Report*
+docs/*Teoritycal*
 
-# Temporary & Local Scratch/Fix Notes
+# Temporary & Local Scratch/Fix Notes & Doc Scripts
 chat-response-format-fix.md
 .chat-response-format-fix.md
 supabase-migration-plan.txt
+backend/scripts/convert_md_to_docx.py
+backend/scripts/update_system_design_docx.py
 
 # Temporary Test & Utility Scripts (Local execution only)
 test.txt

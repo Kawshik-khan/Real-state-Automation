@@ -425,4 +425,20 @@ export async function getSocialAnalyticsKPIs(params = {}) {
   return handleResponse(response);
 }
 
+/**
+ * Simulate Facebook/Instagram Comment to Private DM Lead Bridge
+ */
+export async function simulateSocialCommentToDm(payload) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/social/simulator/comment-to-dm`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+
+
 
