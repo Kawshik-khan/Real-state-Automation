@@ -10,7 +10,13 @@ import asyncio
 import os
 import sys
 import uuid
-import pypdf
+try:
+    import pypdf
+except ImportError:
+    try:
+        import PyPDF2 as pypdf
+    except ImportError:
+        pypdf = None
 import requests
 from pathlib import Path
 from typing import List, Dict, Any
@@ -143,27 +149,30 @@ async def sync_pinecone_and_supabase() -> Dict[str, Any]:
         })
 
         try:
-            reader = pypdf.PdfReader(str(pdf_path))
-            print(f"\n📄 Processing [{pdf_path.name}] ({len(reader.pages)} pages, Project: {meta_info['project']})...")
-            stats["pdf_files_processed"] += 1
+            if pypdf is not None:
+                reader = pypdf.PdfReader(str(pdf_path))
+                print(f"\n📄 Processing [{pdf_path.name}] ({len(reader.pages)} pages, Project: {meta_info['project']})...")
+                stats["pdf_files_processed"] += 1
 
-            for page_idx, page in enumerate(reader.pages):
-                page_text = page.extract_text() or ""
-                if not page_text.strip():
-                    continue
+                for page_idx, page in enumerate(reader.pages):
+                    page_text = page.extract_text() or ""
+                    if not page_text.strip():
+                        continue
 
-                page_chunks = chunk_text(page_text)
-                for chunk_idx, chunk in enumerate(page_chunks):
-                    chunk_id = f"{meta_info['doc_id']}_p{page_idx + 1}_c{chunk_idx + 1}"
-                    raw_chunks_to_embed.append({
-                        "id": chunk_id,
-                        "text": chunk,
-                        "document": pdf_path.name,
-                        "project": meta_info["project"],
-                        "category": meta_info["category"],
-                        "page": page_idx + 1,
-                        "doc_id": meta_info["doc_id"]
-                    })
+                    page_chunks = chunk_text(page_text)
+                    for chunk_idx, chunk in enumerate(page_chunks):
+                        chunk_id = f"{meta_info['doc_id']}_p{page_idx + 1}_c{chunk_idx + 1}"
+                        raw_chunks_to_embed.append({
+                            "id": chunk_id,
+                            "text": chunk,
+                            "document": pdf_path.name,
+                            "project": meta_info["project"],
+                            "category": meta_info["category"],
+                            "page": page_idx + 1,
+                            "doc_id": meta_info["doc_id"]
+                        })
+            else:
+                print(f"[!] Warning: Neither pypdf nor PyPDF2 installed; skipping PDF extraction for {pdf_path.name}")
 
             # Upload PDF file to Supabase Storage bucket 'brochures'
             if supabase_url and supabase_key:

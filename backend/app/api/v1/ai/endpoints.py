@@ -141,7 +141,7 @@ async def _build_full_chat_response(extracted_data: dict, body: ChatRequest, aut
         metadata=extracted_data.get("metadata", {}),
     )
 
-    res = resp.dict()
+    res = resp.model_dump()
     res["success"] = True
     return res
 

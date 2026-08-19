@@ -1,18 +1,19 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class StructuredChatResponse(BaseModel):
     """MVP simplified chat response format per specification: {"reply":"...", "actions":["send_images","send_brochure"]}"""
     reply: str = Field(..., description="AI response text to the user")
     actions: Optional[List[str]] = Field(None, description="List of action type strings (e.g., 'send_images', 'send_brochure')")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "reply": "I found 3 properties matching your criteria.",
                 "actions": ["send_images", "send_brochure"]
             }
         }
+    )
 
 class FullChatResponse(BaseModel):
     """Original comprehensive chat response format (backward compatibility)"""
@@ -24,8 +25,8 @@ class FullChatResponse(BaseModel):
     requires_escalation: bool
     metadata: dict
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "reply": "I found 3 properties matching your criteria.",
                 "confidence": 0.85,
@@ -44,3 +45,4 @@ class FullChatResponse(BaseModel):
                 }
             }
         }
+    )

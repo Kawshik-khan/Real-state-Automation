@@ -20,15 +20,15 @@ router = APIRouter(tags=["Developer Console"])
 
 
 class WebhookSimulationRequest(BaseModel):
-    channel: str = Field(..., example="whatsapp")  # whatsapp, telegram, messenger, email, website
-    sender_id: str = Field("sim-user-99", example="sim-user-99")
-    sender_name: str = Field("Test Lead", example="Tanvir Ahmed")
-    message_text: str = Field(..., example="Hi, what is the price and payment plan for GLG Sky Tower 3BHK?")
-    project_context: Optional[str] = Field("GLG Sky Tower", example="GLG Sky Tower")
+    channel: str = Field(..., json_schema_extra={"example": "whatsapp"})  # whatsapp, telegram, messenger, email, website
+    sender_id: str = Field("sim-user-99", json_schema_extra={"example": "sim-user-99"})
+    sender_name: str = Field("Test Lead", json_schema_extra={"example": "Tanvir Ahmed"})
+    message_text: str = Field(..., json_schema_extra={"example": "Hi, what is the price and payment plan for GLG Sky Tower 3BHK?"})
+    project_context: Optional[str] = Field("GLG Sky Tower", json_schema_extra={"example": "GLG Sky Tower"})
 
 
 class RAGBenchmarkRequest(BaseModel):
-    query: str = Field(..., example="What are the amenities and handover date for Bandra Luxury project?")
+    query: str = Field(..., json_schema_extra={"example": "What are the amenities and handover date for Bandra Luxury project?"})
     top_k: int = Field(5, ge=1, le=20)
     score_threshold: float = Field(0.65, ge=0.0, le=1.0)
 
