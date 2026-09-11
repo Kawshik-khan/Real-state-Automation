@@ -1,40 +1,28 @@
 """Email Agent — Specialized AI Agent for Email Ingestion & Auto-Reply Generation.
 
-Processes email thread context, parses attachments, performs RAG retrieval on property
-catalogs & FAQs, evaluates confidence/risk, and generates structured email replies.
+Audit Reference: prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md
+Eliminates hardcoded $250k / 3.5 Cr price block, sources canonical properties and policies,
+preserves role-separated message structure, and runs pre-send GroundingValidator.
 """
 
 from typing import Any, Dict, List, Optional
+import json
 import logging
 
 from app.services.llm import llm_service
 from app.services.attachment_parser import attachment_parser
+from app.prompts.email import EMAIL_AGENT_SYSTEM_PROMPT
+from app.prompts.registry import log_prompt_telemetry
+from app.repositories.property_repository import property_repository
+from app.repositories.policy_repository import policy_repository
+from app.repositories.contact_repository import contact_repository
+from app.services.grounding_validator import grounding_validator
 
 logger = logging.getLogger(__name__)
 
-EMAIL_AGENT_SYSTEM_PROMPT = """You are the Lead Executive AI Email Representative for GLG Assets Real Estate.
-Your responsibility is to generate formal, highly professional, polite, and accurate email responses to customer inquiries.
-
-GUIDELINES:
-1. Tone: Warm, executive, professional real-estate advisor.
-2. Structure:
-   - Greeting (e.g. "Dear [Customer Name],")
-   - Gratitude for contacting GLG Assets
-   - Clear, direct, structured answer to their specific questions (use clean bullet points if summarizing property details, unit availability, or payment terms)
-   - Call to Action (e.g. scheduling a private property tour or speaking with a dedicated property manager)
-   - Formal Sign-off ("Best regards,\nGLG Assets Client Services Team")
-3. Context: Rely on property information, payment options, and FAQs provided below.
-4. Accuracy: Do NOT invent property features or prices not backed by the provided knowledge.
-
-KNOWLEDGE BASE CONTEXT:
-- GLG Gulshan Heights: Premium luxury residential complex in Gulshan, 3-4 BHK apartments, modern amenities (rooftop pool, gym, 24/7 security). Starting price $250,000 / BDT 3.5 Crore.
-- Payment Terms: 10% booking amount, 30% milestone construction-linked payments, 60% upon possession. Home loan financing available through partner banks.
-- Location: Gulshan Avenue, Dhaka, Bangladesh.
-"""
-
 
 class EmailAgent:
-    """Specialized AI Agent for Email Automation."""
+    """Specialized AI Agent for Email Automation grounded in canonical data."""
 
     async def process_email(
         self,
@@ -46,77 +34,111 @@ class EmailAgent:
         attachment_texts: Optional[List[str]] = None,
         rag_context: str = "",
     ) -> Dict[str, Any]:
-        """Processes an incoming email message within its thread context and generates an AI draft response."""
+        """Processes an incoming email within its thread context and generates an AI draft response."""
 
-        # 1. Format thread history
-        history_str = ""
-        if thread_history:
-            formatted_turns = []
-            for turn in thread_history[-5:]:
-                role = turn.get("sender_type", turn.get("role", "customer"))
-                content = turn.get("body_text", turn.get("text", turn.get("content", "")))
-                formatted_turns.append(f"[{role.upper()}]: {content[:400]}")
-            history_str = "\n".join(formatted_turns)
+        # 1. Fetch Verified Canonical Context
+        canonical_projects = property_repository.to_legacy_dict_format()
+        projects_summary = []
+        for p in canonical_projects:
+            projects_summary.append({
+                "name": p["name"],
+                "location": p["location"],
+                "price": p["price"],
+                "bedrooms": p["bedrooms"],
+                "amenities": p["amenities"],
+                "handover": p.get("handover", "On Schedule"),
+            })
 
-        # 2. Format attachment context
-        attachments_str = ""
-        if attachment_texts:
-            attachments_str = "\n\n--- EXTRACTED ATTACHMENT TEXT ---\n" + "\n".join(attachment_texts)
+        payment_policy = policy_repository.get_policy("standard_payment_plan")
+        contact_info = contact_repository.get_contact_info()
 
-        # 3. Assemble complete context prompt
-        full_user_content = f"SENDER: {sender_name or sender_email} ({sender_email})\n"
-        full_user_content += f"SUBJECT: {subject}\n"
-        if history_str:
-            full_user_content += f"\n--- EMAIL THREAD HISTORY ---\n{history_str}\n"
-        full_user_content += f"\n--- LATEST INCOMING EMAIL ---\n{body_text}\n"
-        if attachments_str:
-            full_user_content += attachments_str
+        verified_evidence = (
+            "--- VERIFIED GLG ASSETS PROPERTY INVENTORY ---\n"
+            + json.dumps(projects_summary, indent=2)
+            + f"\n\n--- APPROVED PAYMENT TERMS ---\n{payment_policy['answer_en']}\n"
+            f"\n--- OFFICIAL CONTACT CONFIG ---\n{contact_repository.format_contact_card(is_english=True)}\n"
+        )
         if rag_context:
-            full_user_content += f"\n--- ADDITIONAL RAG PROPERTY KNOWLEDGE ---\n{rag_context}\n"
+            verified_evidence += f"\n--- RETRIEVED PROJECT RAG CONTEXT ---\n{rag_context}\n"
+        if attachment_texts:
+            verified_evidence += f"\n--- EXTRACTED ATTACHMENT TEXT ---\n" + "\n".join(attachment_texts) + "\n"
 
-        # 4. LLM Generation
-        messages = [
+        # 2. Build Structured Role-Separated Messages
+        messages: List[Dict[str, str]] = [
             {"role": "system", "content": EMAIL_AGENT_SYSTEM_PROMPT},
-            {"role": "user", "content": full_user_content},
+            {"role": "system", "content": f"AUTHORITATIVE BUSINESS EVIDENCE:\n{verified_evidence}"},
         ]
 
+        # Append structured thread history without string flattening
+        if thread_history:
+            for turn in thread_history[-5:]:
+                role_type = turn.get("sender_type", turn.get("role", "customer")).lower()
+                role = "assistant" if role_type in ("assistant", "agent", "glg", "executive") else "user"
+                content = turn.get("body_text", turn.get("text", turn.get("content", "")))
+                if content.strip():
+                    messages.append({"role": role, "content": content})
+
+        # Append current incoming email turn
+        current_email_payload = f"From: {sender_name or sender_email} <{sender_email}>\nSubject: {subject}\n\n{body_text}"
+        messages.append({"role": "user", "content": current_email_payload})
+
+        # 3. LLM Generation
+        raw_reply = ""
         try:
-            raw_reply = await llm_service.chat(messages, temperature=0.3)
+            raw_reply = await llm_service.chat(messages, temperature=0.2)
         except Exception as e:
             logger.error(f"LLM call failed in EmailAgent: {e}")
             raw_reply = (
+                f"Dear {sender_name or 'Valued Client'},\n\n"
                 f"Thank you for contacting GLG Assets regarding '{subject}'. "
-                "Our real estate advisory team has received your inquiry and will provide detailed property specifications shortly."
+                "Our client advisory team has received your inquiry and will provide verified property details shortly.\n\n"
+                + contact_repository.format_contact_card(is_english=True)
             )
 
-        # 5. Intent Classification & Confidence Evaluation
-        intent, priority, confidence = self._evaluate_intent_and_confidence(body_text, subject)
+        # 4. Grounding Validation
+        validation = grounding_validator.validate(reply_text=raw_reply, is_english=True)
+        final_body = raw_reply
+        if not validation.is_grounded:
+            logger.warning(f"EmailAgent grounding violation detected: {validation.violations}")
+            if validation.sanitized_reply:
+                final_body = validation.sanitized_reply
 
+        # 5. Telemetry
+        log_prompt_telemetry(
+            agent_name="email_agent",
+            model_name="gemini-flash",
+            temperature=0.2,
+            language="en",
+            grounding_status=validation.is_grounded,
+        )
+
+        # 6. Intent Classification & Confidence Evaluation
+        intent, priority, confidence = self._evaluate_intent_and_confidence(body_text, subject)
         reply_subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
 
-        # 6. Policy decision
-        # High confidence (>=0.80) and non-complaint/non-negotiation inquiry -> AUTO_SEND
+        # 7. Policy decision
         auto_send_eligible = (
             confidence >= 0.80
             and intent not in ["complaint", "price_negotiation"]
+            and validation.is_grounded
         )
-
         action = "AUTO_SEND" if auto_send_eligible else "REQUIRES_APPROVAL"
 
         return {
             "reply_subject": reply_subject,
-            "reply_body": raw_reply,
+            "reply_body": final_body,
             "intent": intent,
             "priority": priority,
             "confidence_score": confidence,
             "action": action,
             "auto_send_eligible": auto_send_eligible,
+            "grounding_passed": validation.is_grounded,
         }
 
     def _evaluate_intent_and_confidence(
         self, body_text: str, subject: str
     ) -> tuple[str, str, float]:
-        """Simple heuristic intent & confidence scorer (backed by LLM prompts)."""
+        """Heuristic intent & confidence scorer."""
         combined = f"{subject} {body_text}".lower()
 
         if any(w in combined for w in ["cancel", "complaint", "legal", "scam", "refund", "issue"]):

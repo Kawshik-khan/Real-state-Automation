@@ -39,6 +39,33 @@ class Action(BaseModel):
     payload: dict = Field(default_factory=dict)
 
 
+class BeliefRevision(BaseModel):
+    field: str
+    old_value: Any = None
+    new_value: Any = None
+    reason: str = ""
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class UserBeliefState(BaseModel):
+    """Structured, dynamic customer constraint and preference beliefs.
+    
+    Self-correcting memory reconciles contradictions (e.g. changing locations or budgets)
+    and updates this state, invalidating superseded beliefs.
+    """
+    preferred_locations: list[str] = Field(default_factory=list)
+    excluded_locations: list[str] = Field(default_factory=list)
+    budget_min: Optional[float] = None  # In BDT
+    budget_max: Optional[float] = None  # In BDT
+    budget_raw: Optional[str] = None  # e.g. "3.5 Crore"
+    bedrooms: Optional[int] = None
+    facing: Optional[str] = None  # e.g. "South-Facing", "Lake-View"
+    handover_status: Optional[str] = None  # "ready", "under_construction"
+    negative_constraints: list[str] = Field(default_factory=list)
+    buyer_profile: dict = Field(default_factory=dict)
+    revision_history: list[dict] = Field(default_factory=list)
+
+
 class AIState(BaseModel):
     """The complete state passed between graph nodes."""
     # Input
@@ -56,9 +83,12 @@ class AIState(BaseModel):
     moderation: ModerationResult = Field(default_factory=ModerationResult)
     moderated: bool = False
 
-    # Memory
+    # Memory & Dynamic Self-Correcting Beliefs
     history: list[dict] = Field(default_factory=list)
     memory_loaded: bool = False
+    beliefs: UserBeliefState = Field(default_factory=UserBeliefState)
+    memory_corrections: list[dict] = Field(default_factory=list)
+    has_corrections: bool = False
 
     # Intent
     intent: IntentResult = Field(default_factory=IntentResult)

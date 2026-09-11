@@ -1,0 +1,18 @@
+{
+  "doc_cb681661cf0b": {
+    "doc_id": "doc_cb681661cf0b",
+    "filename": "text_upload.txt",
+    "project": "GLG Banani Heights",
+    "location": "Banani, Dhaka",
+    "document_type": "Penthouse Spec",
+    "chunk_count": 1
+  },
+  "doc_0e3c4272654c": {
+    "doc_id": "doc_0e3c4272654c",
+    "filename": "text_upload.txt",
+    "project": "GLG Gulshan Avenue",
+    "location": "Gulshan 2, Dhaka",
+    "document_type": "Security Spec",
+    "chunk_count": 1
+  }
+}

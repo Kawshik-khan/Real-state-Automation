@@ -62,6 +62,7 @@ class ConversationRecord(Base):
     channel: Mapped[str] = mapped_column(String(32), default="website")
     status: Mapped[str] = mapped_column(String(32), default="active")  # active, escalated, closed
     ai_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    beliefs: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     last_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 

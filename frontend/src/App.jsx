@@ -95,7 +95,7 @@ function DashboardApp() {
           ? <ConversationsPage />
           : <DashboardHome setActiveTab={setActiveTab} />;
       case 'knowledge': 
-        return (isManager || isDev) 
+        return (isAdmin || isDev) 
           ? <KnowledgePage /> 
           : <DashboardHome setActiveTab={setActiveTab} />;
       case 'content': 

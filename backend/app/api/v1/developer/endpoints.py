@@ -28,7 +28,7 @@ class WebhookSimulationRequest(BaseModel):
 
 
 class RAGBenchmarkRequest(BaseModel):
-    query: str = Field(..., json_schema_extra={"example": "What are the amenities and handover date for Bandra Luxury project?"})
+    query: str = Field(..., json_schema_extra={"example": "What are the amenities and handover date for Baridhara Diplomatic Zone project?"})
     top_k: int = Field(5, ge=1, le=20)
     score_threshold: float = Field(0.65, ge=0.0, le=1.0)
 
@@ -136,12 +136,12 @@ async def simulate_incoming_webhook(
         intent = "finance_inquiry"
         agent = "FaqAgent"
         confidence = 0.91
-        reply = "We offer pre-approved 8.4% home loan financing with HDFC, ICICI, and SBI banks with flexible 20:80 payment schemes."
+        reply = "Home loan financing is facilitated through premier partner financial institutions including DBH, IDLC, and BRAC Bank with flexible milestone payment options."
     else:
         intent = "general_knowledge"
         agent = "SupervisorMasterAgent"
         confidence = 0.88
-        reply = f"Thank you for contacting GLG Assets. We are here to assist with premium residences across Mumbai, Bangalore, and Goa."
+        reply = "Thank you for contacting GLG Assets. We are here to assist with luxury residential developments across Dhaka including Gulshan, Banani, and Baridhara."
         
     execution_time_ms = round((time.perf_counter() - start_time) * 1000 + 45, 2)
     
@@ -340,3 +340,81 @@ async def stream_developer_logs(request: Request):
             "X-Accel-Buffering": "no",
         }
     )
+
+
+# ── AI Evaluation (Evals) & Quality Gates ────────────────────
+
+class RunEvalsRequest(BaseModel):
+    suite: str = Field("all", description="Evaluation suite: all, intent, rag, safety, memory, numeric")
+    sample_size: Optional[int] = Field(None, description="Optional limit of test cases to run")
+
+
+@router.post("/evals/run", summary="Execute automated AI evaluation benchmark suite")
+async def run_ai_evaluations(
+    body: Optional[RunEvalsRequest] = None,
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Runs automated benchmarks with live WebSocket progress streaming and returns scorecard."""
+    import asyncio
+    from app.evals.engine import evaluation_engine
+    from app.api.v1.ws.websocket import manager as ws_manager
+
+    suite_name = body.suite if body else "all"
+    sample_size = body.sample_size if body else None
+
+    def on_progress(data: dict):
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(ws_manager.broadcast_message({
+                "event": "eval_progress",
+                **data
+            }))
+        except Exception:
+            pass
+
+    report = await evaluation_engine.run_suite(
+        suite_name=suite_name,
+        sample_size=sample_size,
+        on_progress=on_progress,
+    )
+    return {
+        "success": True,
+        "report": report,
+    }
+
+
+@router.get("/evals/latest", summary="Fetch latest AI evaluation benchmark scorecard")
+async def get_latest_ai_evaluations(
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Retrieve the most recent evaluation scorecard, release gate results, and failure logs."""
+    from app.evals.engine import evaluation_engine
+    report = evaluation_engine.get_latest_report()
+    if not report:
+        return {
+            "success": False,
+            "message": "No evaluation runs found. Please run an evaluation suite first.",
+            "report": None,
+        }
+    return {
+        "success": True,
+        "report": report,
+    }
+
+
+@router.get("/evals/suites", summary="List available evaluation suites")
+async def list_ai_eval_suites(
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    return {
+        "success": True,
+        "suites": [
+            {"id": "all", "name": "Comprehensive All-in-One Suite", "description": "Runs Intent, RAG Groundedness, Safety, Memory, and Numeric suites"},
+            {"id": "intent", "name": "Intent Routing & Multilingual NLU", "description": "Tests English, Bangla, and Banglish intent classification accuracy"},
+            {"id": "rag", "name": "RAG Groundedness & QA", "description": "Tests context retrieval, factual faithfulness, and hallucination refusal"},
+            {"id": "safety", "name": "Safety & Adversarial Injections", "description": "Tests prompt injection defense, jailbreak resistance, and PII containment"},
+            {"id": "memory", "name": "Self-Correcting Memory", "description": "Tests multi-turn user preference changes, contradiction resolution, and negative constraints"},
+            {"id": "numeric", "name": "Deterministic Financial Math", "description": "Tests installment, EMI, and token booking fee exactness against arithmetic oracle"},
+        ]
+    }
+

@@ -17,8 +17,8 @@ async def search_knowledge(body: dict, auth: dict = Depends(_auth)):
         "query": "What documents are needed for home loan?",
         "top_k": 3,
         "filters": {
-            "project": "Emerald Towers",
-            "location": "Mumbai",
+            "project": "GLG Gulshan Heights",
+            "location": "Gulshan 2, Dhaka",
             "document_type": "legal"
         }
     }

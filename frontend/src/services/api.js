@@ -56,17 +56,23 @@ export async function generateContent(payload) {
  * Upload a document (PDF, TXT, MD) to the RAG Knowledge Base with OCR
  */
 export async function uploadKnowledgeDocument(file, metadata = {}) {
+  const token = localStorage.getItem('glg_token');
   const formData = new FormData();
   formData.append('file', file);
   if (metadata.project) formData.append('project', metadata.project);
   if (metadata.category) formData.append('category', metadata.category);
   if (metadata.document_type) formData.append('document_type', metadata.document_type);
 
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/knowledge/upload`, {
     method: 'POST',
-    headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
-    },
+    headers,
     body: formData,
   });
   return handleResponse(response);
@@ -76,10 +82,16 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
  * Fetch all indexed RAG documents from backend
  */
 export async function getKnowledgeDocuments() {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents`, {
-    headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
-    },
+    headers,
   });
   return handleResponse(response);
 }
@@ -440,5 +452,51 @@ export async function simulateSocialCommentToDm(payload) {
   return handleResponse(response);
 }
 
+/**
+ * Run developer evaluation suites with progress streaming / HTTP fallback
+ */
+export async function runDeveloperEvals(suite = 'all', sampleSize = null) {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/evals/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify({ suite, sample_size: sampleSize }),
+  });
+  return handleResponse(response);
+}
 
+/**
+ * Fetch latest developer evaluation scorecard and quality gates
+ */
+export async function getLatestDeveloperEvals() {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/evals/latest`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
 
+/**
+ * Fetch list of available evaluation benchmark suites
+ */
+export async function getDeveloperEvalSuites() {
+  const token = localStorage.getItem('glg_token');
+  const response = await fetch(`${API_BASE_URL}/api/v1/developer/evals/suites`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}

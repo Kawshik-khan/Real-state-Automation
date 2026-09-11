@@ -20,7 +20,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
-from app.dependencies import require_automation_secret as _auth
+from app.dependencies import require_automation_secret as _auth, require_roles
+from app.models.user import UserRole
 
 
 @asynccontextmanager
@@ -173,6 +174,7 @@ from app.api.v1.media import router as media_router
 from app.api.v1.notifications.endpoints import router as notifications_router
 from app.api.v1.conversations.endpoints import router as conversations_router
 from app.api.v1.developer.endpoints import router as developer_router
+from app.api.v1.memory.endpoints import router as memory_router
 from app.api.v1.ws import ws_router
 
 from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form, Request
@@ -202,7 +204,7 @@ async def api_knowledge_upload_handler(
     project: str = Form(None),
     location: str = Form(None),
     document_type: str = Form(None),
-    auth: dict = Depends(_auth),
+    auth: dict = Depends(require_roles([UserRole.ADMIN, UserRole.DEVELOPER])),
 ):
     """POST /api/knowledge/upload — Knowledge base OCR document indexer."""
     return await knowledge_upload(file, doc_id, project, location, document_type, auth)
@@ -245,6 +247,7 @@ app.include_router(knowledge_router,    prefix="/api/v1/knowledge",    tags=["kn
 app.include_router(analytics_router,    prefix="/api/v1/analytics",    tags=["analytics"])
 app.include_router(escalations_router,  prefix="/api/v1/escalations",  tags=["escalations"])
 app.include_router(media_router,        prefix="/api/v1/media",        tags=["media"])
+app.include_router(memory_router,       prefix="/api/v1/memory",       tags=["memory"])
 app.include_router(projects_router,     prefix="/api/v1",              tags=["projects"])
 app.include_router(search_router,       prefix="/api/v1",              tags=["search"])
 app.include_router(ws_router,           prefix="/api/v1",              tags=["websockets"])

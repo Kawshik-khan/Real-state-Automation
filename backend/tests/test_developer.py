@@ -73,7 +73,7 @@ def test_developer_rag_benchmark():
     headers = {"Authorization": f"Bearer {dev_token}"}
     
     payload = {
-        "query": "Amenities in Bandra project",
+        "query": "Amenities in Baridhara Diplomatic project",
         "top_k": 3,
         "score_threshold": 0.5,
     }

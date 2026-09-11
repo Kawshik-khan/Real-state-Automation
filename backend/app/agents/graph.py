@@ -8,7 +8,7 @@ from typing import Any
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 from app.agents.state import AIState
-from app.agents.state import ModerationResult, IntentResult, Action, LeadScore
+from app.agents.state import ModerationResult, IntentResult, Action, LeadScore, UserBeliefState
 
 
 # ── Entry ───────────────────────────────────────────────────
@@ -42,7 +42,7 @@ async def moderation_node(state: AIState) -> dict:
 def moderation_router(state: AIState) -> str:
     if state.moderation.action == "block":
         return "blocked"
-    return "supervisor"
+    return "memory_load"
 
 
 async def blocked_node(state: AIState) -> dict:
@@ -53,6 +53,43 @@ async def blocked_node(state: AIState) -> dict:
         "safety_check_passed": True,
         "safety_checked": True,
         "output_built": True,
+    }
+
+
+# ── Memory & Dynamic Belief Reconciliation ──────────────────
+
+async def memory_load_node(state: AIState) -> dict:
+    from app.services.memory import conversation_memory
+    from app.services.belief_memory import belief_memory_service
+
+    history = await conversation_memory.get_history(state.conversation_id)
+    beliefs = await belief_memory_service.get_beliefs(state.conversation_id)
+    return {
+        "history": [
+            {"role": e.role, "content": e.content, "timestamp": e.timestamp.isoformat()}
+            for e in history
+        ],
+        "beliefs": beliefs,
+        "memory_loaded": True,
+    }
+
+
+async def memory_reflection_node(state: AIState) -> dict:
+    """Self-correcting memory reflection pass:
+    Evaluates incoming message against active beliefs to detect corrections,
+    contradictions, and revisions.
+    """
+    from app.services.belief_memory import belief_memory_service
+
+    updated_beliefs, new_revisions = await belief_memory_service.reconcile_beliefs(
+        current=state.beliefs,
+        user_message=state.message,
+        history=state.history,
+    )
+    return {
+        "beliefs": updated_beliefs,
+        "memory_corrections": new_revisions,
+        "has_corrections": bool(new_revisions),
     }
 
 
@@ -81,9 +118,9 @@ async def supervisor_node(state: AIState) -> dict:
     property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
     if any(kw in msg_lower for kw in property_keywords):
         loc = ""
-        for known_loc in ["banani", "gulshan", "uttara", "dhanmondi", "mumbai", "bandra"]:
+        for known_loc in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara"]:
             if known_loc in msg_lower:
-                loc = known_loc.capitalize()
+                loc = known_loc.title()
                 break
         return {
             "intent": IntentResult(
@@ -102,9 +139,16 @@ async def supervisor_node(state: AIState) -> dict:
             f"{e['role']}: {e['content'][:200]}" for e in entries
         )
 
+    # Contextual belief context if available
+    belief_context = ""
+    if state.beliefs.preferred_locations or state.beliefs.budget_raw:
+        belief_context = f"\nActive User Constraints: Locations={state.beliefs.preferred_locations}, Budget={state.beliefs.budget_raw}, Bedrooms={state.beliefs.bedrooms}"
+
     messages = [{"role": "system", "content": SUPERVISOR_PROMPT}]
     if history_context:
         messages.append({"role": "system", "content": f"Conversation history:\n{history_context}"})
+    if belief_context:
+        messages.append({"role": "system", "content": belief_context})
     messages.append({"role": "user", "content": f"Channel: {state.channel}\nMessage: {state.message}"})
 
     try:
@@ -118,38 +162,14 @@ def intent_router(state: AIState) -> str:
     intent = state.intent.intent
     if intent == "greeting":
         return "greeting_handler"
-    elif intent in ("booking", "lead"):
+    elif intent in ("booking", "lead") or state.intent.requires_escalation:
         return "booking_handler"
-    elif state.intent.requires_escalation:
-        return "booking_handler"
-    return "memory_load"
-
-
-# ── Memory ──────────────────────────────────────────────────
-
-async def memory_load_node(state: AIState) -> dict:
-    from app.services.memory import conversation_memory
-
-    history = await conversation_memory.get_history(state.conversation_id)
-    return {
-        "history": [
-            {"role": e.role, "content": e.content, "timestamp": e.timestamp.isoformat()}
-            for e in history
-        ],
-        "memory_loaded": True,
-    }
-
-
-def agent_router(state: AIState) -> str:
-    intent = state.intent.intent
-    if intent == "property_search":
+    elif intent == "property_search":
         return "property_agent"
     elif intent == "faq":
         return "faq_agent"
     elif intent == "content_request":
         return "content_agent"
-    elif intent in ("complaint", "chitchat", "other"):
-        return "fallback_handler"
     return "fallback_handler"
 
 
@@ -168,27 +188,46 @@ async def property_agent_node(state: AIState) -> dict:
             history_lines = [f"{h['role'].upper()}: {h['content']}" for h in state.history[-6:]]
             agent_context += "\n--- CONVERSATION HISTORY ---\n" + "\n".join(history_lines) + "\n"
             
-            # Carry over location entity from history if not present in current query
-            if not entities.get("location"):
-                for turn in reversed(state.history):
-                    content_lower = turn.get("content", "").lower()
-                    for known_loc in ["banani", "gulshan", "uttara", "dhanmondi", "mumbai", "bandra"]:
-                        if known_loc in content_lower:
-                            entities["location"] = known_loc.capitalize()
-                            break
-                    if entities.get("location"):
+        # Prioritize Reconciled Active Beliefs from Self-Correcting Memory
+        reconciled_loc = state.beliefs.preferred_locations[0] if state.beliefs.preferred_locations else entities.get("location", "")
+        reconciled_budget = state.beliefs.budget_raw or entities.get("budget", "")
+        reconciled_beds = state.beliefs.bedrooms or entities.get("bedrooms", 0)
+
+        if not entities.get("location") and not reconciled_loc and state.history:
+            for turn in reversed(state.history):
+                content_lower = turn.get("content", "").lower()
+                for known_loc in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara"]:
+                    if known_loc in content_lower:
+                        reconciled_loc = known_loc.title()
                         break
+                if reconciled_loc:
+                    break
+
+        if reconciled_loc:
+            entities["location"] = reconciled_loc
+            agent_context += f"Active Preferred Location: {reconciled_loc}\n"
+        if reconciled_budget:
+            entities["budget"] = reconciled_budget
+            agent_context += f"Active Budget: {reconciled_budget}\n"
+        if reconciled_beds:
+            entities["bedrooms"] = reconciled_beds
+            agent_context += f"Active Bedrooms: {reconciled_beds}\n"
+        if state.beliefs.negative_constraints:
+            agent_context += f"MANDATORY EXCLUSIONS & NEGATIVE CONSTRAINTS: {', '.join(state.beliefs.negative_constraints)}\n"
+        if state.beliefs.excluded_locations:
+            agent_context += f"EXCLUDED LOCATIONS (DO NOT SUGGEST): {', '.join(state.beliefs.excluded_locations)}\n"
 
         if entities.get("project"):
             agent_context += f"Project: {entities['project']}\n"
-        if entities.get("location"):
-            agent_context += f"Location: {entities['location']}\n"
-        if entities.get("budget"):
-            agent_context += f"Budget: {entities['budget']}\n"
 
         rag_context, rag_done = "", False
         try:
-            chunks = await rag.query(state.message, top_k=3)
+            rag_filters = {}
+            if reconciled_loc:
+                rag_filters["location"] = reconciled_loc
+            if entities.get("project"):
+                rag_filters["project"] = entities["project"]
+            chunks = await rag.query(state.message, top_k=3, filters=rag_filters if rag_filters else None)
             if chunks:
                 context_str = await rag.build_context(chunks)
                 agent_context += f"\nKnowledge base context:\n{context_str}"
@@ -275,21 +314,21 @@ async def greeting_handler_node(state: AIState) -> dict:
 
 async def booking_handler_node(state: AIState) -> dict:
     from app.utils.language import is_english_query
+    from app.repositories.contact_repository import contact_repository
 
     is_english = is_english_query(state.message) if state.message else False
+    contact_card = contact_repository.format_contact_card(is_english=is_english)
     if is_english:
         reply = (
             f"Thank you for your interest! 🎉\n\n"
-            f"I'll connect you with our sales team who will follow up with personalized assistance. "
-            f"In the meantime, feel free to ask me any questions about our projects!\n\n"
-            f"📞 You can also reach us at +91-1800-GLG-ASSET"
+            f"I'll connect you with our senior sales advisory team who will follow up with personalized assistance and schedule your private site visit.\n\n"
+            f"{contact_card}"
         )
     else:
         reply = (
             f"আমাদের প্রজেক্টে আগ্রহ প্রকাশের জন্য ধন্যবাদ! 🎉\n\n"
-            f"আপনাকে সাহায্য করার জন্য খুব শীঘ্রই আমাদের সেলস টিমের প্রতিনিধি যোগাযোগ করবেন। "
-            f"এর মধ্যে আমাদের প্রজেক্ট সম্পর্কিত যেকোনো প্রশ্ন করতে পারেন!\n\n"
-            f"📞 হেল্পলাইন: +91-1800-GLG-ASSET"
+            f"আপনাকে ব্যক্তিগতভাবে সহযোগিতা ও সাইট পরিদর্শনের সময় নির্ধারণে আমাদের সেলস টিম দ্রুত যোগাযোগ করবে।\n\n"
+            f"{contact_card}"
         )
     return {
         "agent_reply": reply,
@@ -303,17 +342,11 @@ async def booking_handler_node(state: AIState) -> dict:
 
 async def fallback_handler_node(state: AIState) -> dict:
     from app.services.llm import llm_service
-    from app.prompts.base import LANGUAGE_POLICY_INSTRUCTION
+    from app.prompts.fallback import FALLBACK_PROMPT
+    from app.services.grounding_validator import grounding_validator
+    from app.utils.language import is_english_query
 
-    system_prompt = (
-        f"You are a helpful real-estate assistant for GLG Assets. "
-        f"You're chatting via {state.channel}. "
-        f"Be friendly, professional, and concise. "
-        f"If the user asks something you can't answer, offer to connect them with a human agent.\n"
-        f"{LANGUAGE_POLICY_INSTRUCTION}"
-    )
-
-    context_messages = [{"role": "system", "content": system_prompt}]
+    context_messages = [{"role": "system", "content": FALLBACK_PROMPT}]
     if state.rag_context:
         context_messages.append({"role": "system", "content": f"Relevant context:\n{state.rag_context}"})
     if state.history:
@@ -321,10 +354,22 @@ async def fallback_handler_node(state: AIState) -> dict:
             context_messages.append({"role": entry["role"], "content": entry["content"]})
     context_messages.append({"role": "user", "content": state.message})
 
+    is_en = is_english_query(state.message) if state.message else False
     try:
-        reply = await llm_service.chat(context_messages, temperature=0.5)
+        reply = await llm_service.chat(context_messages, temperature=0.2)
     except Exception:
-        reply = "I apologize, but I'm having trouble processing your request right now. Please try again or contact our team for assistance."
+        reply = (
+            "I apologize, but I'm having trouble retrieving verified records right now. "
+            "Please try again or connect directly with our advisory team."
+            if is_en
+            else "আমি দুঃখিত, এই মুহূর্তে ভেরিফায়েড রেকর্ড পেতে কিছুটা সমস্যা হচ্ছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা আমাদের টিমের সাথে যোগাযোগ করুন।"
+        )
+
+    # Validate fallback response
+    val = grounding_validator.validate(reply_text=reply, is_english=is_en)
+    if not val.is_grounded and val.sanitized_reply:
+        reply = val.sanitized_reply
+
     return {"agent_reply": reply, "agent_used": "fallback", "agent_done": True}
 
 
@@ -336,10 +381,19 @@ async def safety_check_node(state: AIState) -> dict:
     if not state.agent_reply.strip():
         return {"safety_check_passed": True, "safety_checked": True}
 
+    from app.services.grounding_validator import grounding_validator
+    from app.utils.language import is_english_query
+
+    is_en = is_english_query(state.message) if state.message else False
+    val_res = grounding_validator.validate(reply_text=state.agent_reply, is_english=is_en)
+    sanitized_reply = state.agent_reply
+    if not val_res.is_grounded and val_res.sanitized_reply:
+        sanitized_reply = val_res.sanitized_reply
+
     prompt = f"""You are a safety checker. Review this message for harmful or inappropriate content.
 Reply should be allowed for a real-estate customer communication channel.
 
-Message: "{state.agent_reply[:500]}"
+Message: "{sanitized_reply[:500]}"
 
 Respond with JSON: {{"safe": true, "reason": ""}} or {{"safe": false, "reason": "..."}}"""
 
@@ -354,15 +408,16 @@ Respond with JSON: {{"safe": true, "reason": ""}} or {{"safe": false, "reason": 
                 "safety_check_passed": False,
                 "safety_checked": True,
             }
-        return {"safety_check_passed": True, "safety_checked": True}
+        return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
     except Exception:
-        return {"safety_check_passed": True, "safety_checked": True}
+        return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
 
 
 # ── Response Builder ────────────────────────────────────────
 
 async def response_builder_node(state: AIState) -> dict:
     from app.services.memory import conversation_memory
+    from app.services.belief_memory import belief_memory_service
     from app.schemas.chat import MemoryEntry
 
     user_entry = MemoryEntry(role="user", content=state.message)
@@ -370,6 +425,9 @@ async def response_builder_node(state: AIState) -> dict:
 
     assistant_entry = MemoryEntry(role="assistant", content=state.agent_reply)
     await conversation_memory.add(state.conversation_id, assistant_entry)
+
+    # Persist updated belief state
+    await belief_memory_service.save_beliefs(state.conversation_id, state.beliefs)
 
     return {"output_built": True}
 
@@ -387,8 +445,9 @@ async def lead_scoring_node(state: AIState) -> dict:
     # 1. Budget Readiness (max 35 pts)
     budget_pts = 0
     budget_status = "unknown"
-    if any(k in msg_lower for k in ["crore", "lakh", "budget", "$", "৳", "price", "cost", "cash", "loan", "financing"]):
-        if any(k in msg_lower for k in ["crore", "lakh", "under", "ready", "pre-approved", "$", "৳"]):
+    has_active_budget = bool(state.beliefs.budget_max or state.beliefs.budget_raw)
+    if has_active_budget or any(k in msg_lower for k in ["crore", "lakh", "budget", "$", "৳", "price", "cost", "cash", "loan", "financing"]):
+        if has_active_budget or any(k in msg_lower for k in ["crore", "lakh", "under", "ready", "pre-approved", "$", "৳"]):
             budget_pts = 35
             budget_status = "ready"
         else:
@@ -450,9 +509,10 @@ def build_ai_graph() -> CompiledStateGraph:
     workflow.add_node("entry", entry_node)
     workflow.add_node("moderation", moderation_node)
     workflow.add_node("blocked", blocked_node)
+    workflow.add_node("memory_load", memory_load_node)
+    workflow.add_node("memory_reflection", memory_reflection_node)
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("lead_scoring", lead_scoring_node)
-    workflow.add_node("memory_load", memory_load_node)
     workflow.add_node("greeting_handler", greeting_handler_node)
     workflow.add_node("booking_handler", booking_handler_node)
     workflow.add_node("property_agent", property_agent_node)
@@ -467,26 +527,21 @@ def build_ai_graph() -> CompiledStateGraph:
     workflow.add_edge("entry", "moderation")
     workflow.add_conditional_edges("moderation", moderation_router, {
         "blocked": "blocked",
-        "supervisor": "supervisor",
+        "memory_load": "memory_load",
     })
     workflow.add_edge("blocked", "safety_check")
+    workflow.add_edge("memory_load", "memory_reflection")
+    workflow.add_edge("memory_reflection", "supervisor")
     workflow.add_edge("supervisor", "lead_scoring")
     workflow.add_conditional_edges("lead_scoring", intent_router, {
-        "memory_load": "memory_load",
         "greeting_handler": "greeting_handler",
         "booking_handler": "booking_handler",
-        "blocked": "blocked",
-    })
-    workflow.add_edge("greeting_handler", "safety_check")
-    workflow.add_edge("booking_handler", "safety_check")
-    workflow.add_conditional_edges("memory_load", agent_router, {
         "property_agent": "property_agent",
         "faq_agent": "faq_agent",
         "content_agent": "content_agent",
-        "booking_handler": "booking_handler",
         "fallback_handler": "fallback_handler",
     })
-    for agent in ["property_agent", "faq_agent", "content_agent", "fallback_handler"]:
+    for agent in ["greeting_handler", "booking_handler", "property_agent", "faq_agent", "content_agent", "fallback_handler"]:
         workflow.add_edge(agent, "safety_check")
     workflow.add_edge("safety_check", "response_builder")
     workflow.add_edge("response_builder", "output_formatter")

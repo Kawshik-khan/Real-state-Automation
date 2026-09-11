@@ -1,0 +1,50 @@
+{
+  "doc_1e6a9be56e03": {
+    "doc_id": "doc_1e6a9be56e03",
+    "filename": "text_upload.txt",
+    "project": "GLG Banani Heights",
+    "location": "Banani, Dhaka",
+    "document_type": "Penthouse Spec",
+    "chunk_count": 1
+  },
+  "doc_3c57cc8a2eda": {
+    "doc_id": "doc_3c57cc8a2eda",
+    "filename": "text_upload.txt",
+    "project": "GLG Gulshan Avenue",
+    "location": "Gulshan 2, Dhaka",
+    "document_type": "Security Spec",
+    "chunk_count": 1
+  },
+  "doc_a52b6265304a": {
+    "doc_id": "doc_a52b6265304a",
+    "filename": "text_upload.txt",
+    "project": "GLG Banani Heights",
+    "location": "Banani, Dhaka",
+    "document_type": "Penthouse Spec",
+    "chunk_count": 1
+  },
+  "doc_3d35c8b52b77": {
+    "doc_id": "doc_3d35c8b52b77",
+    "filename": "text_upload.txt",
+    "project": "GLG Gulshan Avenue",
+    "location": "Gulshan 2, Dhaka",
+    "document_type": "Security Spec",
+    "chunk_count": 1
+  },
+  "doc_e54c2f63150f": {
+    "doc_id": "doc_e54c2f63150f",
+    "filename": "text_upload.txt",
+    "project": "GLG Banani Heights",
+    "location": "Banani, Dhaka",
+    "document_type": "Penthouse Spec",
+    "chunk_count": 1
+  },
+  "doc_8b12c00db124": {
+    "doc_id": "doc_8b12c00db124",
+    "filename": "text_upload.txt",
+    "project": "GLG Gulshan Avenue",
+    "location": "Gulshan 2, Dhaka",
+    "document_type": "Security Spec",
+    "chunk_count": 1
+  }
+}

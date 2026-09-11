@@ -1,110 +1,136 @@
-"""Property Agent — handles property search and inquiries using PropertySearchTool."""
+"""Property Agent — Handles property inquiries using canonical PropertyRepository + RAG context.
+
+Audit Reference: prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md
+Removes static template bypass, synthesizes SQL + RAG data, enforces PROPERTY_AGENT_PROMPT,
+and validates response with GroundingValidator.
+"""
+
+from typing import Any, Dict, List, Optional
+import json
+import logging
 
 from app.services.llm import llm_service
-from app.prompts.base import PROPERTY_AGENT_PROMPT
-from app.tools.property_tool import property_search_tool, PROJECTS_DATABASE
+from app.prompts.property import PROPERTY_AGENT_PROMPT
+from app.prompts.registry import log_prompt_telemetry
+from app.tools.property_tool import property_search_tool
+from app.repositories.property_repository import property_repository
+from app.repositories.policy_repository import policy_repository
+from app.services.grounding_validator import grounding_validator
+from app.utils.language import detect_language
+
+logger = logging.getLogger(__name__)
 
 
 class PropertyAgent:
-    """Handles property search and inquiry conversations."""
+    """Handles property search and inquiry conversations with strict factual grounding."""
 
     async def handle(self, message: str, entities: dict | None = None, extra_context: str = "") -> str:
-        """Process a property query using SQL property search + RAG context."""
+        """Process a property query by synthesizing canonical repository records with RAG context."""
         entities = entities or {}
         location = entities.get("location")
         budget = entities.get("budget")
 
-        # Run SQL Property Search Tool
+        # 1. Detect customer language
+        lang_info = detect_language(message)
+        is_english = lang_info["language"] == "en"
+
+        # 2. Query Canonical Property Database via Tool
         search_res = await property_search_tool.search(
             query=message,
             location=location,
         )
-
         projects = search_res.get("projects", [])
-        if projects:
-            from app.utils.language import is_english_query
-            is_english = is_english_query(message)
-            msg_lower = message.lower()
 
-            # Aspect detection
-            wants_payment = any(kw in msg_lower for kw in ["payment", "installment", "kisti", "down payment", "pament", "taka koto", "booking amount"])
-            wants_price = any(kw in msg_lower for kw in ["price", "dam koto", "cost", "rate", "taka"]) and not wants_payment
-            wants_location = any(kw in msg_lower for kw in ["location", "address", "kothay", "where"])
-            wants_amenities = any(kw in msg_lower for kw in ["amenities", "facility", "facilities", "features", "ki ki ache"])
+        # If no projects matched specific query, fetch relevant canonical records for context
+        if not projects:
+            projects = property_repository.to_legacy_dict_format()
 
-            formatted = []
-            for p in projects:
-                # 1. Targeted Payment Response
-                if wants_payment:
-                    if is_english:
-                        formatted.append(
-                            f"💳 *{p['name']} — Payment Terms & Plan*:\n"
-                            f"• 10% Booking Amount upon reservation\n"
-                            f"• 30% Milestone Construction Payments (spread over 36 months)\n"
-                            f"• 60% Final Payment upon handover/possession\n"
-                            f"• Pre-approved home loan financing available through partner banks."
-                        )
-                    else:
-                        formatted.append(
-                            f"💳 *{p['name']} — পেমেন্ট টার্মস ও কিস্তি সুবিধা*:\n"
-                            f"• ১০% বুকিং মানি রেজারভেশনের সময়\n"
-                            f"• ৩০% কনস্ট্রাকশন ভিত্তিক কিস্তি (৩৬ মাস মেয়াদী)\n"
-                            f"• ৬০% হ্যান্ডওভার / পজেশনের সময়\n"
-                            f"• পার্টনার ব্যাংকসমূহের মাধ্যমে সহজ হোম লোন সুবিধা রয়েছে।"
-                        )
-                # 2. Targeted Price Response
-                elif wants_price:
-                    if is_english:
-                        formatted.append(f"💰 *{p['name']} — Pricing*: {p['price']} ({p['bedrooms']} BHK Luxury Suite).")
-                    else:
-                        formatted.append(f"💰 *{p['name']} — প্রাইজ লিস্ট*: {p['price']} ({p['bedrooms']} BHK লক্সারি অ্যাপার্টমেন্ট)।")
-                # 3. Targeted Location Response
-                elif wants_location:
-                    if is_english:
-                        formatted.append(f"📍 *{p['name']} — Location*: {p['location']}.")
-                    else:
-                        formatted.append(f"📍 *{p['name']} — লোকেশন*: {p['location']}।")
-                # 4. Targeted Amenities Response
-                elif wants_amenities:
-                    if is_english:
-                        formatted.append(f"✨ *{p['name']} — Key Amenities*: {', '.join(p['amenities'])}.")
-                    else:
-                        formatted.append(f"✨ *{p['name']} — সুবিধাসমূহ*: {', '.join(p['amenities'])}।")
-                # 5. Full Overview Response (default)
-                else:
-                    if is_english:
-                        formatted.append(
-                            f"🏢 *{p['name']}*\n"
-                            f"📍 Location: {p['location']}\n"
-                            f"💰 Price: {p['price']} ({p['bedrooms']} BHK)\n"
-                            f"📝 Overview: {p['description']}\n"
-                            f"✨ Amenities: {', '.join(p['amenities'])}"
-                        )
-                    else:
-                        formatted.append(
-                            f"🏢 *{p['name']}*\n"
-                            f"📍 লোকেশন: {p['location']}\n"
-                            f"💰 দাম: {p['price']} ({p['bedrooms']} BHK)\n"
-                            f"📝 বিস্তারিত: {p['description']}\n"
-                            f"✨ সুবিধাসমূহ: {', '.join(p['amenities'])}"
-                        )
+        # 3. Construct Structured Verified Evidence Context (5-tier hierarchy)
+        catalog_summary = []
+        for p in projects:
+            catalog_summary.append({
+                "project_id": p.get("id"),
+                "name": p.get("name"),
+                "location": p.get("location"),
+                "price": p.get("price"),
+                "price_bn": p.get("price_bn"),
+                "bedrooms": p.get("bedrooms"),
+                "bathrooms": p.get("bathrooms"),
+                "handover": p.get("handover_date"),
+                "amenities": p.get("amenities"),
+                "description": p.get("description"),
+            })
 
-            return "\n\n---\n\n".join(formatted)
+        payment_policy = policy_repository.get_policy("standard_payment_plan")
+        payment_info = payment_policy["answer_en"] if is_english else payment_policy["answer_bn"]
 
-        # Fallback to LLM with full context
-        system_content = PROPERTY_AGENT_PROMPT + f"\n\nAvailable projects catalog: {PROJECTS_DATABASE}"
+        context_builder = (
+            "--- VERIFIED CANONICAL PROPERTY RECORDS (AUTHORITATIVE) ---\n"
+            + json.dumps(catalog_summary, ensure_ascii=False, indent=2)
+            + f"\n\n--- APPROVED PAYMENT POLICY ---\n{payment_info}\n"
+        )
+
         if extra_context:
-            system_content += f"\n\nAdditional RAG context:\n{extra_context}"
+            context_builder += f"\n--- RETRIEVED RAG KNOWLEDGE BASE CONTEXT ---\n{extra_context}\n"
 
+        # 4. Assemble Messages preserving system policy and role separation
         messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": message}
+            {"role": "system", "content": PROPERTY_AGENT_PROMPT},
+            {"role": "system", "content": f"CURRENT VERIFIED BUSINESS EVIDENCE:\n{context_builder}"},
+            {"role": "user", "content": message},
         ]
-        return await llm_service.chat(messages, temperature=0.3)
+
+        # 5. Call LLM with conservative temperature
+        raw_reply = ""
+        try:
+            raw_reply = await llm_service.chat(messages, temperature=0.2)
+        except Exception as e:
+            logger.error(f"LLM call failed in PropertyAgent: {e}")
+            # Fallback to direct factual synthesis from canonical records
+            top_p = projects[0] if projects else property_repository.to_legacy_dict_format()[0]
+            if is_english:
+                raw_reply = (
+                    f"🏢 *{top_p['name']}*\n"
+                    f"📍 Location: {top_p['location']}\n"
+                    f"💰 Price: {top_p['price']} ({top_p['bedrooms']} BHK)\n"
+                    f"✨ Verified Amenities: {', '.join(top_p['amenities'])}\n\n"
+                    "For verified floor plans and private site visits, our advisory team is at your service."
+                )
+            else:
+                raw_reply = (
+                    f"🏢 *{top_p['name']}*\n"
+                    f"📍 লোকেশন: {top_p['location']}\n"
+                    f"💰 দাম: {top_p.get('price_bn', top_p['price'])} ({top_p['bedrooms']} BHK)\n"
+                    f"✨ ভেরিফায়েড সুবিধাসমূহ: {', '.join(top_p['amenities'])}\n\n"
+                    "বিস্তারিত ফ্লোর প্ল্যান ও সাইট পরিদর্শনের জন্য আমাদের সেলস টিমের সাথে যোগাযোগ করার অনুরোধ করছি।"
+                )
+
+        # 6. Pre-Send Grounding Validation
+        validation = grounding_validator.validate(
+            reply_text=raw_reply,
+            is_english=is_english,
+        )
+
+        final_reply = raw_reply
+        if not validation.is_grounded:
+            logger.warning(f"PropertyAgent grounding violation detected: {validation.violations}")
+            if validation.sanitized_reply:
+                final_reply = validation.sanitized_reply
+
+        # 7. Telemetry Logging
+        log_prompt_telemetry(
+            agent_name="property_agent",
+            model_name="gemini-flash",
+            temperature=0.2,
+            language=lang_info["language"],
+            grounding_status=validation.is_grounded,
+        )
+
+        return final_reply
 
     async def get_projects(self) -> list[dict]:
-        """Return all available projects."""
-        return PROJECTS_DATABASE
+        """Return all available canonical projects."""
+        return property_repository.to_legacy_dict_format()
 
 
 property_agent = PropertyAgent()

@@ -6,12 +6,14 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
-from app.dependencies import require_automation_secret as _auth
+from app.dependencies import require_roles
+from app.models.user import UserRole
 from app.config import settings
 from app.services.llm import llm_service
 from app.rag.pipeline import rag
 
 router = APIRouter()
+_knowledge_auth = require_roles([UserRole.ADMIN, UserRole.DEVELOPER])
 
 
 def _extract_text_from_file(filename: str, content: bytes) -> str:
@@ -74,7 +76,7 @@ async def knowledge_upload(
     project: str = Form(None),
     location: str = Form(None),
     document_type: str = Form(None),
-    auth: dict = Depends(_auth),
+    current_user: dict = Depends(_knowledge_auth),
 ):
     """Upload a document file (PDF/TXT/MD/JSON) for OCR/extraction, chunking, embedding, and indexing."""
     if not file.filename:
@@ -132,12 +134,15 @@ async def knowledge_upload(
         "document_type": document_type,
         "status": "indexed",
         "ocr_status": "completed",
-        "tenantId": auth["tenant_id"],
+        "tenantId": current_user.get("tenant_id", settings.default_tenant_id),
     }
 
 
 @router.post("/text", summary="Upload plain text — chunk, embed, and index")
-async def knowledge_text(body: dict, auth: dict = Depends(_auth)):
+async def knowledge_text(
+    body: dict, 
+    current_user: dict = Depends(_knowledge_auth),
+):
     """Upload plain text content for chunking, embedding, and indexing."""
     text = body.get("text", "").strip()
     doc_id = body.get("doc_id", f"doc_{uuid.uuid4().hex[:12]}")
@@ -181,29 +186,32 @@ async def knowledge_text(body: dict, auth: dict = Depends(_auth)):
         "location": location,
         "document_type": document_type,
         "status": "indexed",
-        "tenantId": auth["tenant_id"],
+        "tenantId": current_user.get("tenant_id", settings.default_tenant_id),
     }
 
 
 @router.get("/documents", summary="List all indexed documents")
-async def list_documents(auth: dict = Depends(_auth)):
+async def list_documents(current_user: dict = Depends(_knowledge_auth)):
     """List all unique documents in the knowledge base with metadata."""
     docs = await rag.list_documents()
     return {
         "success": True,
         "documents": docs,
         "count": len(docs),
-        "tenantId": auth["tenant_id"],
+        "tenantId": current_user.get("tenant_id", settings.default_tenant_id),
     }
 
 
 @router.delete("/documents/{doc_id}", summary="Delete a document and its chunks")
-async def delete_document(doc_id: str, auth: dict = Depends(_auth)):
+async def delete_document(
+    doc_id: str, 
+    current_user: dict = Depends(_knowledge_auth),
+):
     """Delete a document and all its chunks from the knowledge base."""
     deleted = await rag.delete_document(doc_id)
     return {
         "success": True,
         "document_id": doc_id,
         "chunks_deleted": deleted,
-        "tenantId": auth["tenant_id"],
+        "tenantId": current_user.get("tenant_id", settings.default_tenant_id),
     }

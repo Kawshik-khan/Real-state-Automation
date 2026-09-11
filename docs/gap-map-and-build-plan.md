@@ -321,6 +321,22 @@ These are the highest-impact items that can be done in 1-2 days:
 - **Self-hosted Docker**: `docker compose up n8n` — full localhost access, but needs maintenance
 - **Deploy backend publicly**: Render/Railway/Fly.io — fastest for production
 
+### ADR-4: Factual Grounding & Prompt Behavior Separation (Bangladesh Localization Blueprint)
+
+**Audit Source**: `docs/prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md`
+**Decision**: Prompts define behavior; canonical repositories (`PropertyRepository`, `PolicyRepository`, `ContactRepository`) and approved RAG tools define business facts.
+**Rationale**:
+1. Business facts embedded in system prompts lead to cross-agent drift (e.g. 95 Lakhs BDT vs $250k / 3.5 Cr contradiction in email vs chat).
+2. Indian real estate metadata contamination (Mumbai, Bandra, Goa, PAN card, Aadhaar, +91 phone numbers) severely violated operating geography requirements.
+3. RAG short-circuiting in property agent discarded knowledge chunks when SQL returned records.
+4. Banglish requires multi-signal classification (script ratio + lexical scoring + suffix patterns), not brittle keyword checks.
+**Implementation**:
+- Canonical data layer in `backend/app/repositories/`.
+- Modular, versioned prompt registry in `backend/app/prompts/` rooted in `SYSTEM_CORE_POLICY`.
+- Strict 5-tier evidence hierarchy (Live tool/DB > Approved policy > RAG docs > Conversation context > Model knowledge).
+- Pre-send response validation via `GroundingValidator`.
+- Complete removal of legacy foreign tokens.
+
 ---
 
 ## 7. Dependency Graph

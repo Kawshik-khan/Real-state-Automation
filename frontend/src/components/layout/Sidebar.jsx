@@ -26,7 +26,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'social_analytics', label: 'Social Analytics', icon: Share2, badge: 'KPIs', highlight: true, roles: ['admin'] },
     { id: 'role_reports', label: 'Role Reports', icon: FileText, badge: 'EXEC', highlight: true, roles: ['admin'] },
     { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', roles: ['manager', 'agent'] },
-    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['manager', 'developer'] },
+    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, roles: ['admin', 'developer'] },
     { id: 'content', label: 'Content Engine', icon: Share2, roles: ['manager'] },
     { id: 'properties', label: 'Properties', icon: Building2, roles: ['manager', 'agent', 'viewer'] },
     { id: 'n8n_monitoring', label: 'n8n Health', icon: Activity, badge: 'NODES', roles: ['developer'] },

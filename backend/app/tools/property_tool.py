@@ -1,63 +1,15 @@
 """Property Search Tool — SQL property filtering + RAG integration + Media Actions."""
 
 import re
-from typing import Optional
+from typing import Optional, List, Dict, Any
+from app.repositories.property_repository import property_repository
 
-# Enhanced real-estate project inventory for MVP
-PROJECTS_DATABASE = [
-    {
-        "id": "proj_gulshan_luxe",
-        "name": "GLG Gulshan Heights",
-        "location": "Gulshan 2, Dhaka",
-        "price": "95 Lakhs BDT",
-        "price_val": 9500000,
-        "bedrooms": 3,
-        "description": "Luxury 3 BHK apartment in Gulshan 2 with modern amenities, rooftop garden, and 24/7 security.",
-        "amenities": ["Rooftop Garden", "Gym", "Elevator", "Generator", "Parking"],
-        "brochure_url": "https://example.com/brochures/gulshan_heights.pdf",
-        "images": ["https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800"]
-    },
-    {
-        "id": "proj_gulshan_palace",
-        "name": "GLG Grand Residency",
-        "location": "Gulshan 1, Dhaka",
-        "price": "85 Lakhs BDT",
-        "price_val": 8500000,
-        "bedrooms": 2,
-        "description": "Elegant 2 BHK apartment near Gulshan Lake, close to shopping centers and schools.",
-        "amenities": ["Lake View", "Security", "Backup Generator"],
-        "brochure_url": "https://example.com/brochures/grand_residency.pdf",
-        "images": ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800"]
-    },
-    {
-        "id": "proj_banani_crest",
-        "name": "GLG Banani Crest",
-        "location": "Banani, Dhaka",
-        "price": "1.2 Crore BDT",
-        "price_val": 12000000,
-        "bedrooms": 3,
-        "description": "Exclusive 3 BHK luxury residence in prime Banani area.",
-        "amenities": ["Infinity Pool", "Concierge", "Underground Parking"],
-        "brochure_url": "https://example.com/brochures/banani_crest.pdf",
-        "images": ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800"]
-    },
-    {
-        "id": "proj_mumbai_luxe",
-        "name": "GLG Luxe Heights",
-        "location": "Baridhara Diplomatic Zone, Dhaka",
-        "price": "1.8 Crore BDT",
-        "price_val": 18000000,
-        "bedrooms": 3,
-        "description": "Premium luxury apartments with panoramic city view and smart home automation.",
-        "amenities": ["Lake View", "Infinity Pool", "Smart Home Automation", "24/7 Security"],
-        "brochure_url": "https://example.com/brochures/luxe_heights.pdf",
-        "images": ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800"]
-    }
-]
+# Backward-compatibility alias pointing to canonical repository data
+PROJECTS_DATABASE = property_repository.to_legacy_dict_format()
 
 
 class PropertySearchTool:
-    """SQL + RAG hybrid property search tool."""
+    """SQL + RAG hybrid property search tool grounded in canonical repository."""
 
     async def search(
         self,
@@ -68,37 +20,45 @@ class PropertySearchTool:
     ) -> dict:
         """Perform SQL search on project database with RAG fallback."""
         query_lower = query.lower()
-        results = []
 
-        # Parse budget if present in text (e.g. "under 1 crore", "under 90 lakhs")
+        # Parse budget if present in text (e.g. "under 1 crore", "under 90 lakhs", "1.5 cr")
         parsed_budget = max_budget
         if not parsed_budget:
-            if "1 crore" in query_lower or "1 cr" in query_lower or "100 lakh" in query_lower:
+            if "1.8 crore" in query_lower or "1.8 cr" in query_lower:
+                parsed_budget = 18000000
+            elif "1.2 crore" in query_lower or "1.2 cr" in query_lower:
+                parsed_budget = 12000000
+            elif "1 crore" in query_lower or "1 cr" in query_lower or "100 lakh" in query_lower:
                 parsed_budget = 10000000
+            elif "95 lakh" in query_lower or "95 L" in query_lower:
+                parsed_budget = 9500000
             elif "90 lakh" in query_lower or "90 L" in query_lower:
                 parsed_budget = 9000000
+            elif "85 lakh" in query_lower or "85 L" in query_lower:
+                parsed_budget = 8500000
             elif "80 lakh" in query_lower:
                 parsed_budget = 8000000
 
-        # Location extraction from query
-        search_loc = (location or "").lower()
+        # Location extraction from query — strictly Bangladesh operating locations
+        search_loc = (location or "").lower().strip()
         if not search_loc:
-            for loc_name in ["gulshan", "banani", "bandra", "mumbai", "dhaka"]:
+            for loc_name in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara", "dhaka"]:
                 if loc_name in query_lower:
                     search_loc = loc_name
                     break
 
         # Check if user specifically requested a project by name
         target_project_keywords = []
-        for proj in PROJECTS_DATABASE:
+        all_projects = property_repository.to_legacy_dict_format()
+        for proj in all_projects:
             proj_name_lower = proj["name"].lower()
-            # Match project name keywords e.g. "luxe heights", "banani crest", "gulshan heights", "grand residency"
             clean_proj_words = [w for w in proj_name_lower.split() if w != "glg"]
             phrase = " ".join(clean_proj_words)
             if phrase in query_lower or proj_name_lower in query_lower:
                 target_project_keywords.append(proj["id"])
 
-        for proj in PROJECTS_DATABASE:
+        results = []
+        for proj in all_projects:
             match = True
             if target_project_keywords:
                 if proj["id"] not in target_project_keywords:
@@ -114,7 +74,6 @@ class PropertySearchTool:
             if match:
                 results.append(proj)
 
-        # Build actions based on findings
         actions = []
         if results:
             actions.append("send_images")

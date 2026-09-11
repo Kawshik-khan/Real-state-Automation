@@ -29,7 +29,15 @@ import {
   Clock,
   ArrowUpRight,
   Lock,
-  Bot
+  Bot,
+  XCircle,
+  Award,
+  TrendingUp,
+  BarChart2,
+  CheckSquare,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { 
   getDeveloperSystemHealth, 
@@ -44,7 +52,11 @@ import {
   getN8nTelemetry,
   getDeveloperLogs,
   clearDeveloperLogs,
-  getDeveloperLogsStreamUrl
+  getDeveloperLogsStreamUrl,
+  getWebSocketUrl,
+  runDeveloperEvals,
+  getLatestDeveloperEvals,
+  getDeveloperEvalSuites
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -93,10 +105,22 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [logs, setLogs] = useState([]);
 
-  // Fetch initial logs and health on mount + establish live SSE stream
+  // AI Evaluations & Quality Gates State
+  const [evalSuites, setEvalSuites] = useState([]);
+  const [selectedEvalSuite, setSelectedEvalSuite] = useState('all');
+  const [evalsSampleSize, setEvalsSampleSize] = useState('');
+  const [evalsRunning, setEvalsRunning] = useState(false);
+  const [evalsProgress, setEvalsProgress] = useState(null); // { suite, test_idx, total_tests, query, passed, pct, latency_ms }
+  const [evalsReport, setEvalsReport] = useState(null);
+  const [evalsError, setEvalsError] = useState(null);
+  const [evalFilterCategory, setEvalFilterCategory] = useState('ALL'); // 'ALL' | 'FAILURES' | specific suite
+  const [expandedFailureId, setExpandedFailureId] = useState(null);
+
+  // Fetch initial logs, health, and evals on mount + establish live SSE stream
   useEffect(() => {
     fetchHealthData();
     fetchLiveLogs();
+    fetchEvalData();
 
     // Connect to live SSE log stream
     let eventSource = null;
@@ -133,6 +157,112 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
       }
     };
   }, []);
+
+  // Connect to live WebSocket stream for real-time eval progress streaming
+  useEffect(() => {
+    let ws = null;
+    let reconnectTimeout = null;
+
+    const connectWS = () => {
+      try {
+        const wsUrl = getWebSocketUrl();
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.debug('[WS] Connected to live event stream for AI Evals');
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'eval_progress') {
+              setEvalsProgress(data);
+            }
+          } catch (e) {
+            // ignore non-json messages
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.debug('[WS] Eval stream error (HTTP fallback active):', err);
+        };
+
+        ws.onclose = () => {
+          reconnectTimeout = setTimeout(connectWS, 5000);
+        };
+      } catch (err) {
+        console.warn('WebSocket connection not available:', err);
+      }
+    };
+
+    connectWS();
+
+    return () => {
+      if (ws) ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, []);
+
+  const fetchEvalData = async () => {
+    try {
+      const [suitesRes, latestRes] = await Promise.allSettled([
+        getDeveloperEvalSuites(),
+        getLatestDeveloperEvals()
+      ]);
+      if (suitesRes.status === 'fulfilled' && suitesRes.value?.suites) {
+        setEvalSuites(suitesRes.value.suites);
+      }
+      if (latestRes.status === 'fulfilled' && latestRes.value?.report) {
+        setEvalsReport(latestRes.value.report);
+      }
+    } catch (err) {
+      console.warn('Error fetching eval suites / latest report:', err);
+    }
+  };
+
+  const handleRunEvals = async () => {
+    setEvalsRunning(true);
+    setEvalsError(null);
+    setEvalsProgress({
+      suite: selectedEvalSuite,
+      test_idx: 0,
+      total_tests: 1,
+      pct: 5,
+      query: 'Initializing test suite & benchmarks...'
+    });
+
+    try {
+      addLog('INFO', 'EvaluationEngine', `Initiating eval run for suite: ${selectedEvalSuite}`);
+      const sample = evalsSampleSize ? parseInt(evalsSampleSize, 10) : null;
+      const res = await runDeveloperEvals(selectedEvalSuite, sample);
+      if (res && res.status === 'success' && res.report) {
+        setEvalsReport(res.report);
+        setEvalsProgress({
+          suite: selectedEvalSuite,
+          test_idx: res.report.summary?.total_tests || 1,
+          total_tests: res.report.summary?.total_tests || 1,
+          pct: 100,
+          passed: res.report.gate_status === 'PASSED',
+          query: `Evaluation complete: Gate ${res.report.gate_status} (${res.report.summary?.pass_rate_pct}% pass rate)`
+        });
+        addLog(
+          res.report.gate_status === 'PASSED' ? 'INFO' : 'WARN',
+          'EvaluationEngine',
+          `Eval finished: Gate ${res.report.gate_status} • ${res.report.summary?.pass_rate_pct}% (${res.report.summary?.passed_tests}/${res.report.summary?.total_tests})`
+        );
+      } else {
+        const errMsg = res?.message || 'Evaluation run failed to return report';
+        setEvalsError(errMsg);
+        addLog('ERROR', 'EvaluationEngine', errMsg);
+      }
+    } catch (err) {
+      const errMsg = err.message || 'Error executing evaluations';
+      setEvalsError(errMsg);
+      addLog('ERROR', 'EvaluationEngine', errMsg);
+    } finally {
+      setEvalsRunning(false);
+    }
+  };
 
   const fetchLiveLogs = async () => {
     try {
@@ -529,6 +659,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
       }}>
         {[
           { id: 'engineering_summary', label: 'Engineering Summary & Health', icon: LayoutDashboard, count: '6 Modules', highlight: true },
+          { 
+            id: 'evals_benchmarks', 
+            label: 'AI Evals & Quality Gates', 
+            icon: ShieldCheck, 
+            count: evalsRunning ? 'Testing...' : evalsReport?.gate_status ? (evalsReport.gate_status === 'PASSED' ? 'Passed' : 'Blocked') : 'Gates', 
+            highlight: true 
+          },
           { id: 'api_playground', label: 'API Playground', icon: Play, count: '6 Endpoints' },
           { id: 'webhooks', label: 'Webhook Simulator', icon: Radio, count: '5 Channels' },
           { id: 'rag_diagnostics', label: 'RAG & Vector Diagnostics', icon: Database, count: 'Pinecone' },
@@ -1320,6 +1457,973 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
         </div>
       )}
+
+      {/* ── TAB: AI EVALUATIONS & PRODUCTION QUALITY GATES ── */}
+      {activeTab === 'evals_benchmarks' && (() => {
+        const isGatePassed = evalsReport ? (evalsReport.all_passed ?? (evalsReport.gate_status === 'PASSED')) : null;
+        const gateStatus = isGatePassed === true ? 'PASSED' : isGatePassed === false ? 'FAILED' : (evalsReport?.gate_status || 'STANDBY');
+        const gates = evalsReport?.release_gates || {};
+        const scorecard = evalsReport?.summary_scorecard || evalsReport?.scorecard || {};
+
+        let totalCases = 0;
+        let passedCases = 0;
+        let failedCases = 0;
+        let allFailures = [];
+
+        if (evalsReport?.suites) {
+          Object.entries(evalsReport.suites).forEach(([sKey, sVal]) => {
+            totalCases += sVal.total_cases ?? sVal.total_tests ?? 0;
+            passedCases += sVal.passed_cases ?? sVal.passed_tests ?? 0;
+            failedCases += sVal.failed_cases ?? sVal.failed_tests ?? 0;
+            if (Array.isArray(sVal.failures)) {
+              sVal.failures.forEach((f) => allFailures.push({ ...f, suite: f.suite || sKey }));
+            }
+          });
+        }
+        if (evalsReport?.failures && allFailures.length === 0) {
+          allFailures = evalsReport.failures;
+        }
+        if (evalsReport?.summary) {
+          totalCases = evalsReport.summary.total_tests ?? totalCases;
+          passedCases = evalsReport.summary.passed_tests ?? passedCases;
+          failedCases = evalsReport.summary.failed_tests ?? failedCases;
+        }
+        const passRate = totalCases > 0 
+          ? Math.round((passedCases / totalCases) * 100) 
+          : (evalsReport?.summary?.pass_rate_pct ?? (isGatePassed ? 100 : 0));
+        const durationSec = evalsReport?.total_duration_sec ?? evalsReport?.summary?.total_duration_sec ?? 0;
+
+        // Extract latency percentiles
+        let p50 = evalsReport?.latency?.p50_ms || 0;
+        let p90 = evalsReport?.latency?.p90_ms || 0;
+        let p95 = evalsReport?.latency?.p95_ms || 0;
+        let p99 = evalsReport?.latency?.p99_ms || 0;
+        if (!p50 && evalsReport?.suites) {
+          const firstSuiteWithLatency = Object.values(evalsReport.suites).find((s) => s.latency);
+          if (firstSuiteWithLatency?.latency) {
+            p50 = Math.round(firstSuiteWithLatency.latency.p50_ms || 0);
+            p90 = Math.round(firstSuiteWithLatency.latency.p90_ms || 0);
+            p95 = Math.round(firstSuiteWithLatency.latency.p95_ms || 0);
+            p99 = Math.round(firstSuiteWithLatency.latency.p99_ms || 0);
+          }
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Hero Header & Execution Controls */}
+            <div className="glass-card" style={{
+              padding: '24px 28px',
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              borderRadius: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '20px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    background: gateStatus === 'PASSED' 
+                      ? 'rgba(16, 185, 129, 0.15)' 
+                      : gateStatus === 'FAILED'
+                      ? 'rgba(239, 68, 68, 0.15)'
+                      : 'rgba(56, 189, 248, 0.15)',
+                    border: `1px solid ${
+                      gateStatus === 'PASSED' 
+                        ? 'rgba(16, 185, 129, 0.4)' 
+                        : gateStatus === 'FAILED'
+                        ? 'rgba(239, 68, 68, 0.4)'
+                        : 'rgba(56, 189, 248, 0.4)'
+                    }`,
+                    color: gateStatus === 'PASSED' 
+                      ? '#34D399' 
+                      : gateStatus === 'FAILED'
+                      ? '#F87171'
+                      : '#38BDF8',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    {gateStatus === 'PASSED' ? (
+                      <><CheckCircle2 size={13} /> RELEASE GATE: PASSED (DEPLOYMENT READY)</>
+                    ) : gateStatus === 'FAILED' ? (
+                      <><XCircle size={13} /> RELEASE GATE: BLOCKED (QUALITY CRITERIA BREACHED)</>
+                    ) : (
+                      <><ShieldCheck size={13} /> QUALITY GATES: STANDBY</>
+                    )}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                    Execution Engine: <strong style={{ color: '#38BDF8' }}>WebSocket Live Stream</strong>
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                    Last Run: <strong style={{ color: '#F1F5F9' }}>
+                      {evalsReport?.timestamp ? new Date(evalsReport.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Never'}
+                    </strong>
+                  </span>
+                </div>
+                
+                <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={22} color="#38BDF8" /> AI Evaluation Engine &amp; Production Quality Gates
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94A3B8', maxWidth: '820px' }}>
+                  Automated multi-lingual benchmarks testing Intent Routing (Bangla/Banglish/EN), RAG Groundedness, Safety &amp; Guardrails, Self-Correcting Memory, and Financial Calculations with LLM-as-a-judge.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Suite Selector */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>BENCHMARK SUITE</label>
+                  <select
+                    value={selectedEvalSuite}
+                    onChange={(e) => setSelectedEvalSuite(e.target.value)}
+                    disabled={evalsRunning}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#F1F5F9',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Full Benchmark Suite (All 5 Gates)</option>
+                    <option value="intent">Intent Routing (Bangla/Banglish/EN)</option>
+                    <option value="rag">RAG Groundedness &amp; Faithfulness</option>
+                    <option value="safety">Safety &amp; Adversarial Guardrails</option>
+                    <option value="memory">Self-Correcting Memory Suite</option>
+                    <option value="numeric">Deterministic Financial Math</option>
+                  </select>
+                </div>
+
+                {/* Sample Size Limit */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>SAMPLE LIMIT</label>
+                  <input
+                    type="number"
+                    placeholder="All (Default)"
+                    value={evalsSampleSize}
+                    onChange={(e) => setEvalsSampleSize(e.target.value)}
+                    disabled={evalsRunning}
+                    style={{
+                      width: '95px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#F1F5F9',
+                      fontSize: '0.8rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Run Button */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'transparent', userSelect: 'none' }}>TRIGGER</label>
+                  <button
+                    onClick={handleRunEvals}
+                    disabled={evalsRunning}
+                    style={{
+                      padding: '9px 18px',
+                      borderRadius: '8px',
+                      background: evalsRunning 
+                        ? 'rgba(56, 189, 248, 0.3)' 
+                        : 'linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: evalsRunning ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: evalsRunning ? 'none' : '0 4px 14px rgba(14, 165, 233, 0.4)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {evalsRunning ? (
+                      <RefreshCw size={15} className="spin-anim" />
+                    ) : (
+                      <Play size={15} />
+                    )}
+                    <span>{evalsRunning ? 'Evaluating Models...' : 'Run Evaluation Suite'}</span>
+                  </button>
+                </div>
+
+                {/* Refresh Report Button */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'transparent', userSelect: 'none' }}>SYNC</label>
+                  <button
+                    onClick={fetchEvalData}
+                    disabled={evalsRunning}
+                    title="Reload latest benchmark report"
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: '#94A3B8',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <RefreshCw size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Real-time Live Progress Bar (WebSocket Streamed) */}
+            {(evalsRunning || evalsProgress) && (
+              <div className="glass-card" style={{
+                padding: '16px 20px',
+                borderRadius: '12px',
+                background: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Activity size={16} color="#38BDF8" className={evalsRunning ? 'spin-anim' : ''} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase' }}>
+                      Active Suite: {evalsProgress?.suite || selectedEvalSuite}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
+                    <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                      Test {evalsProgress?.test_idx || 0} of {evalsProgress?.total_tests || 0}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {evalsProgress?.passed !== undefined && (
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        background: evalsProgress.passed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: evalsProgress.passed ? '#34D399' : '#F87171'
+                      }}>
+                        {evalsProgress.passed ? 'PASS' : 'FAIL'}
+                      </span>
+                    )}
+                    {evalsProgress?.latency_ms && (
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'monospace' }}>
+                        {evalsProgress.latency_ms}ms
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#F1F5F9' }}>
+                      {evalsProgress?.pct || 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Query Preview */}
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  fontSize: '0.78rem',
+                  color: '#CBD5E1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <span style={{ color: '#64748B', fontWeight: 600 }}>QUERY:</span>
+                  <span style={{ color: '#38BDF8', fontFamily: 'monospace' }}>
+                    {evalsProgress?.query || 'Loading test case...'}
+                  </span>
+                </div>
+
+                {/* Progress Bar Track */}
+                <div style={{
+                  height: '8px',
+                  borderRadius: '4px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${evalsProgress?.pct || 0}%`,
+                    background: 'linear-gradient(90deg, #38BDF8 0%, #818CF8 50%, #34D399 100%)',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease',
+                    boxShadow: '0 0 12px rgba(56, 189, 248, 0.6)'
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {/* Error Callout if any */}
+            {evalsError && (
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#FCA5A5',
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <AlertCircle size={16} color="#F87171" />
+                <span>{evalsError}</span>
+              </div>
+            )}
+
+            {/* Production Quality Gate Release Verdict Banner */}
+            {evalsReport && (
+              <div className="glass-card" style={{
+                padding: '20px 24px',
+                borderRadius: '14px',
+                background: gateStatus === 'PASSED'
+                  ? 'linear-gradient(135deg, rgba(6, 78, 59, 0.35) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                  : 'linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(15, 23, 42, 0.95) 100%)',
+                border: `1px solid ${gateStatus === 'PASSED' ? 'rgba(52, 211, 153, 0.4)' : 'rgba(248, 113, 113, 0.4)'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: gateStatus === 'PASSED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {gateStatus === 'PASSED' ? (
+                      <Award size={26} color="#34D399" />
+                    ) : (
+                      <XCircle size={26} color="#F87171" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: gateStatus === 'PASSED' ? '#34D399' : '#F87171' }}>
+                      {gateStatus === 'PASSED' 
+                        ? 'PRODUCTION QUALITY GATE PASSED' 
+                        : 'PRODUCTION QUALITY GATE BLOCKED'}
+                    </h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#CBD5E1' }}>
+                      {evalsReport.gate_reason || (gateStatus === 'PASSED' 
+                        ? 'All evaluation suites met or exceeded release criteria thresholds. Safe for automated deployment.' 
+                        : 'One or more benchmark metrics fell below the required threshold.')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Aggregate metrics pills */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>PASS RATE</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: passRate >= 95 ? '#34D399' : '#F87171' }}>
+                      {passRate}%
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>PASSED / TOTAL</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F1F5F9' }}>
+                      {passedCases} / {totalCases}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>FAILURES</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: failedCases > 0 ? '#F87171' : '#34D399' }}>
+                      {failedCases}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>DURATION</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38BDF8' }}>
+                      {durationSec}s
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 6 Core Quality Gate Cards Grid */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Gauge size={16} color="#38BDF8" /> 6 Critical Production Gate Thresholds
+                </h4>
+                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Automated Threshold Validation</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                
+                {/* Card 1: Intent Routing */}
+                {(() => {
+                  const gateObj = gates.intent_accuracy;
+                  const val = gateObj?.current ?? scorecard.intent_accuracy ?? scorecard.intent_routing_accuracy;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val >= 0.95 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>1. Intent Routing Accuracy</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        Multi-lingual intent classification across Bangla, Banglish, and English property search, booking, and support queries.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card 2: RAG Groundedness */}
+                {(() => {
+                  const gateObj = gates.rag_groundedness;
+                  const val = gateObj?.current ?? scorecard.rag_groundedness ?? scorecard.rag_groundedness_faithfulness;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val >= 0.95 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>2. RAG Groundedness</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        LLM-as-a-judge verifying that property facts, unit sizes, and handover dates directly entail from retrieved knowledge chunks.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card 3: Hallucination Rate */}
+                {(() => {
+                  const gateObj = gates.hallucination_rate;
+                  const val = gateObj?.current ?? scorecard.hallucination_rate;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val <= 0.02 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>3. Hallucination Rate</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≤ 2.0%</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        Strict refusal testing ensuring model refrains from fabricating non-existent projects or unverified pricing claims.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card 4: Safety & Guardrails */}
+                {(() => {
+                  const gateObj = gates.safety_compliance;
+                  const val = gateObj?.current ?? scorecard.safety_compliance ?? scorecard.guardrail_safety_compliance;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val >= 1.0 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>4. Safety &amp; Guardrail Compliance</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: 100.0% (Zero Tolerance)</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        Adversarial jailbreaks, prompt injection, and PII leakage queries are blocked 100% of the time before inference.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card 5: Self-Correcting Memory */}
+                {(() => {
+                  const gateObj = gates.memory_reconciliation;
+                  const val = gateObj?.current ?? scorecard.memory_reconciliation ?? scorecard.memory_correction_accuracy;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val >= 0.95 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>5. Self-Correcting Memory</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        Validates that multi-turn user contradictions automatically supersede invalidated premises without carry-over bias.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card 6: Deterministic Financial Calculations */}
+                {(() => {
+                  const gateObj = gates.math_exactness;
+                  const val = gateObj?.current ?? scorecard.math_exactness ?? scorecard.deterministic_math_accuracy;
+                  const passed = gateObj?.passed ?? (val !== undefined ? val >= 1.0 : null);
+                  return (
+                    <div className="glass-card" style={{
+                      padding: '18px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>6. Deterministic Financial Math</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                        }}>
+                          {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                          {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: 100.0% (Exact Match)</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                        Ensures down payment schedules and monthly installments match exact financial Python tool computations.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            </div>
+
+            {/* Latency Percentile Breakdown */}
+            {p50 > 0 && (
+              <div className="glass-card" style={{
+                padding: '18px 24px',
+                borderRadius: '14px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F1F5F9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} color="#38BDF8" /> Pipeline Latency Distribution (Percentiles)
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Real-time measured across all suite queries</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P50 (Median)</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace' }}>
+                      {p50} ms
+                    </div>
+                  </div>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P90</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#818CF8', fontFamily: 'monospace' }}>
+                      {p90} ms
+                    </div>
+                  </div>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P95</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F59E0B', fontFamily: 'monospace' }}>
+                      {p95} ms
+                    </div>
+                  </div>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P99</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#EC4899', fontFamily: 'monospace' }}>
+                      {p99} ms
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Test Case Breakdown & Failure Inspector */}
+            <div className="glass-card" style={{
+              padding: '24px',
+              borderRadius: '16px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Code2 size={18} color="#38BDF8" /> Suite Results &amp; Failure Inspector
+                  </h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#94A3B8' }}>
+                    Detailed breakdown of benchmark suites and automated judge critiques for flagged test cases.
+                  </p>
+                </div>
+
+                {/* Category Filter Pills */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'ALL', label: 'All Suites' },
+                    { id: 'FAILURES', label: `Failures (${allFailures.length})` },
+                    { id: 'intent', label: 'Intent' },
+                    { id: 'rag', label: 'Groundedness' },
+                    { id: 'safety', label: 'Safety' },
+                    { id: 'memory', label: 'Memory' },
+                    { id: 'numeric', label: 'Financial' },
+                  ].map((pill) => (
+                    <button
+                      key={pill.id}
+                      onClick={() => setEvalFilterCategory(pill.id)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        background: evalFilterCategory === pill.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                        color: evalFilterCategory === pill.id ? '#38BDF8' : '#94A3B8',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {pill.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Suite Progress Summaries */}
+              {evalsReport?.suites && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                  {Object.entries(evalsReport.suites).map(([suiteKey, suiteData]) => {
+                    const total = suiteData.total_cases ?? suiteData.total_tests ?? 0;
+                    const passed = suiteData.passed_cases ?? suiteData.passed_tests ?? 0;
+                    const passPct = total > 0 ? Math.round((passed / total) * 100) : 100;
+                    return (
+                      <div key={suiteKey} style={{
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.25)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#CBD5E1', textTransform: 'capitalize' }}>
+                            {suiteKey.replace(/_/g, ' ')}
+                          </span>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: passPct >= 95 ? '#34D399' : '#F87171'
+                          }}>
+                            {passPct}%
+                          </span>
+                        </div>
+                        <div style={{
+                          height: '5px',
+                          borderRadius: '3px',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          overflow: 'hidden',
+                          marginBottom: '6px'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${passPct}%`,
+                            background: passPct >= 95 ? '#34D399' : '#F87171'
+                          }} />
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748B' }}>
+                          {passed} of {total} passed
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Failures List or Zero Failure Banner */}
+              {(() => {
+                const filteredFailures = evalFilterCategory === 'ALL' || evalFilterCategory === 'FAILURES'
+                  ? allFailures
+                  : allFailures.filter((f) => f.suite === evalFilterCategory || f.suite?.includes(evalFilterCategory));
+
+                if (allFailures.length === 0) {
+                  return (
+                    <div style={{
+                      padding: '24px',
+                      borderRadius: '12px',
+                      background: 'rgba(16, 185, 129, 0.08)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      textAlign: 'center',
+                      color: '#34D399',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <CheckCircle2 size={28} color="#34D399" />
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                        Zero Regressions Detected
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '500px' }}>
+                        All evaluated prompt tests satisfied their deterministic oracle conditions and factual entailment thresholds.
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#F87171', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertCircle size={15} />
+                      Flagged Test Cases Requiring Inspection ({filteredFailures.length}):
+                    </div>
+
+                    {filteredFailures.map((failure, idx) => {
+                      const isExpanded = expandedFailureId === (failure.test_id || idx);
+                      return (
+                        <div
+                          key={failure.test_id || idx}
+                          style={{
+                            borderRadius: '10px',
+                            background: 'rgba(239, 68, 68, 0.06)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}
+                        >
+                          <div
+                            onClick={() => setExpandedFailureId(isExpanded ? null : (failure.test_id || idx))}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                color: '#F87171',
+                                fontSize: '0.68rem',
+                                fontWeight: 700
+                              }}>
+                                FAIL
+                              </span>
+                              <span style={{ fontSize: '0.74rem', color: '#A5B4FC', fontWeight: 600 }}>
+                                [{failure.suite}]
+                              </span>
+                              <span style={{ fontSize: '0.78rem', color: '#E2E8F0', fontWeight: 700 }}>
+                                {failure.test_id}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {failure.latency_ms && (
+                                <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                                  {failure.latency_ms}ms
+                                </span>
+                              )}
+                              <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                                {isExpanded ? '▲ Less' : '▼ Details'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Query snippet */}
+                          <div style={{
+                            fontSize: '0.78rem',
+                            color: '#CBD5E1',
+                            background: 'rgba(0,0,0,0.25)',
+                            padding: '6px 10px',
+                            borderRadius: '6px'
+                          }}>
+                            <span style={{ color: '#64748B', fontWeight: 600 }}>QUERY:</span> {failure.query}
+                          </div>
+
+                          {/* Expanded details */}
+                          {isExpanded && (
+                            <div style={{
+                              marginTop: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              fontSize: '0.76rem'
+                            }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div style={{ padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)' }}>
+                                  <div style={{ color: '#34D399', fontWeight: 700, marginBottom: '4px' }}>EXPECTED:</div>
+                                  <div style={{ color: '#E2E8F0', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                    {typeof failure.expected === 'object' ? JSON.stringify(failure.expected, null, 2) : String(failure.expected)}
+                                  </div>
+                                </div>
+                                <div style={{ padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)' }}>
+                                  <div style={{ color: '#F87171', fontWeight: 700, marginBottom: '4px' }}>ACTUAL:</div>
+                                  <div style={{ color: '#E2E8F0', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                    {typeof failure.actual === 'object' ? JSON.stringify(failure.actual, null, 2) : String(failure.actual)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {failure.critique && (
+                                <div style={{
+                                  padding: '8px 10px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(239, 68, 68, 0.12)',
+                                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                                  color: '#FCA5A5'
+                                }}>
+                                  <strong style={{ color: '#F87171' }}>Judge Critique:</strong> {failure.critique}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* ── TAB 1: API PLAYGROUND ── */}
       {activeTab === 'api_playground' && (

@@ -271,9 +271,9 @@ async def get_social_kpi_analytics(
             "target_audience": "HNIs, Gulshan Business Owners, Expats (Age 32-55)"
         },
         {
-            "id": "cmp-bandra-02",
-            "name": "Bandra Luxury Suites — Sea-Facing Reveal",
-            "project": "Bandra Luxury Suites",
+            "id": "cmp-baridhara-02",
+            "name": "Baridhara Luxury Suites — Lake-Facing Reveal",
+            "project": "Baridhara Luxury Suites",
             "platform": "Meta & LinkedIn",
             "type": "Virtual Tour / Brand",
             "status": "ACTIVE",
@@ -284,7 +284,7 @@ async def get_social_kpi_analytics(
             "ctr": "4.8%",
             "impressions": int(410000 * multiplier),
             "creative": "Sunset Infinity Pool Walkthrough",
-            "target_audience": "Tech Executives, Corporate Leaders (Mumbai / Bangalore)"
+            "target_audience": "Tech Executives, Corporate Leaders & NRBs (Dhaka / Global NRB)"
         },
         {
             "id": "cmp-sky-03",
