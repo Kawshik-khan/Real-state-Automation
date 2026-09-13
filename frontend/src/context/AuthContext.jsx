@@ -9,16 +9,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Validate session on app load
-    if (token && !user) {
+    // Validate session against backend on app launch
+    if (token) {
       setLoading(true);
       authService.getMe()
         .then((userData) => {
-          if (userData) setUser(userData);
+          if (userData) {
+            setUser(userData);
+          } else {
+            setToken(null);
+            setUser(null);
+          }
+        })
+        .catch(() => {
+          setToken(null);
+          setUser(null);
         })
         .finally(() => setLoading(false));
     }
-  }, [token]);
+  }, []);
 
   const login = async (email, password) => {
     setLoading(true);
