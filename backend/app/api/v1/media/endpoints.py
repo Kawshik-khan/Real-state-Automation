@@ -1,10 +1,9 @@
 """Media Services — Workstream 12."""
 from fastapi import APIRouter, Depends
 
-router = APIRouter()
-
-
 from app.dependencies import require_automation_secret as _auth
+
+router = APIRouter()
 
 
 @router.post("/brochure", summary="WS12 — Brochure Distribution")

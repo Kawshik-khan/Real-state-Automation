@@ -5,7 +5,6 @@ All policy answers are versioned, approved, and retrieved from here.
 """
 from typing import Any, Dict, Optional
 
-
 APPROVED_POLICIES: Dict[str, Dict[str, Any]] = {
     "required_documents_purchase": {
         "policy_key": "required_documents_purchase",

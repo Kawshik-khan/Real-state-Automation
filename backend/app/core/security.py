@@ -3,18 +3,19 @@
 import hashlib
 import hmac
 import time
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from app.config import settings
 
 # JWT secret key from environment or default secret
-SECRET_KEY = getattr(settings, "jwt_secret", None) or getattr(settings, "automation_shared_secret", "glg-assets-super-secret-key-2026")
+SECRET_KEY = settings.jwt_secret or settings.automation_shared_secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 
 def hash_password(password: str) -> str:
     """Hash a plain text password using HMAC SHA256 with salt."""
-    salt = "glg_assets_salt_2026"
+    salt = settings.password_hash_salt
     return hmac.new(salt.encode('utf-8'), password.encode('utf-8'), hashlib.sha256).hexdigest()
 
 
@@ -33,8 +34,8 @@ def create_access_token(data: Dict[str, Any], expires_delta_minutes: Optional[in
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     except ImportError:
         # Simple signed token fallback if pyjwt is not installed
-        import json
         import base64
+        import json
         payload = data.copy()
         payload["exp"] = int(time.time() + ((expires_delta_minutes or ACCESS_TOKEN_EXPIRE_MINUTES) * 60))
         encoded_bytes = base64.urlsafe_b64encode(json.dumps(payload).encode())
@@ -51,8 +52,8 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     except Exception:
         # Fallback decoder
         try:
-            import json
             import base64
+            import json
             parts = token.split(".")
             if len(parts) != 2:
                 return None

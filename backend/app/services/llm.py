@@ -1,6 +1,8 @@
 import json
 from typing import Optional
+
 from openai import AsyncOpenAI
+
 from app.config import settings
 
 

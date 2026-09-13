@@ -1,8 +1,7 @@
 """Event Broadcaster Service — Server-Sent Events (SSE) Broadcast Engine."""
 
 import asyncio
-import json
-from typing import Dict, List, AsyncGenerator
+from typing import Dict, List
 
 
 class EventBroadcaster:

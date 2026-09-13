@@ -5,11 +5,12 @@ absence of foreign legacy tokens, and verified property claims.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
-from app.repositories.property_repository import property_repository, SUPPORTED_MARKET
 from app.repositories.contact_repository import contact_repository
+from app.repositories.property_repository import property_repository
 
 
 class GroundingViolation(BaseModel):

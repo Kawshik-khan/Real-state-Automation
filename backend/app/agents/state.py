@@ -1,8 +1,10 @@
 """AI Pipeline State — Typed state that flows through the LangGraph."""
 
 from __future__ import annotations
-from typing import Optional, Any
+
 from datetime import datetime
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 

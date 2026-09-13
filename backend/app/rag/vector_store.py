@@ -9,9 +9,10 @@ Features:
 import json
 from pathlib import Path
 from typing import Optional
-from sqlalchemy import text
-from app.database import async_session_factory
+
 from app.config import settings
+from app.database import async_session_factory
+from sqlalchemy import text
 
 
 class PgVectorStore:

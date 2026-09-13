@@ -4,15 +4,14 @@ Audit Reference: prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md
 Replaces static Indian FAQ dictionaries with approved PolicyRepository and ContactRepository data.
 """
 
-from typing import Optional
 import logging
 
-from app.services.llm import llm_service
 from app.prompts.faq import FAQ_AGENT_PROMPT
 from app.prompts.registry import log_prompt_telemetry
-from app.repositories.policy_repository import policy_repository
 from app.repositories.contact_repository import contact_repository
+from app.repositories.policy_repository import policy_repository
 from app.services.grounding_validator import grounding_validator
+from app.services.llm import llm_service
 from app.utils.language import detect_language
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,6 @@ class FAQAgent:
             return f"📋 *{title}*\n\n{body}"
 
         # 3. Assemble Structured Evidence Context for LLM
-        contact_info = contact_repository.get_contact_info()
         doc_purchase = policy_repository.get_policy("required_documents_purchase")
         doc_rental = policy_repository.get_policy("required_documents_rental")
         payment_policy = policy_repository.get_policy("standard_payment_plan")

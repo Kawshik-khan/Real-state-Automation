@@ -7,8 +7,10 @@ Handles:
 4. Automatic Fallback / Mock Simulation when live Meta App credentials are not provided.
 """
 
-from typing import Optional, Any
+from typing import Any, Optional
+
 import httpx
+
 from app.config import settings
 
 

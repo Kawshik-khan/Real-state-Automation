@@ -1,7 +1,9 @@
 """Telegram Bot Service — Direct API Integration with Telegram Bot API."""
 
 from typing import Optional
+
 import httpx
+
 from app.config import settings
 
 

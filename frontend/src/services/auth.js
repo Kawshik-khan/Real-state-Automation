@@ -4,10 +4,22 @@
 
 const BACKEND_CANDIDATES = [
   import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '') : null,
+  'http://localhost:8000',
   'https://real-state-automation.onrender.com',
-  'https://glg-realestate-backend.onrender.com',
-  'http://localhost:8000'
+  'https://glg-realestate-backend.onrender.com'
 ].filter(Boolean);
+
+/** Helper: fetch with a per-request timeout (default 5 s) */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export const authService = {
   /**
@@ -19,7 +31,7 @@ export const authService = {
     for (const baseUrl of BACKEND_CANDIDATES) {
       try {
         const url = `${baseUrl.replace(/\/$/, '')}/api/v1/auth/login`;
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -45,12 +57,12 @@ export const authService = {
         if (err.message && (err.message.includes('Invalid') || err.message.includes('credentials') || err.message.includes('password'))) {
           throw err;
         }
-        // Network error / Failed to fetch: try next candidate URL
+        // Network error / Failed to fetch / Timeout: try next candidate URL
       }
     }
 
     throw new Error(
-      lastError?.message?.includes('Failed to fetch') || lastError instanceof TypeError
+      lastError?.message?.includes('Failed to fetch') || lastError instanceof TypeError || lastError?.name === 'AbortError'
         ? 'Unable to connect to backend server. Render may be performing a cold start (~15s) or Vercel needs deployment. Please retry in a moment.'
         : (lastError?.message || 'Connection to backend failed.')
     );
@@ -69,7 +81,7 @@ export const authService = {
     for (const baseUrl of candidates) {
       try {
         const url = `${baseUrl.replace(/\/$/, '')}/api/v1/auth/me`;
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

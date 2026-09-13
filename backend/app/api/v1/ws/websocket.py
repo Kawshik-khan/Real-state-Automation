@@ -1,8 +1,8 @@
 """WebSocket Router for Real-Time Conversation Synchronization."""
 
 from typing import List
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import json
 
 router = APIRouter()
 

@@ -1,0 +1,49 @@
+# Environment & Credentials
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.eggs/
+*.whl
+
+# Testing
+.pytest_cache/
+.benchmarks/
+.coverage
+htmlcov/
+tests/
+
+# IDE & Tools
+.vscode/
+.idea/
+.git/
+.gitignore
+.agents/
+.hermes/
+.junie/
+
+# Documentation & non-runtime files
+*.md
+*.txt
+!requirements.txt
+*.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db

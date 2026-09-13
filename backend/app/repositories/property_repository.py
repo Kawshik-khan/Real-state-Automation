@@ -3,9 +3,8 @@
 Architecture Rule: Prompts define behavior; this repository defines facts.
 All agents (Property, Email, Social, FAQ, Chat) query this repository.
 """
-from typing import Any, Dict, List, Optional
 from copy import deepcopy
-
+from typing import Any, Dict, List, Optional
 
 CANONICAL_PROPERTIES: List[Dict[str, Any]] = [
     {
@@ -180,7 +179,6 @@ class PropertyRepository:
             p_loc_area = p["location"]["area"].lower()
             p_loc_city = p["location"]["city"].lower()
             p_name = p["name"].lower()
-            p_desc = p["description"].lower()
             p_price = p["pricing"]["amount"]
             p_beds = p["facts"]["bedrooms"]
 

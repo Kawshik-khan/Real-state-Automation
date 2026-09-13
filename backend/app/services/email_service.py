@@ -4,14 +4,14 @@ Manages email thread storage, message state transitions, attachment context aggr
 and outbound reply dispatch via n8n Email Node webhook API.
 """
 
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
 import httpx
 
 from app.config import settings
 from app.models.email import (
-    EmailAttachment,
     EmailMessageSchema,
     EmailStatus,
     EmailThreadSchema,
@@ -178,8 +178,8 @@ class EmailService:
         if not sent_successfully and not is_dummy_test_domain and settings.gmail_user_email and settings.gmail_app_password:
             try:
                 import smtplib
-                from email.mime.text import MIMEText
                 from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
 
                 msg = MIMEMultipart("alternative")
                 msg["From"] = f"GLG Assets Real Estate <{settings.gmail_user_email}>"

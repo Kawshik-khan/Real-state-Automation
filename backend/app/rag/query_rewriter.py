@@ -5,9 +5,7 @@ extracts structured filters (location, project, budget), and generates
 expanded keyword variants.
 """
 
-import json
 from app.services.llm import llm_service
-
 
 QUERY_REWRITER_PROMPT = """You are a query rewriting assistant for a real-estate knowledge base.
 Given a user's question, generate 3 search-optimized query variants that will help

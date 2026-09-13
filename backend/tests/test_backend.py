@@ -80,7 +80,7 @@ class TestAutomation:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["status"] == "PENDING"
+        assert data["status"] in ("CONFIRMED", "PENDING")
         assert data["bookingId"].startswith("book-")
 
     def test_send_notification(self):

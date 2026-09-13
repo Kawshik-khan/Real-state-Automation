@@ -14,6 +14,10 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.t
 # ── Stage 2: Production Runtime ──
 FROM python:3.12-slim
 
+# Prevent Python from writing bytecode and enable unbuffered output for logging
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

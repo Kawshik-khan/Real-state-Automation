@@ -1,7 +1,7 @@
 """AI Evaluations (Evals) Framework for GLG Assets Automation Platform."""
 
 from app.evals.engine import evaluation_engine
-from app.evals.judges import GroundednessJudge, AnswerRelevanceJudge, SafetyComplianceJudge
+from app.evals.judges import AnswerRelevanceJudge, GroundednessJudge, SafetyComplianceJudge
 
 __all__ = [
     "evaluation_engine",

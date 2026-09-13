@@ -17,6 +17,8 @@ import {
   FileText,
   Check
 } from 'lucide-react';
+import { getEmailThreads, approveEmailDraft, rejectEmailDraft } from '../services/api';
+import Pagination from '../components/ui/Pagination';
 
 const MOCK_EMAIL_THREADS = [
   {
@@ -128,15 +130,12 @@ export default function EmailInboxPage() {
 
   const fetchThreadsFromBackend = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/email/threads');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.threads && data.threads.length > 0) {
-          setThreads(data.threads);
-        }
+      const data = await getEmailThreads();
+      if (data && data.threads && data.threads.length > 0) {
+        setThreads(data.threads);
       }
     } catch (e) {
-      console.log('Using local mock threads fallback');
+      console.log('Using local mock threads fallback:', e);
     }
   };
 
@@ -148,16 +147,9 @@ export default function EmailInboxPage() {
     if (!activeThread) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/email/threads/${activeThread.thread_id}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Automation-Secret': 'change-me-in-production'
-        },
-        body: JSON.stringify({
-          thread_id: activeThread.thread_id,
-          edited_reply: isEditingDraft ? editedDraftReply : undefined
-        })
+      await approveEmailDraft(activeThread.thread_id, {
+        thread_id: activeThread.thread_id,
+        edited_reply: isEditingDraft ? editedDraftReply : undefined
       });
 
       setThreads((prev) =>
@@ -185,6 +177,11 @@ export default function EmailInboxPage() {
 
   const handleRejectDraft = async () => {
     if (!activeThread) return;
+    try {
+      await rejectEmailDraft(activeThread.thread_id);
+    } catch (e) {
+      console.warn('Reject email draft call:', e);
+    }
     setThreads((prev) =>
       prev.map((t) => (t.thread_id === activeThread.thread_id ? { ...t, status: 'REJECTED' } : t))
     );
@@ -202,73 +199,99 @@ export default function EmailInboxPage() {
     return matchesFilter && matchesSearch;
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus]);
+
+  const paginatedThreads = filteredThreads.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
-    <div className="p-6 bg-slate-950 text-slate-100 min-h-screen font-sans">
+    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-4 border-b border-slate-800 gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-indigo-400">
-              <Mail className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                AI Email Reply Automation
-                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                  n8n Email Dispatcher Active
-                </span>
-              </h1>
-              <p className="text-slate-400 text-sm">
-                Human-in-the-Loop review, RAG context enrichment, and automated thread management
-              </p>
-            </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: 'rgba(232, 101, 74, 0.1)',
+            border: '1px solid rgba(232, 101, 74, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--primary-coral)'
+          }}>
+            <Mail size={22} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              AI Email Reply Automation
+              <span className="badge badge-emerald">
+                n8n Email Dispatcher Active
+              </span>
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
+              Human-in-the-Loop review, RAG context enrichment, and automated thread management
+            </p>
           </div>
         </div>
 
         <button
           onClick={fetchThreadsFromBackend}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 text-sm font-medium transition-colors"
+          className="glass-card"
+          style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw size={14} />
           Refresh Inbox
         </button>
       </div>
 
       {toastMessage && (
-        <div className="mb-4 p-3 bg-emerald-950/80 border border-emerald-500/30 text-emerald-200 rounded-lg text-sm flex items-center justify-between animate-fadeIn">
+        <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#059669', borderRadius: '10px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-emerald-400 hover:text-white">
+          <button onClick={() => setToastMessage(null)} style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', fontSize: '1.1rem' }}>
             &times;
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: '24px' }}>
         {/* Left Column: Email Thread List */}
-        <div className="lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-xl p-4 flex flex-col h-[750px]">
+        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '720px' }}>
           {/* Search & Filter Controls */}
-          <div className="space-y-3 mb-4">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} color="var(--text-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
                 placeholder="Search by sender or subject..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="glass-input"
+                style={{ width: '100%', paddingLeft: '36px', fontSize: '0.85rem' }}
               />
             </div>
 
-            <div className="flex gap-2">
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {['ALL', 'PENDING_APPROVAL', 'AUTO_REPLIED', 'APPROVED_AND_SENT'].map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    filterStatus === st
-                      ? 'bg-indigo-600 text-white border-indigo-500'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                  }`}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    border: '1px solid',
+                    borderColor: filterStatus === st ? 'var(--primary-coral)' : 'var(--border-glass)',
+                    background: filterStatus === st ? 'var(--primary-coral)' : 'var(--bg-main)',
+                    color: filterStatus === st ? '#FFFFFF' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   {st === 'PENDING_APPROVAL' ? 'Pending Review' : st === 'APPROVED_AND_SENT' ? 'Sent' : st}
                 </button>
@@ -277,42 +300,40 @@ export default function EmailInboxPage() {
           </div>
 
           {/* Thread Scroll List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredThreads.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-sm">No email threads found</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No email threads found</div>
             ) : (
-              filteredThreads.map((thread) => {
+              paginatedThreads.map((thread) => {
                 const isSelected = thread.thread_id === selectedThreadId;
                 const isPending = thread.status === 'PENDING_APPROVAL';
                 return (
                   <div
                     key={thread.thread_id}
                     onClick={() => setSelectedThreadId(thread.thread_id)}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-indigo-950/40 border-indigo-500/50 shadow-lg shadow-indigo-500/5'
-                        : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700'
-                    }`}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '12px',
+                      border: isSelected ? '1px solid var(--primary-coral)' : '1px solid var(--border-glass)',
+                      background: isSelected ? 'rgba(232, 101, 74, 0.06)' : 'var(--bg-main)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: isSelected ? '0 2px 8px rgba(232, 101, 74, 0.15)' : 'none'
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-semibold text-slate-200 text-sm truncate max-w-[200px]">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
                         {thread.customer_name || thread.customer_email}
                       </span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                          isPending
-                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                            : thread.status === 'AUTO_REPLIED'
-                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        }`}
-                      >
+                      <span className={isPending ? 'badge badge-amber' : thread.status === 'AUTO_REPLIED' ? 'badge badge-cyan' : 'badge badge-emerald'} style={{ fontSize: '0.65rem' }}>
                         {isPending ? 'Action Required' : thread.status}
                       </span>
                     </div>
-                    <p className="text-xs font-medium text-slate-300 truncate mb-1">{thread.subject}</p>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="capitalize text-slate-400">Intent: {thread.intent_category}</span>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
+                      {thread.subject}
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span>Intent: {thread.intent_category}</span>
                       <span>Confidence: {Math.round((thread.confidence_score || 0) * 100)}%</span>
                     </div>
                   </div>
@@ -320,63 +341,80 @@ export default function EmailInboxPage() {
               })
             )}
           </div>
+
+          {filteredThreads.length > pageSize && (
+            <Pagination
+              compact={true}
+              currentPage={currentPage}
+              totalItems={filteredThreads.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              itemLabel="threads"
+            />
+          )}
         </div>
 
         {/* Right Column: Active Thread Detail & AI Draft Approval Box */}
         {activeThread && (
-          <div className="lg:col-span-7 bg-slate-900/70 border border-slate-800 rounded-xl p-5 flex flex-col h-[750px]">
+          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '720px' }}>
             {/* Header Detail */}
-            <div className="border-b border-slate-800 pb-4 mb-4">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h2 className="text-lg font-semibold text-white leading-snug">{activeThread.subject}</h2>
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-semibold border whitespace-nowrap ${
-                    activeThread.lead_priority === 'high'
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                      : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
-                  }`}
-                >
+            <div style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.4 }}>{activeThread.subject}</h2>
+                <span className={activeThread.lead_priority === 'high' ? 'badge badge-rose' : 'badge badge-violet'}>
                   Priority: {activeThread.lead_priority.toUpperCase()}
                 </span>
               </div>
-              <div className="flex items-center gap-4 text-xs text-slate-400">
-                <span className="flex items-center gap-1">
-                  <User className="w-3.5 h-3.5 text-slate-500" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} color="var(--text-dim)" />
                   {activeThread.customer_email}
                 </span>
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#059669', fontWeight: 600 }}>
+                  <ShieldCheck size={14} />
                   AI Confidence: {Math.round((activeThread.confidence_score || 0) * 100)}%
                 </span>
               </div>
             </div>
 
             {/* Conversation Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
               {activeThread.messages.map((msg, i) => (
                 <div
                   key={i}
-                  className={`p-4 rounded-xl border text-sm ${
-                    msg.sender_type === 'customer'
-                      ? 'bg-slate-950 border-slate-800 text-slate-200'
-                      : 'bg-indigo-950/20 border-indigo-800/40 text-indigo-100'
-                  }`}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-glass)',
+                    background: msg.sender_type === 'customer' ? 'var(--bg-main)' : 'rgba(232, 101, 74, 0.04)',
+                    fontSize: '0.85rem'
+                  }}
                 >
-                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                    <span className="font-semibold">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 700, color: msg.sender_type === 'customer' ? 'var(--text-main)' : 'var(--primary-coral)' }}>
                       {msg.sender_type === 'customer' ? msg.sender_email : 'GLG Assets AI Advisor'}
                     </span>
                     <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.body_text}</p>
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-main)', margin: 0 }}>{msg.body_text}</p>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="mt-3 pt-2 border-t border-slate-800 flex gap-2 flex-wrap">
+                    <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--border-glass)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {msg.attachments.map((att, attIdx) => (
                         <div
                           key={attIdx}
-                          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-indigo-300"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border-glass)',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            color: 'var(--primary-coral)'
+                          }}
                         >
-                          <Paperclip className="w-3.5 h-3.5" />
+                          <Paperclip size={12} />
                           <span>{att.filename}</span>
                         </div>
                       ))}
@@ -387,18 +425,18 @@ export default function EmailInboxPage() {
 
               {/* Staged AI Draft Box */}
               {activeThread.ai_draft_reply && activeThread.status !== 'APPROVED_AND_SENT' && (
-                <div className="p-4 rounded-xl border border-indigo-500/40 bg-indigo-950/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-indigo-300 font-semibold text-sm">
-                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                <div style={{ padding: '16px', borderRadius: '12px', border: '1px solid rgba(232, 101, 74, 0.3)', background: 'rgba(232, 101, 74, 0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-coral)', fontWeight: 700, fontSize: '0.85rem' }}>
+                      <Sparkles size={16} />
                       AI Staged Draft Response
                     </div>
                     {!isEditingDraft && (
                       <button
                         onClick={() => setIsEditingDraft(true)}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                        style={{ background: 'none', border: 'none', color: 'var(--primary-coral)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Edit3 size={14} />
                         Edit Draft
                       </button>
                     )}
@@ -409,10 +447,11 @@ export default function EmailInboxPage() {
                       rows={8}
                       value={editedDraftReply}
                       onChange={(e) => setEditedDraftReply(e.target.value)}
-                      className="w-full bg-slate-950 border border-indigo-500/50 rounded-lg p-3 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans leading-relaxed"
+                      className="glass-input"
+                      style={{ width: '100%', fontSize: '0.85rem', lineHeight: 1.6, resize: 'vertical' }}
                     />
                   ) : (
-                    <div className="bg-slate-950/60 p-3 rounded-lg border border-indigo-900/40 text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+                    <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-glass)', fontSize: '0.85rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                       {editedDraftReply || activeThread.ai_draft_reply}
                     </div>
                   )}
@@ -422,20 +461,33 @@ export default function EmailInboxPage() {
 
             {/* Bottom Approval Toolbar */}
             {activeThread.status === 'PENDING_APPROVAL' && (
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+              <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button
                   onClick={handleRejectDraft}
-                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    color: '#DC2626',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
                 >
-                  <XCircle className="w-4 h-4" />
+                  <XCircle size={16} />
                   Reject Draft
                 </button>
 
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: '10px' }}>
                   {isEditingDraft && (
                     <button
                       onClick={() => setIsEditingDraft(false)}
-                      className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-700"
+                      className="glass-card"
+                      style={{ padding: '8px 16px', fontSize: '0.85rem', cursor: 'pointer' }}
                     >
                       Cancel Edit
                     </button>
@@ -443,9 +495,9 @@ export default function EmailInboxPage() {
                   <button
                     onClick={handleApproveDraft}
                     disabled={isSubmitting}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-colors"
+                    className="btn-gradient"
                   >
-                    <CheckCircle className="w-4 h-4" />
+                    <CheckCircle size={16} />
                     {isSubmitting ? 'Sending via n8n...' : 'Approve & Send via n8n'}
                   </button>
                 </div>

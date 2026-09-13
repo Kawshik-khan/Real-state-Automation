@@ -6,11 +6,10 @@ Backward compatible: Full format with confidence, intent, metadata
 """
 from fastapi import APIRouter, Depends, Header
 
-from app.dependencies import require_automation_secret as _auth
-from app.schemas.chat import ChatRequest, ChatResponse, Action
 from app.agents.graph import ai_graph
 from app.agents.state import AIState
-from app.schemas.chat_response import StructuredChatResponse, FullChatResponse
+from app.dependencies import require_automation_secret as _auth
+from app.schemas.chat import Action, ChatRequest, ChatResponse
 from app.utils.chat_response_builder import ChatResponseBuilder
 
 router = APIRouter()
@@ -45,9 +44,9 @@ async def ai_chat(
     
     # Broadcast live SSE message events & update conversations store
     try:
-        from app.services.memory import conversation_memory
-        from app.schemas.chat import MemoryEntry
         from app.api.v1.conversations.endpoints import add_message_to_conversation
+        from app.schemas.chat import MemoryEntry
+        from app.services.memory import conversation_memory
         requires_esc = bool(extracted_data.get("requires_escalation", False))
         reply_text = extracted_data.get("agent_reply", "")
         confidence = extracted_data.get("confidence", 0.90)

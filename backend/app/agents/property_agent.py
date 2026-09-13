@@ -5,17 +5,16 @@ Removes static template bypass, synthesizes SQL + RAG data, enforces PROPERTY_AG
 and validates response with GroundingValidator.
 """
 
-from typing import Any, Dict, List, Optional
 import json
 import logging
 
-from app.services.llm import llm_service
 from app.prompts.property import PROPERTY_AGENT_PROMPT
 from app.prompts.registry import log_prompt_telemetry
-from app.tools.property_tool import property_search_tool
-from app.repositories.property_repository import property_repository
 from app.repositories.policy_repository import policy_repository
+from app.repositories.property_repository import property_repository
 from app.services.grounding_validator import grounding_validator
+from app.services.llm import llm_service
+from app.tools.property_tool import property_search_tool
 from app.utils.language import detect_language
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ class PropertyAgent:
         """Process a property query by synthesizing canonical repository records with RAG context."""
         entities = entities or {}
         location = entities.get("location")
-        budget = entities.get("budget")
 
         # 1. Detect customer language
         lang_info = detect_language(message)

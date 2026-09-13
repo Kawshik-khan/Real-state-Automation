@@ -2,9 +2,9 @@
 
 Centralized source of truth for properties, policies, and contact configurations.
 """
-from app.repositories.property_repository import property_repository, PropertyRepository
-from app.repositories.policy_repository import policy_repository, PolicyRepository
-from app.repositories.contact_repository import contact_repository, ContactRepository
+from app.repositories.contact_repository import ContactRepository, contact_repository
+from app.repositories.policy_repository import PolicyRepository, policy_repository
+from app.repositories.property_repository import PropertyRepository, property_repository
 
 __all__ = [
     "property_repository",

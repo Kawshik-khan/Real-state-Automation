@@ -3,10 +3,10 @@
 Provides utility methods for uploading brochures, floor plan images, and OCR files
 directly to Supabase Cloud Storage buckets.
 """
-import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
+
 from app.config import settings
 
 

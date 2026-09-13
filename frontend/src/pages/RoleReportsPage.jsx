@@ -141,9 +141,9 @@ Generated: ${reportData.generated_at}
       {/* ── Top Executive Banner ── */}
       <div className="glass-card" style={{
         padding: '24px 32px',
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(15, 23, 42, 0.95) 70%)',
-        border: '1px solid rgba(139, 92, 246, 0.35)',
-        boxShadow: '0 8px 32px rgba(139, 92, 246, 0.15)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-glass)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -157,19 +157,19 @@ Generated: ${reportData.generated_at}
             gap: '6px',
             padding: '4px 12px',
             borderRadius: '20px',
-            background: 'rgba(139, 92, 246, 0.2)',
-            border: '1px solid rgba(139, 92, 246, 0.4)',
-            color: '#C084FC',
+            background: 'rgba(232, 101, 74, 0.1)',
+            border: '1px solid rgba(232, 101, 74, 0.25)',
+            color: 'var(--primary-coral)',
             fontSize: '0.75rem',
             fontWeight: 700,
             marginBottom: '8px'
           }}>
             <Award size={14} /> ADMIN EXECUTIVE INTELLIGENCE HUB
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, letterSpacing: '-0.02em' }}>
             Cross-Role Summary &amp; Operational Reports 📑
           </h2>
-          <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px', marginBottom: 0 }}>
             Unified performance reports across Agent Frontline, Manager Approvals, Marketing Campaigns, and Engineering Subsystems.
           </p>
         </div>
@@ -178,10 +178,10 @@ Generated: ${reportData.generated_at}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div style={{
             display: 'flex',
-            background: 'rgba(15, 23, 42, 0.8)',
+            background: 'var(--bg-main)',
             padding: '4px',
             borderRadius: '10px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid var(--border-glass)'
           }}>
             {[
               { label: 'Last 24h', val: '24h' },
@@ -195,8 +195,8 @@ Generated: ${reportData.generated_at}
                   padding: '6px 12px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: period === p.val ? 'rgba(139, 92, 246, 0.4)' : 'transparent',
-                  color: period === p.val ? '#FFFFFF' : '#94A3B8',
+                  background: period === p.val ? 'var(--primary-coral)' : 'transparent',
+                  color: period === p.val ? '#FFFFFF' : 'var(--text-muted)',
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -211,18 +211,17 @@ Generated: ${reportData.generated_at}
           <button
             onClick={fetchReport}
             disabled={loading}
+            className="glass-card"
             style={{
               padding: '8px 14px',
               borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
               fontSize: '0.8rem',
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              color: 'var(--text-main)'
             }}
           >
             <RefreshCw size={14} className={loading ? 'spin-anim' : ''} />
@@ -231,20 +230,8 @@ Generated: ${reportData.generated_at}
 
           <button
             onClick={copyMarkdownSummary}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-              border: 'none',
-              color: '#FFFFFF',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 16px rgba(139, 92, 246, 0.3)'
-            }}
+            className="btn-gradient"
+            style={{ padding: '8px 14px', fontSize: '0.8rem' }}
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}
             <span>{copied ? 'Copied Markdown!' : 'Copy Summary'}</span>
@@ -254,54 +241,54 @@ Generated: ${reportData.generated_at}
 
       {/* ── Key Performance Executive KPIs ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #8B5CF6' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid var(--primary-coral)' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
             <span>FRONTLINE AI RESOLUTION</span>
-            <Sparkles size={16} color="#C084FC" />
+            <Sparkles size={16} color="var(--primary-coral)" />
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '6px', letterSpacing: '-0.02em' }}>
             {s ? `${s.agent_operations.ai_handled_percent}%` : '--'}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#34D399', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: '#059669', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <TrendingUp size={12} /> {s ? `${s.agent_operations.total_inquiries_handled} Total Chats Handled` : ''}
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #38BDF8' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #0284C7' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
             <span>AVG RESPONSE LATENCY</span>
-            <Zap size={16} color="#38BDF8" />
+            <Zap size={16} color="#0284C7" />
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38BDF8', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0284C7', marginTop: '6px', letterSpacing: '-0.02em' }}>
             {s ? `${s.agent_operations.avg_response_time_seconds}s` : '--'}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             Sub-4s Multi-Channel SLAs
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #34D399' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+        <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #059669' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
             <span>MANAGER EMAIL APPROVAL</span>
-            <Mail size={16} color="#34D399" />
+            <Mail size={16} color="#059669" />
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34D399', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#059669', marginTop: '6px', letterSpacing: '-0.02em' }}>
             {s ? `${Math.round((s.manager_operations.email_replies_approved / s.manager_operations.email_replies_drafted_by_ai) * 100)}%` : '--'}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             {s ? `${s.manager_operations.email_replies_approved} Approved of ${s.manager_operations.email_replies_drafted_by_ai} Drafts` : ''}
           </div>
         </div>
 
         <div className="glass-card" style={{ padding: '18px 22px', borderLeft: '4px solid #10B981' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
             <span>SYSTEM UPTIME</span>
             <CheckCircle2 size={16} color="#10B981" />
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10B981', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10B981', marginTop: '6px', letterSpacing: '-0.02em' }}>
             {s ? `${s.engineering_infrastructure.system_uptime_percent}%` : '--'}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             n8n, Pinecone &amp; Supabase Online
           </div>
         </div>
@@ -313,49 +300,49 @@ Generated: ${reportData.generated_at}
         {/* 1. Agent & Sales Operations Report */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={18} color="#C084FC" /> 1. Agent &amp; Frontline Sales Digest
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={18} color="var(--primary-coral)" /> 1. Agent &amp; Frontline Sales Digest
             </h3>
-            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(139, 92, 246, 0.2)', color: '#C084FC', fontWeight: 700 }}>
+            <span className="badge badge-violet">
               {s?.agent_operations?.active_agents || 4} ACTIVE AGENTS
             </span>
           </div>
 
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
             Customer inquiries received across WhatsApp, Telegram, Facebook Messenger, and Web live chat.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Total Inquiries Handled</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Inquiries Handled</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
                 {s?.agent_operations?.total_inquiries_handled || 348}
               </div>
             </div>
             
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Human Takeovers / Escalated</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#F59E0B', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Human Takeovers / Escalated</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#D97706', marginTop: '2px' }}>
                 {s?.agent_operations?.human_agent_takeover_count || 44}
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Site Visits Scheduled</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Site Visits Scheduled</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                 {s?.agent_operations?.site_visits_booked || 26} Tours
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>🔥 Hot Leads (Score ≥ 80)</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#EF4444', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>🔥 Hot Leads (Score ≥ 80)</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#DC2626', marginTop: '2px' }}>
                 {s?.agent_operations?.hot_leads_identified || 52} Leads
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.25)', fontSize: '0.75rem', color: '#C084FC' }}>
+          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(232, 101, 74, 0.08)', border: '1px solid rgba(232, 101, 74, 0.2)', fontSize: '0.75rem', color: 'var(--primary-coral)' }}>
             🏆 <strong>Top Agent:</strong> {s?.agent_operations?.top_performing_agent || 'Rahim Ahmed (94% CSAT)'}
           </div>
         </div>
@@ -363,49 +350,49 @@ Generated: ${reportData.generated_at}
         {/* 2. Manager Operations & Approvals Report */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Mail size={18} color="#34D399" /> 2. Manager Operations &amp; Approvals
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Mail size={18} color="#059669" /> 2. Manager Operations &amp; Approvals
             </h3>
-            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(52, 211, 153, 0.2)', color: '#34D399', fontWeight: 700 }}>
+            <span className="badge badge-emerald">
               OPERATIONS OK
             </span>
           </div>
 
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
             Review turnaround for AI drafted emails, document ingestion, and resolved escalation tickets.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>AI Email Drafts Approved</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>AI Email Drafts Approved</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                 {s?.manager_operations?.email_replies_approved || 108}
               </div>
             </div>
             
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Pending Email Queue</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#60A5FA', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pending Email Queue</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#2563EB', marginTop: '2px' }}>
                 {s?.manager_operations?.pending_review_emails || 4} Drafts
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Avg Approval Turnaround</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FBBF24', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Avg Approval Turnaround</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#D97706', marginTop: '2px' }}>
                 {s?.manager_operations?.avg_approval_turnaround_mins || 14.5}m
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Knowledge Docs Indexed</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Knowledge Docs Indexed</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
                 {s?.manager_operations?.knowledge_documents_indexed || 6} PDFs
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(52, 211, 153, 0.1)', border: '1px solid rgba(52, 211, 153, 0.25)', fontSize: '0.75rem', color: '#34D399' }}>
+          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.75rem', color: '#059669' }}>
             ⚡ <strong>Operational Speed:</strong> 96.4% of drafts approved without modifications.
           </div>
         </div>
@@ -413,49 +400,49 @@ Generated: ${reportData.generated_at}
         {/* 3. Marketing & Content Performance Report */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Share2 size={18} color="#38BDF8" /> 3. Marketing &amp; Content Engine Digest
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Share2 size={18} color="#0284C7" /> 3. Marketing &amp; Content Engine Digest
             </h3>
-            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(14, 165, 233, 0.2)', color: '#38BDF8', fontWeight: 700 }}>
+            <span className="badge badge-cyan">
               CAMPAIGNS ACTIVE
             </span>
           </div>
 
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
             Multi-platform campaign generation, brochure downloads, and acquisition channel attribution.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Campaigns Published</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Campaigns Published</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0284C7', marginTop: '2px' }}>
                 {s?.marketing_content?.approved_and_posted || 24} Posts
               </div>
             </div>
             
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Brochure Downloads</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Brochure Downloads</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                 {s?.marketing_content?.brochure_downloads || 184}
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Top Channel</div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF', marginTop: '4px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Top Channel</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '4px' }}>
                 {s?.marketing_content?.top_channel || 'WhatsApp & FB'}
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Lead Conversion Rate</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#C084FC', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Lead Conversion Rate</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--primary-coral)', marginTop: '2px' }}>
                 {s?.marketing_content?.lead_conversion_rate_percent || 18.4}%
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.25)', fontSize: '0.75rem', color: '#38BDF8' }}>
+          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.2)', fontSize: '0.75rem', color: '#0284C7' }}>
             📊 <strong>ROI Insight:</strong> WhatsApp direct inquiries generated highest closing velocity.
           </div>
         </div>
@@ -463,49 +450,49 @@ Generated: ${reportData.generated_at}
         {/* 4. Engineering & Infrastructure Health Report */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Cpu size={18} color="#10B981" /> 4. Engineering &amp; Infrastructure Health
             </h3>
-            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontWeight: 700 }}>
+            <span className="badge badge-emerald">
               99.98% UPTIME
             </span>
           </div>
 
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
             System-level health of n8n webhook automations, Pinecone vector search, and cloud storage.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>n8n Workflows</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>n8n Workflows</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                 {s?.engineering_infrastructure?.n8n_workflows_active || '6/6 Active'}
               </div>
             </div>
             
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Vector Query Latency</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Vector Query Latency</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0284C7', marginTop: '2px' }}>
                 {s?.engineering_infrastructure?.pinecone_vector_query_latency_ms || 18}ms
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Supabase Cloud DB</div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF', marginTop: '4px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Supabase Cloud DB</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '4px' }}>
                 {s?.engineering_infrastructure?.supabase_storage_status || 'Synced'}
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Pinecone Vectors</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#C084FC', marginTop: '2px' }}>
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pinecone Vectors</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--primary-coral)', marginTop: '2px' }}>
                 {s?.engineering_infrastructure?.total_vectors_indexed || 86} Chunks
               </div>
             </div>
           </div>
 
-          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', fontSize: '0.75rem', color: '#34D399' }}>
+          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.75rem', color: '#059669' }}>
             🛡️ <strong>Zero Incidents:</strong> 0 failed webhook deliveries across all channels in period.
           </div>
         </div>
@@ -515,23 +502,24 @@ Generated: ${reportData.generated_at}
       {/* ── Executive AI Insights & Recommendations ── */}
       <div className="glass-card" style={{
         padding: '24px 28px',
-        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-glass)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px'
+        gap: '12px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={18} color="#C084FC" />
-          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
+          <Sparkles size={18} color="var(--primary-coral)" />
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
             Executive AI Digest &amp; Recommendations
           </h4>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {reportData?.executive_insights?.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#CBD5E1' }}>
-              <span style={{ color: '#C084FC', fontWeight: 700 }}>•</span>
+            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--primary-coral)', fontWeight: 700 }}>•</span>
               <span>{item}</span>
             </div>
           ))}

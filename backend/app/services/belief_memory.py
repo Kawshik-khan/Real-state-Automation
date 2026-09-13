@@ -11,11 +11,9 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
-from typing import Any, Optional
 
-from app.agents.state import UserBeliefState, BeliefRevision
+from app.agents.state import UserBeliefState
 from app.services.llm import llm_service
-
 
 RECONCILIATION_PROMPT = """You are an expert cognitive memory reconciliation engine for a luxury real estate advisory platform (GLG Assets).
 Your task is to analyze the user's latest message in context of their current belief state and conversation history.
@@ -71,8 +69,9 @@ class BeliefMemoryService:
 
         # Attempt to load from database
         try:
-            from app.database import async_session_factory
             from sqlalchemy import text
+
+            from app.database import async_session_factory
             async with async_session_factory() as session:
                 result = await session.execute(
                     text("SELECT beliefs FROM conversations WHERE conversation_id = :cid"),
@@ -95,8 +94,9 @@ class BeliefMemoryService:
         """Persist belief state into cache and PostgreSQL."""
         self._cache[conversation_id] = beliefs
         try:
-            from app.database import async_session_factory
             from sqlalchemy import text
+
+            from app.database import async_session_factory
             beliefs_json = json.dumps(beliefs.model_dump())
             async with async_session_factory() as session:
                 await session.execute(
@@ -116,8 +116,9 @@ class BeliefMemoryService:
         """Clear customer beliefs."""
         self._cache.pop(conversation_id, None)
         try:
-            from app.database import async_session_factory
             from sqlalchemy import text
+
+            from app.database import async_session_factory
             async with async_session_factory() as session:
                 await session.execute(
                     text("UPDATE conversations SET beliefs = NULL WHERE conversation_id = :cid"),
@@ -247,7 +248,7 @@ class BeliefMemoryService:
 
             return new_beliefs, new_revisions_logged
 
-        except Exception as err:
+        except Exception:
             # Deterministic heuristic fallback in case of LLM service failure
             return self._heuristic_reconciliation(current, user_message)
 

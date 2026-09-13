@@ -1,10 +1,9 @@
 """Escalation Services — Workstream 19."""
 from fastapi import APIRouter, Depends
 
-router = APIRouter()
-
-
 from app.dependencies import require_automation_secret as _auth
+
+router = APIRouter()
 
 
 @router.post("/create", summary="WS19 — Human Escalation Notifications")

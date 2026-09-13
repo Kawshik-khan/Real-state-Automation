@@ -5,6 +5,7 @@ Maps n8n workflow URL paths (e.g. /social/whatsapp/send) to the
 actual social endpoint routes.
 """
 from fastapi import APIRouter, Depends
+
 from app.dependencies import require_automation_secret as _auth
 
 router = APIRouter()

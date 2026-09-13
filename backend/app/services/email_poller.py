@@ -7,14 +7,14 @@ and marks processed emails as seen.
 
 import asyncio
 import email
-from email.header import decode_header
 import imaplib
 import logging
+from email.header import decode_header
 from typing import Optional
 
+from app.api.v1.email.endpoints import incoming_email_webhook
 from app.config import settings
 from app.models.email import IncomingEmailPayload
-from app.api.v1.email.endpoints import incoming_email_webhook
 
 logger = logging.getLogger(__name__)
 

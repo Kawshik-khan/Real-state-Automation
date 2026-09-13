@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || 'glg-secret-key';
+const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || '3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8';
 
 /**
  * Helper to handle fetch responses and errors
@@ -425,14 +425,22 @@ export function getDeveloperLogsStreamUrl() {
  */
 export async function getSocialAnalyticsKPIs(params = {}) {
   const token = localStorage.getItem('glg_token');
-  const query = new URLSearchParams(params).toString();
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  let query = '';
+  if (typeof params === 'string') {
+    query = `period=${params}`;
+  } else if (typeof params === 'object' && params !== null) {
+    query = new URLSearchParams(params).toString();
+  }
   const response = await fetch(`${API_BASE_URL}/api/v1/analytics/social-kpis${query ? `?${query}` : ''}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-Automation-Secret': AUTOMATION_SECRET,
-    },
+    headers,
   });
   return handleResponse(response);
 }
@@ -500,3 +508,232 @@ export async function getDeveloperEvalSuites() {
   });
   return handleResponse(response);
 }
+
+/**
+ * Create a new real-estate project
+ */
+export async function createProject(projectData) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(projectData),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch inbound email threads for review
+ */
+export async function getEmailThreads() {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads`, {
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Approve AI email draft reply and dispatch via worker
+ */
+export async function approveEmailDraft(threadId, payload = {}) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/approve`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Reject AI email draft reply
+ */
+export async function rejectEmailDraft(threadId) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/reject`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ thread_id: threadId }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Update access permission tag on a knowledge document
+ */
+export async function updateKnowledgeAccess(docId, accessLevel) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents/${docId}/access`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ access_level: accessLevel }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch calendar events and upcoming property critical dates
+ */
+export async function getCalendarEvents() {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch calendar milestones (site visits, signings, payments, handovers)
+ */
+export async function getCalendarMilestones(params = {}) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const query = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/api/v1/calendar/milestones${query ? `?${query}` : ''}`;
+  const response = await fetch(url, { headers });
+  return handleResponse(response);
+}
+
+/**
+ * Create a new calendar milestone
+ */
+export async function createCalendarMilestone(milestoneData) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(milestoneData),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Create a site tour booking
+ */
+export async function createSiteTourBooking(bookingData) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/automation/booking`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(bookingData),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Publish or schedule social media post
+ */
+export async function publishSocialPost(postData) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE_URL}/api/v1/content/publish`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(postData),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch social media post history and content calendar entries
+ */
+export async function getSocialPosts(params = {}) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const query = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/api/v1/content/posts${query ? `?${query}` : ''}`;
+  const response = await fetch(url, { headers });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch analytics volume timeseries (inquiries, visits, bookings)
+ */
+export async function getTimeSeriesAnalytics(params = {}) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const query = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/api/v1/analytics/volume-timeseries${query ? `?${query}` : ''}`;
+  const response = await fetch(url, { headers });
+  return handleResponse(response);
+}
+// Alias for backward compatibility
+export const getSocialKPIs = getSocialAnalyticsKPIs;
+
+

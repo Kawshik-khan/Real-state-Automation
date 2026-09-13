@@ -66,6 +66,7 @@ htmlcov/
 *.temp
 *.egg-info/
 .eggs/
+*.whl
 
 # Node.js & Frontend Build Outputs
 node_modules/

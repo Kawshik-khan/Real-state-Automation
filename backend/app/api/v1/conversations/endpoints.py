@@ -2,10 +2,11 @@
 
 import asyncio
 import json
-from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.dependencies import require_automation_secret as _auth
 from app.services.event_broadcaster import broadcaster
+from app.services.telegram import telegram_service
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 
@@ -151,10 +152,42 @@ async def add_message_to_conversation(
             "reason": "AI confidence low or escalation requested"
         })
 
-    # Trigger background sync to n8n Google Sheets webhook
+    # Trigger background sync to n8n Google Sheets webhook and database persistence
     asyncio.create_task(_sync_lead_to_n8n_sheets(conv))
+    asyncio.create_task(_persist_message_to_db(conv_id, sender, text, conv["channel"], conv["name"], conv["phone"]))
         
     return conv, msg_obj
+
+
+async def _persist_message_to_db(conv_id: str, sender: str, text: str, channel: str = "website", name: str = None, phone: str = None):
+    """Persists conversation and message into Supabase/PostgreSQL."""
+    try:
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord, MessageRecord, UserRecord
+        from sqlalchemy import select
+        async with async_session_factory() as session:
+            user_id = f"usr_{conv_id}"
+            user_stmt = select(UserRecord).where(UserRecord.user_id == user_id)
+            u_res = await session.execute(user_stmt)
+            db_user = u_res.scalar_one_or_none()
+            if not db_user:
+                db_user = UserRecord(user_id=user_id, name=name, phone=phone, channel=channel)
+                session.add(db_user)
+                await session.flush()
+
+            conv_stmt = select(ConversationRecord).where(ConversationRecord.conversation_id == conv_id)
+            conv_res = await session.execute(conv_stmt)
+            db_conv = conv_res.scalar_one_or_none()
+            if not db_conv:
+                db_conv = ConversationRecord(conversation_id=conv_id, user_id=user_id, channel=channel, status="active")
+                session.add(db_conv)
+                await session.flush()
+
+            new_msg = MessageRecord(conversation_id=conv_id, sender=sender, text=text)
+            session.add(new_msg)
+            await session.commit()
+    except Exception:
+        pass  # Non-blocking async persistence
 
 
 async def _sync_lead_to_n8n_sheets(conv: dict):
@@ -179,9 +212,66 @@ async def _sync_lead_to_n8n_sheets(conv: dict):
 
 @router.get("", summary="List active conversations")
 @router.get("/", summary="List active conversations")
-async def list_conversations():
-    """Returns active customer conversations."""
-    return {"success": True, "conversations": IN_MEMORY_CONVERSATIONS}
+async def list_conversations(
+    limit: int = 50,
+    offset: int = 0,
+    channel: str = "all",
+    status: str = "all"
+):
+    """Returns active customer conversations from database or cache."""
+    try:
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord, MessageRecord, UserRecord
+        from sqlalchemy import and_, desc, select
+
+        async with async_session_factory() as session:
+            stmt = select(ConversationRecord, UserRecord).join(
+                UserRecord, ConversationRecord.user_id == UserRecord.user_id, isouter=True
+            )
+            filters = []
+            if channel != "all":
+                filters.append(ConversationRecord.channel == channel)
+            if status != "all":
+                filters.append(ConversationRecord.status == status)
+
+            if filters:
+                stmt = stmt.where(and_(*filters))
+
+            stmt = stmt.order_by(desc(ConversationRecord.last_message_at)).offset(offset).limit(limit)
+            res = await session.execute(stmt)
+            rows = res.all()
+
+            if rows:
+                formatted = []
+                for conv, usr in rows:
+                    msg_stmt = (
+                        select(MessageRecord)
+                        .where(MessageRecord.conversation_id == conv.conversation_id)
+                        .order_by(desc(MessageRecord.created_at))
+                        .limit(1)
+                    )
+                    msg_res = await session.execute(msg_stmt)
+                    last_msg = msg_res.scalar_one_or_none()
+
+                    formatted.append({
+                        "id": conv.conversation_id,
+                        "name": usr.name if usr and usr.name else "Prospective Buyer",
+                        "phone": usr.phone if usr and usr.phone else "+880 1700-000000",
+                        "channel": conv.channel,
+                        "status": conv.status,
+                        "aiPaused": conv.ai_paused,
+                        "lastMessage": last_msg.text if last_msg and hasattr(last_msg, 'text') else "Inquiry initiated",
+                        "time": conv.last_message_at.strftime("%I:%M %p") if conv.last_message_at else "Just now",
+                        "unread": 0,
+                        "avatar": (usr.name[0].upper() if (usr and usr.name) else "C"),
+                        "beliefs": conv.beliefs or {},
+                        "createdAt": conv.created_at.isoformat() if conv.created_at else None
+                    })
+                return {"success": True, "conversations": formatted, "count": len(formatted)}
+    except Exception:
+        pass
+    return {"success": True, "conversations": IN_MEMORY_CONVERSATIONS, "count": len(IN_MEMORY_CONVERSATIONS)}
+
 
 
 @router.post("", summary="Create a new conversation / lead")
@@ -286,7 +376,7 @@ async def send_customer_message(conv_id: str, body: dict):
                 intent=intent,
                 requires_escalation=requires_esc
             )
-        except Exception as err:
+        except Exception:
             # Fallback if graph fails or API key missing
             fallback_text = "Thank you for your message! Our GLG Assets team has received your inquiry."
             conv, ai_reply_msg = await add_message_to_conversation(
@@ -313,6 +403,21 @@ async def toggle_takeover(conv_id: str):
             conv["aiPaused"] = not conv["aiPaused"]
             conv["status"] = "human_takeover" if conv["aiPaused"] else "active"
             
+            # Persist to database
+            try:
+                from app.database import async_session_factory
+                from app.models.models import ConversationRecord
+                from sqlalchemy import update
+
+                async with async_session_factory() as session:
+                    stmt = update(ConversationRecord).where(
+                        ConversationRecord.conversation_id == conv_id
+                    ).values(ai_paused=conv["aiPaused"], status=conv["status"])
+                    await session.execute(stmt)
+                    await session.commit()
+            except Exception:
+                pass
+
             # Broadcast state change
             await broadcaster.broadcast("agent_takeover", {
                 "conversation_id": conv_id,
@@ -331,7 +436,7 @@ async def toggle_takeover(conv_id: str):
     raise HTTPException(status_code=404, detail="Conversation not found")
 
 
-from app.services.telegram import telegram_service
+
 
 
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")

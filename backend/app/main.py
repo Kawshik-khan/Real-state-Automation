@@ -10,30 +10,90 @@ MVP Specification Endpoints exposed directly under /api/:
 - POST /api/search
 """
 
+import asyncio
+import logging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.ai.endpoints import ai_chat
+from app.api.v1.ai.endpoints import router as ai_router
+from app.api.v1.analytics import router as analytics_router
+from app.api.v1.auth.endpoints import router as auth_router
+from app.api.v1.automation import router as automation_router
+from app.api.v1.calendar.endpoints import router as calendar_router
+from app.api.v1.content.endpoints import generate_content
+from app.api.v1.content.endpoints import router as content_router
+from app.api.v1.conversations.endpoints import router as conversations_router
+from app.api.v1.developer.endpoints import router as developer_router
+from app.api.v1.email.endpoints import router as email_router
+from app.api.v1.escalations import router as escalations_router
+from app.api.v1.knowledge.endpoints import knowledge_upload
+from app.api.v1.knowledge.endpoints import router as knowledge_router
+from app.api.v1.media import router as media_router
+from app.api.v1.memory.endpoints import router as memory_router
+from app.api.v1.moderation.endpoints import check_moderation
+from app.api.v1.moderation.endpoints import router as moderation_router
+from app.api.v1.notifications.endpoints import router as notifications_router
+from app.api.v1.projects.endpoints import create_project, get_project, list_projects
+from app.api.v1.projects.endpoints import router as projects_router
+from app.api.v1.search.endpoints import router as search_router
+from app.api.v1.search.endpoints import search_knowledge
+from app.api.v1.social import router as social_router
+from app.api.v1.ws import ws_router
 from app.config import settings
-from app.dependencies import require_automation_secret as _auth, require_roles
+from app.database import get_session
+from app.dependencies import require_automation_secret as _auth
+from app.dependencies import require_roles
 from app.models.user import UserRole
+from app.services.log_streamer import log_streamer, setup_live_logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"[startup] {settings.app_name} — MVP routes registered at /api/")
-    print(f"[startup] Docs available at http://localhost:8000/docs")
-    import asyncio
+    logger.info(f"[startup] {settings.app_name} — Initializing database connection...")
+    from app.database import check_connection, init_db
+    from app.services.supabase_db import supabase_db
+    try:
+        is_connected = await check_connection()
+        if is_connected:
+            await init_db()
+            logger.info("[startup] Supabase/PostgreSQL schema initialized successfully (pgvector & tables verified).")
+        else:
+            supa_health = supabase_db.check_health()
+            if supa_health.get("configured"):
+                logger.info(f"[startup] Supabase Cloud configured ({settings.supabase_url}) — REST Status: {supa_health.get('status')}")
+            else:
+                logger.warning("[startup] Database offline or unreachable; continuing with resilient fallback.")
+    except Exception as db_err:
+        logger.warning(f"[startup] Database initialization note: {db_err}")
+
+    logger.info(f"[startup] {settings.app_name} — MVP routes registered at /api/")
+    logger.info("[startup] Docs available at http://localhost:8000/docs")
+
+    # Only start email poller if Gmail credentials are configured
+    poller_task = None
     from app.services.email_poller import email_poller_worker, stop_email_poller
-    poller_task = asyncio.create_task(email_poller_worker(interval_seconds=15))
+    if settings.gmail_user_email and settings.gmail_app_password:
+        poller_task = asyncio.create_task(email_poller_worker(interval_seconds=15))
+        logger.info("[startup] Gmail IMAP poller started.")
+    else:
+        logger.info("[startup] Gmail credentials not configured — email poller disabled.")
+
     yield
+
     stop_email_poller()
-    print(f"[shutdown] {settings.app_name} — Shutting down gracefully")
+    if poller_task and not poller_task.done():
+        poller_task.cancel()
+    logger.info(f"[shutdown] {settings.app_name} — Shutting down gracefully")
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
@@ -56,10 +116,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-from fastapi import Request
-import time
-from app.services.log_streamer import log_streamer, setup_live_logging
 
 setup_live_logging()
 
@@ -156,28 +212,7 @@ async def health_live():
     return {"status": "ok", "live": True}
 
 
-# ---------- Import Sub-Routers ----------
 
-from app.api.v1.auth.endpoints import router as auth_router
-from app.api.v1.email.endpoints import router as email_router
-from app.api.v1.ai.endpoints import ai_chat, router as ai_router
-from app.api.v1.content.endpoints import generate_content, router as content_router
-from app.api.v1.knowledge.endpoints import knowledge_upload, router as knowledge_router
-from app.api.v1.moderation.endpoints import check_moderation, router as moderation_router
-from app.api.v1.projects.endpoints import list_projects, get_project, router as projects_router
-from app.api.v1.search.endpoints import search_knowledge, router as search_router
-from app.api.v1.automation import router as automation_router
-from app.api.v1.social import router as social_router
-from app.api.v1.analytics import router as analytics_router
-from app.api.v1.escalations import router as escalations_router
-from app.api.v1.media import router as media_router
-from app.api.v1.notifications.endpoints import router as notifications_router
-from app.api.v1.conversations.endpoints import router as conversations_router
-from app.api.v1.developer.endpoints import router as developer_router
-from app.api.v1.memory.endpoints import router as memory_router
-from app.api.v1.ws import ws_router
-
-from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form, Request
 
 # ---------- MVP Explicit API Routes (/api/...) ----------
 
@@ -215,14 +250,19 @@ async def api_moderation_handler(body: dict, auth: dict = Depends(_auth)):
     return await check_moderation(body, auth)
 
 @app.get("/api/projects", tags=["MVP API"])
-async def api_projects_handler(auth: dict = Depends(_auth)):
+async def api_projects_handler(db: AsyncSession = Depends(get_session), auth: dict = Depends(_auth)):
     """GET /api/projects — List real-estate projects."""
-    return await list_projects(auth)
+    return await list_projects(db=db, auth=auth)
+
+@app.post("/api/projects", tags=["MVP API"])
+async def api_project_create_handler(body: dict, db: AsyncSession = Depends(get_session), auth: dict = Depends(_auth)):
+    """POST /api/projects — Create a new property development."""
+    return await create_project(body=body, db=db, auth=auth)
 
 @app.get("/api/project/{project_id}", tags=["MVP API"])
-async def api_project_detail_handler(project_id: str, auth: dict = Depends(_auth)):
+async def api_project_detail_handler(project_id: str, db: AsyncSession = Depends(get_session), auth: dict = Depends(_auth)):
     """GET /api/project/{id} — Get project details by ID or name."""
-    return await get_project(project_id, auth)
+    return await get_project(project_id=project_id, db=db, auth=auth)
 
 @app.post("/api/search", tags=["MVP API"])
 @limiter.limit("20/minute")
@@ -250,4 +290,6 @@ app.include_router(media_router,        prefix="/api/v1/media",        tags=["me
 app.include_router(memory_router,       prefix="/api/v1/memory",       tags=["memory"])
 app.include_router(projects_router,     prefix="/api/v1",              tags=["projects"])
 app.include_router(search_router,       prefix="/api/v1",              tags=["search"])
+app.include_router(calendar_router,     prefix="/api/v1/calendar",     tags=["calendar"])
+app.include_router(calendar_router,     prefix="/api/calendar",        tags=["calendar"])
 app.include_router(ws_router,           prefix="/api/v1",              tags=["websockets"])

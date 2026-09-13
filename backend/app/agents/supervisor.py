@@ -1,9 +1,8 @@
 """Supervisor agent — classifies user intent and routes to the right handler."""
 
-import json
+from app.prompts.base import SUPERVISOR_PROMPT
 from app.services.llm import llm_service
 from app.services.memory import conversation_memory
-from app.prompts.base import SUPERVISOR_PROMPT
 
 
 class SupervisorAgent:

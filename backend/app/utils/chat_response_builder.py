@@ -1,10 +1,10 @@
 """Utility for building and validating chat responses"""
 
 import logging
-from typing import Dict, Any, Optional, List
-from fastapi.responses import JSONResponse
+from typing import Any, Dict
 
-from app.schemas.chat_response import StructuredChatResponse, FullChatResponse
+from app.schemas.chat_response import FullChatResponse, StructuredChatResponse
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 class ChatResponseBuilder:

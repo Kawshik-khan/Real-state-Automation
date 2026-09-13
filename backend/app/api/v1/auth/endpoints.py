@@ -1,12 +1,12 @@
 """Auth endpoints for login, user verification, and user management."""
 
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 
-from app.models.user import UserRole, UserResponse, UserInDB, LoginRequest, Token, UserCreate
-from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import create_access_token, hash_password, verify_password
 from app.dependencies import get_current_user, require_roles
+from app.models.user import LoginRequest, Token, UserCreate, UserInDB, UserResponse, UserRole
+from fastapi import APIRouter, Depends, HTTPException, status
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 

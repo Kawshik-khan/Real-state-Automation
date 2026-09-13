@@ -5,11 +5,12 @@ Purges Indian locations, grounds private DM payload in canonical PropertyReposit
 and applies multi-signal language detection.
 """
 
-from typing import Optional, Any
-from app.utils.language import detect_language
-from app.tools.property_tool import property_search_tool
+from typing import Any
+
 from app.repositories.property_repository import property_repository
 from app.services.grounding_validator import grounding_validator
+from app.tools.property_tool import property_search_tool
+from app.utils.language import detect_language
 
 
 class SocialBridgeAgent:
@@ -27,12 +28,9 @@ class SocialBridgeAgent:
         is_en = lang_info["language"] == "en"
         text_lower = comment_text.lower()
 
-        # 1. Entity & Location Extraction (Dhaka operating core)
-        location = ""
-        for known_loc in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara"]:
-            if known_loc in text_lower:
-                location = known_loc.title()
-                break
+        # 1. Entity & Location Extraction (Dynamic query from ProjectRecord with fallback)
+        from app.services.location_service import location_service
+        location = await location_service.resolve_location_from_text(comment_text)
 
         # 2. Query Property Database
         search_res = await property_search_tool.search(query=comment_text, location=location)
@@ -42,7 +40,6 @@ class SocialBridgeAgent:
 
         # 3. Intent & Aspect Detection
         wants_price = any(kw in text_lower for kw in ["price", "dam", "cost", "taka", "koto", "budget"])
-        wants_location = any(kw in text_lower for kw in ["location", "address", "kothay", "where"])
         has_phone = any(char.isdigit() for char in comment_text) and len([c for c in comment_text if c.isdigit()]) >= 8
 
         # 4. Generate Public Comment Reply

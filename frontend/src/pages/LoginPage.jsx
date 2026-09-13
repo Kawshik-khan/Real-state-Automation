@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Zap, Lock, Mail, ArrowRight } from 'lucide-react';
+import HexagonBackground from '../components/layout/HexagonBackground';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -23,51 +24,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{
+    <div className="app-shell" style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at 50% 20%, rgba(139, 92, 246, 0.18) 0%, rgba(11, 15, 25, 1) 70%)',
+      background: 'var(--bg-dark)',
       padding: '24px',
       position: 'relative',
-      overflow: 'hidden'
+      overflowY: 'auto',
+      overflowX: 'hidden'
     }}>
-      {/* Dynamic Background Glass Spheres */}
-      <div style={{
-        position: 'absolute',
-        top: '-10%',
-        left: '20%',
-        width: '350px',
-        height: '350px',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(0,0,0,0) 70%)',
-        filter: 'blur(50px)',
-        pointerEvents: 'none'
-      }} />
-
-      <div style={{
-        position: 'absolute',
-        bottom: '-10%',
-        right: '20%',
-        width: '400px',
-        height: '400px',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(0,0,0,0) 70%)',
-        filter: 'blur(60px)',
-        pointerEvents: 'none'
-      }} />
+      {/* Interactive Hexagonal Background */}
+      <HexagonBackground />
 
       {/* Main Login Card */}
       <div style={{
         width: '100%',
         maxWidth: '440px',
-        background: 'rgba(15, 23, 42, 0.8)',
-        backdropFilter: 'blur(24px)',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid var(--border-glass)',
         borderRadius: '24px',
         padding: '40px 32px',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(139, 92, 246, 0.25)',
+        boxShadow: 'var(--shadow-card)',
         position: 'relative',
         zIndex: 10
       }}>
@@ -77,26 +58,24 @@ export default function LoginPage() {
             width: '56px',
             height: '56px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+            background: 'var(--grad-coral)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 16px auto',
-            boxShadow: '0 0 24px rgba(139, 92, 246, 0.6)'
+            boxShadow: '0 6px 18px rgba(232, 101, 74, 0.35)'
           }}>
             <Zap size={30} color="#FFFFFF" />
           </div>
           <h1 style={{
             fontSize: '1.75rem',
             fontWeight: 800,
-            background: 'linear-gradient(135deg, #FFFFFF, #9CA3AF)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: 'var(--text-main)',
             letterSpacing: '-0.5px'
           }}>
             GLG Assets AI OS
           </h1>
-          <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginTop: '6px' }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px' }}>
             Enter your credentials to access your workspace
           </p>
         </div>
@@ -106,9 +85,9 @@ export default function LoginPage() {
           <div style={{
             padding: '12px 16px',
             borderRadius: '12px',
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            color: '#F87171',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            color: '#DC2626',
             fontSize: '0.85rem',
             marginBottom: '20px',
             display: 'flex',
@@ -123,11 +102,11 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#D1D5DB', marginBottom: '8px', display: 'block' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
               Email Address
             </label>
             <div style={{ position: 'relative' }}>
-              <Mail size={18} color="#9CA3AF" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Mail size={18} color="var(--text-dim)" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="email"
                 required
@@ -138,9 +117,9 @@ export default function LoginPage() {
                   width: '100%',
                   padding: '12px 16px 12px 42px',
                   borderRadius: '12px',
-                  background: 'rgba(11, 15, 25, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.9rem',
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -150,11 +129,11 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#D1D5DB', marginBottom: '8px', display: 'block' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
               Password
             </label>
             <div style={{ position: 'relative' }}>
-              <Lock size={18} color="#9CA3AF" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Lock size={18} color="var(--text-dim)" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="password"
                 required
@@ -165,9 +144,9 @@ export default function LoginPage() {
                   width: '100%',
                   padding: '12px 16px 12px 42px',
                   borderRadius: '12px',
-                  background: 'rgba(11, 15, 25, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.9rem',
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -183,7 +162,7 @@ export default function LoginPage() {
               width: '100%',
               padding: '14px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+              background: 'var(--grad-coral)',
               border: 'none',
               color: '#FFFFFF',
               fontWeight: 700,
@@ -193,7 +172,7 @@ export default function LoginPage() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+              boxShadow: '0 4px 16px rgba(232, 101, 74, 0.35)',
               transition: 'all 0.2s ease',
               marginTop: '8px'
             }}

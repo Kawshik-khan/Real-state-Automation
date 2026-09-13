@@ -4,18 +4,18 @@ Handles incoming email webhooks, thread listing, AI draft review, and 1-click ap
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
+from app.agents.email_agent import email_agent
 from app.config import settings
 from app.models.email import (
     DraftApprovalRequest,
     EmailStatus,
     IncomingEmailPayload,
 )
+from app.services.attachment_parser import attachment_parser
 from app.services.email_service import email_service
 from app.services.idempotency import idempotency_service
-from app.services.attachment_parser import attachment_parser
-from app.agents.email_agent import email_agent
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 router = APIRouter()
 
@@ -67,7 +67,7 @@ async def incoming_email_webhook(
     thread = email_service.get_or_create_thread(payload)
 
     # 4. Append message to thread
-    incoming_msg = email_service.record_incoming_message(payload, thread)
+    email_service.record_incoming_message(payload, thread)
 
     # 5. Extract thread history for agent
     history = [m.model_dump() for m in thread.messages[:-1]]  # Exclude current incoming msg

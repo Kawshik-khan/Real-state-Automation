@@ -6,15 +6,15 @@ review the audit trail of preference corrections, and perform manual overrides.
 
 from __future__ import annotations
 
-from typing import Any, Optional
 from datetime import datetime, timezone
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.dependencies import require_automation_secret as _auth
 from app.services.belief_memory import belief_memory_service
 from app.services.memory import conversation_memory
-from app.agents.state import UserBeliefState
 
 router = APIRouter()
 

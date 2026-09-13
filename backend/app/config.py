@@ -1,5 +1,9 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -20,7 +24,9 @@ class Settings(BaseSettings):
     supabase_bucket_ocr: str = "ocr-documents"
 
     # Security
-    automation_shared_secret: str = "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
+    automation_shared_secret: str = "change-me-to-a-random-secret"
+    jwt_secret: Optional[str] = None  # Falls back to automation_shared_secret if unset
+    password_hash_salt: str = "glg_assets_salt_2026"
     api_key: Optional[str] = None
 
     # CORS — comma-separated origins; "*" for development
@@ -62,8 +68,8 @@ class Settings(BaseSettings):
     social_auto_dm_enabled: bool = True
 
     # Gmail SMTP / IMAP Settings
-    gmail_user_email: Optional[str] = "kawshikkhan25@gmail.com"
-    gmail_app_password: Optional[str] = "sfnn btmk hvfk tixq"
+    gmail_user_email: Optional[str] = None
+    gmail_app_password: Optional[str] = None
 
     @property
     def allowed_origins(self) -> list[str]:
@@ -73,7 +79,7 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     model_config = SettingsConfigDict(
-        env_file=("backend/.env", ".env"),
+        env_file=(_ENV_PATH, "backend/.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

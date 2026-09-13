@@ -1,5 +1,7 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class StructuredChatResponse(BaseModel):
     """MVP simplified chat response format per specification: {"reply":"...", "actions":["send_images","send_brochure"]}"""

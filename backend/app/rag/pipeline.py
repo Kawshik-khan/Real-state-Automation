@@ -6,9 +6,9 @@ including query rewriting, metadata filtering, and LLM re-ranking.
 
 from typing import Optional
 
-from app.rag.vector_store import vector_store
 from app.rag.query_rewriter import query_rewriter
-from app.rag.reranker import reranker, reciprocal_rank_fusion
+from app.rag.reranker import reciprocal_rank_fusion, reranker
+from app.rag.vector_store import vector_store
 from app.services.llm import llm_service
 
 
@@ -101,7 +101,6 @@ class RAGPipeline:
         parts = []
         for i, chunk in enumerate(chunks):
             text = chunk.get("content", "")
-            source = chunk.get("doc_id", "unknown")
             filename = chunk.get("filename", "")
             project = chunk.get("project", "")
             loc = chunk.get("location", "")

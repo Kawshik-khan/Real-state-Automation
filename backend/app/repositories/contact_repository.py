@@ -5,7 +5,6 @@ All customer-facing contact details are retrieved dynamically from this reposito
 """
 from typing import Any, Dict
 
-
 OFFICIAL_CONTACT_CONFIG: Dict[str, Any] = {
     "company_name": "GLG Assets Limited",
     "primary_phone": "+880-9612-888-999",

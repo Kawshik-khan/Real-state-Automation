@@ -1,11 +1,13 @@
 """Social Channel Services — Facebook & Instagram Auto-Comment to Private DM Lead Bridge."""
 
-from typing import Optional, Any
-from fastapi import APIRouter, Depends, Response, Query
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, Query, Response
+
+from app.agents.social_bridge_agent import social_bridge_agent
 from app.config import settings
 from app.dependencies import require_automation_secret as _auth
 from app.services.meta_social import meta_social_service
-from app.agents.social_bridge_agent import social_bridge_agent
 from app.services.telegram import telegram_service
 
 router = APIRouter()
@@ -54,9 +56,9 @@ async def _execute_comment_bridge(
     # 4. Save to Conversation Memory & DB Store
     conv_id = f"{platform[:2]}_{author_id}" if author_id else f"{platform[:2]}_{comment_id[-8:]}"
     try:
-        from app.services.memory import conversation_memory
-        from app.schemas.chat import MemoryEntry
         from app.api.v1.conversations.endpoints import add_message_to_conversation
+        from app.schemas.chat import MemoryEntry
+        from app.services.memory import conversation_memory
 
         # Add user comment to history
         await conversation_memory.add(conv_id, MemoryEntry(role="user", content=comment_text))

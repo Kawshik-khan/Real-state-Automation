@@ -7,10 +7,9 @@ mock test runs or external API downtime.
 
 from __future__ import annotations
 
-import json
 from typing import Any, Optional
-from app.services.llm import llm_service
 
+from app.services.llm import llm_service
 
 GROUNDEDNESS_PROMPT = """You are an impartial, highly rigorous evaluator grading factual groundedness in RAG systems for real estate.
 Given a user query, retrieved context chunks, and the AI agent's generated answer, determine if every factual claim in the answer is strictly supported by the retrieved context.

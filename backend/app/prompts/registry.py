@@ -3,15 +3,15 @@
 Audit Reference: prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md
 Centralizes all production prompts, versions, and telemetry logging metadata.
 """
-from typing import Any, Dict, Optional
 import logging
+from typing import Any, Dict, Optional
 
 from app.prompts.core import SYSTEM_CORE_POLICY
-from app.prompts.property import PROPERTY_AGENT_PROMPT
-from app.prompts.faq import FAQ_AGENT_PROMPT
 from app.prompts.email import EMAIL_AGENT_SYSTEM_PROMPT
-from app.prompts.social import SOCIAL_CONTENT_PROMPT, SOCIAL_BRIDGE_PROMPT
 from app.prompts.fallback import FALLBACK_PROMPT
+from app.prompts.faq import FAQ_AGENT_PROMPT
+from app.prompts.property import PROPERTY_AGENT_PROMPT
+from app.prompts.social import SOCIAL_BRIDGE_PROMPT, SOCIAL_CONTENT_PROMPT
 
 logger = logging.getLogger(__name__)
 

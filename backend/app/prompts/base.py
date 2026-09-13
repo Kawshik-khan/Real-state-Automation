@@ -5,12 +5,13 @@ Audit Reference: prompt-engineering-and-system-prompt-audit-bangladesh-fixed.md
 """
 
 from app.prompts.core import SYSTEM_CORE_POLICY
-from app.prompts.property import PROPERTY_AGENT_PROMPT
-from app.prompts.faq import FAQ_AGENT_PROMPT
 from app.prompts.email import EMAIL_AGENT_SYSTEM_PROMPT
-from app.prompts.social import SOCIAL_CONTENT_PROMPT as CONTENT_AGENT_PROMPT, SOCIAL_BRIDGE_PROMPT
 from app.prompts.fallback import FALLBACK_PROMPT
+from app.prompts.faq import FAQ_AGENT_PROMPT
+from app.prompts.property import PROPERTY_AGENT_PROMPT
 from app.prompts.registry import PROMPT_REGISTRY, PROMPT_VERSION, get_prompt
+from app.prompts.social import SOCIAL_BRIDGE_PROMPT
+from app.prompts.social import SOCIAL_CONTENT_PROMPT as CONTENT_AGENT_PROMPT
 
 LANGUAGE_POLICY_INSTRUCTION = """
 LANGUAGE POLICY RULES:

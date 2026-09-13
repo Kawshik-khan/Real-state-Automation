@@ -17,18 +17,15 @@ from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
-    BigInteger,
     Boolean,
-    Column,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, deferred, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, deferred, mapped_column
 
 try:
     from pgvector.sqlalchemy import Vector
@@ -140,4 +137,83 @@ class LogRecord(Base):
     level: Mapped[str] = mapped_column(String(16), default="INFO")
     source: Mapped[str] = mapped_column(String(64))
     message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AdCampaignRecord(Base):
+    __tablename__ = "ad_campaigns"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    campaign_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    platform: Mapped[str] = mapped_column(String(64), nullable=False)
+    campaign_type: Mapped[str] = mapped_column(String(64), default="lead_generation")
+    project_id: Mapped[str | None] = mapped_column(String(128), ForeignKey("projects.project_id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    budget_bdt: Mapped[float] = mapped_column(Float, default=0.0)
+    ad_spend_bdt: Mapped[float] = mapped_column(Float, default=0.0)
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    reach: Mapped[int] = mapped_column(Integer, default=0)
+    engagements: Mapped[int] = mapped_column(Integer, default=0)
+    leads_generated: Mapped[int] = mapped_column(Integer, default=0)
+    pipeline_value_bdt: Mapped[float] = mapped_column(Float, default=0.0)
+    start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class SocialPostRecord(Base):
+    __tablename__ = "social_posts"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str | None] = mapped_column(String(128), ForeignKey("projects.project_id"), nullable=True)
+    platform: Mapped[str] = mapped_column(String(64), nullable=False)
+    topic: Mapped[str] = mapped_column(String(256), nullable=False)
+    post_content: Mapped[str] = mapped_column(Text, nullable=False)
+    hashtags: Mapped[list | None] = mapped_column(JSON, default=list)
+    media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tone: Mapped[str] = mapped_column(String(64), default="luxury")
+    language: Mapped[str] = mapped_column(String(32), default="dual")
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    likes_count: Mapped[int] = mapped_column(Integer, default=0)
+    comments_count: Mapped[int] = mapped_column(Integer, default=0)
+    shares_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[str] = mapped_column(String(128), default="ai-content-engine")
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class BookingRecord(Base):
+    __tablename__ = "bookings"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    booking_reference: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    project_id: Mapped[str] = mapped_column(String(128), ForeignKey("projects.project_id"), nullable=False)
+    customer_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    customer_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    customer_phone: Mapped[str] = mapped_column(String(64), nullable=False)
+    tour_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tour_time_slot: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    source: Mapped[str] = mapped_column(String(64), default="website")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_agent_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CalendarMilestoneRecord(Base):
+    __tablename__ = "calendar_milestones"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    client_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    project_id: Mapped[str | None] = mapped_column(String(128), ForeignKey("projects.project_id"), nullable=True)
+    milestone_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    time_range: Mapped[str] = mapped_column(String(64), default="All Day")
+    milestone_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="upcoming")
+    badge_variant: Mapped[str] = mapped_column(String(32), default="emerald")
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

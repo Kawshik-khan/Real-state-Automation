@@ -13,11 +13,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from app.evals.judges import GroundednessJudge, AnswerRelevanceJudge, SafetyComplianceJudge
-from app.evals.metrics import calculate_classification_metrics, calculate_latency_percentiles, verify_numeric_exactness
 from app.agents.graph import ai_graph
 from app.agents.state import AIState
-from app.rag.pipeline import rag
+from app.evals.judges import GroundednessJudge, SafetyComplianceJudge
+from app.evals.metrics import calculate_classification_metrics, calculate_latency_percentiles, verify_numeric_exactness
 
 BENCHMARKS_DIR = Path(__file__).resolve().parent.parent.parent.parent / ".benchmarks"
 DATASETS_DIR = BENCHMARKS_DIR / "datasets"
@@ -298,12 +297,12 @@ class EvaluationEngine:
             # Verify preferred locations
             if "preferred_locations" in expected:
                 for exp_loc in expected["preferred_locations"]:
-                    if not any(exp_loc.lower() in str(l).lower() for l in beliefs.preferred_locations):
+                    if not any(exp_loc.lower() in str(loc).lower() for loc in beliefs.preferred_locations):
                         turn_passed = False
             # Verify superseded location is absent
             if "excluded_locations_or_absent" in expected:
                 for absent_loc in expected["excluded_locations_or_absent"]:
-                    if any(absent_loc.lower() in str(l).lower() for l in beliefs.preferred_locations):
+                    if any(absent_loc.lower() in str(loc).lower() for loc in beliefs.preferred_locations):
                         turn_passed = False
             # Verify budget max
             if "budget_max" in expected:

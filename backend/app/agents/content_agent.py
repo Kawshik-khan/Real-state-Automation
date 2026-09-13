@@ -1,7 +1,7 @@
 """Content Agent — generates marketing copy, captions, descriptions."""
 
-from app.services.llm import llm_service
 from app.prompts.base import CONTENT_AGENT_PROMPT
+from app.services.llm import llm_service
 
 
 class ContentAgent:

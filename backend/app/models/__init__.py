@@ -1,14 +1,14 @@
 from app.models.models import (
+    AnalyticsRecord,
     Base,
-    UserRecord,
+    ChunkRecord,
     ConversationRecord,
+    KnowledgeDocumentRecord,
+    LogRecord,
+    MediaRecord,
     MessageRecord,
     ProjectRecord,
-    KnowledgeDocumentRecord,
-    ChunkRecord,
-    MediaRecord,
-    AnalyticsRecord,
-    LogRecord,
+    UserRecord,
 )
 
 __all__ = [

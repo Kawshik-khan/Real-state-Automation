@@ -1,20 +1,37 @@
-python-multipart>=0.0.9
-python-dotenv>=1.0.0
-fastapi>=0.109.1
-uvicorn[standard]>=0.25.0
-SQLAlchemy>=2.0.28
-asyncpg>=0.29.0
-pgvector>=0.2.0
-openai>=1.3.5
-langgraph>=0.2.0
-langgraph-checkpoint>=1.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.0.0
-email-validator>=2.1.0
-pyjwt>=2.8.0
-passlib[bcrypt]>=1.7.4
-slowapi>=0.1.9
-pinecone>=5.0.0
-pypdf>=5.0.0
-requests>=2.31.0
-psutil>=5.9.0
+# ── Core Framework ──
+fastapi>=0.109.1,<1.0
+uvicorn[standard]>=0.25.0,<1.0
+pydantic>=2.5.0,<3.0
+pydantic-settings>=2.0.0,<3.0
+python-multipart>=0.0.9,<1.0
+python-dotenv>=1.0.0,<2.0
+
+# ── Database ──
+SQLAlchemy>=2.0.28,<3.0
+alembic>=1.13.0,<2.0
+asyncpg>=0.29.0,<1.0
+psycopg2-binary>=2.9.9,<3.0
+pgvector>=0.2.0,<1.0
+
+# ── AI / LLM ──
+openai>=1.3.5,<2.0
+langgraph>=0.2.0,<1.0
+langgraph-checkpoint>=1.0.0,<3.0
+
+# ── Vector Store ──
+pinecone>=5.0.0,<7.0
+
+# ── Security & Auth ──
+pyjwt>=2.8.0,<3.0
+bcrypt>=4.0.1,<5.0
+passlib[bcrypt]>=1.7.4,<2.0
+email-validator>=2.1.0,<3.0
+
+# ── Utilities ──
+slowapi>=0.1.9,<1.0
+pypdf>=5.0.0,<6.0
+requests>=2.31.0,<3.0
+psutil>=5.9.0,<7.0
+
+# ── HTTP Client (required by FastAPI TestClient) ──
+httpx>=0.27.0,<1.0

@@ -5,18 +5,17 @@ Eliminates hardcoded $250k / 3.5 Cr price block, sources canonical properties an
 preserves role-separated message structure, and runs pre-send GroundingValidator.
 """
 
-from typing import Any, Dict, List, Optional
 import json
 import logging
+from typing import Any, Dict, List, Optional
 
-from app.services.llm import llm_service
-from app.services.attachment_parser import attachment_parser
 from app.prompts.email import EMAIL_AGENT_SYSTEM_PROMPT
 from app.prompts.registry import log_prompt_telemetry
-from app.repositories.property_repository import property_repository
-from app.repositories.policy_repository import policy_repository
 from app.repositories.contact_repository import contact_repository
+from app.repositories.policy_repository import policy_repository
+from app.repositories.property_repository import property_repository
 from app.services.grounding_validator import grounding_validator
+from app.services.llm import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,6 @@ class EmailAgent:
             })
 
         payment_policy = policy_repository.get_policy("standard_payment_plan")
-        contact_info = contact_repository.get_contact_info()
 
         verified_evidence = (
             "--- VERIFIED GLG ASSETS PROPERTY INVENTORY ---\n"
@@ -61,7 +59,7 @@ class EmailAgent:
         if rag_context:
             verified_evidence += f"\n--- RETRIEVED PROJECT RAG CONTEXT ---\n{rag_context}\n"
         if attachment_texts:
-            verified_evidence += f"\n--- EXTRACTED ATTACHMENT TEXT ---\n" + "\n".join(attachment_texts) + "\n"
+            verified_evidence += "\n--- EXTRACTED ATTACHMENT TEXT ---\n" + "\n".join(attachment_texts) + "\n"
 
         # 2. Build Structured Role-Separated Messages
         messages: List[Dict[str, str]] = [

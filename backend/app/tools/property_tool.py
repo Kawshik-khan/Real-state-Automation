@@ -1,7 +1,7 @@
 """Property Search Tool — SQL property filtering + RAG integration + Media Actions."""
 
-import re
-from typing import Optional, List, Dict, Any
+from typing import Optional
+
 from app.repositories.property_repository import property_repository
 
 # Backward-compatibility alias pointing to canonical repository data
@@ -47,9 +47,39 @@ class PropertySearchTool:
                     search_loc = loc_name
                     break
 
+        # Fetch dynamic projects from DB if available
+        all_projects = property_repository.to_legacy_dict_format()
+        try:
+            from app.database import async_session_factory, is_db_reachable
+            from app.models.models import ProjectRecord
+            from sqlalchemy import select
+
+            if is_db_reachable():
+                async with async_session_factory() as session:
+                    res = await session.execute(select(ProjectRecord))
+                db_projs = res.scalars().all()
+                if db_projs:
+                    db_list = []
+                    for p in db_projs:
+                        db_list.append({
+                            "id": p.project_id,
+                            "name": p.project_name,
+                            "location": p.location,
+                            "price": f"৳{(p.starting_price_bdt / 10000000):.1f} Cr" if p.starting_price_bdt else "৳2.5 Cr",
+                            "price_val": int(p.starting_price_bdt) if p.starting_price_bdt else 25000000,
+                            "bedrooms": p.bedrooms or 3,
+                            "amenities": p.amenities or ["Security", "Lift", "Generator"],
+                            "description": p.description or f"Luxury residence in {p.location}.",
+                            "image": p.hero_image or "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800",
+                            "brochure_url": p.brochure_url or "https://fdjzbtkypedzlkwpzzzt.supabase.co/storage/v1/object/public/brochures/gulshan_heights_brochure.pdf"
+                        })
+                    if db_list:
+                        all_projects = db_list
+        except Exception:
+            pass
+
         # Check if user specifically requested a project by name
         target_project_keywords = []
-        all_projects = property_repository.to_legacy_dict_format()
         for proj in all_projects:
             proj_name_lower = proj["name"].lower()
             clean_proj_words = [w for w in proj_name_lower.split() if w != "glg"]

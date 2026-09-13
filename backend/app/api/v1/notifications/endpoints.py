@@ -1,10 +1,11 @@
 """Notification Adapter Services — Workstreams 22-24."""
 from fastapi import APIRouter, Depends
 
-router = APIRouter()
-
-
+from app.config import settings
 from app.dependencies import require_automation_secret as _auth
+from app.services.telegram import telegram_service
+
+router = APIRouter()
 
 
 @router.post("/email", summary="WS22 — Email Notification Adapter")
@@ -28,9 +29,6 @@ async def notify_slack(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-
-from app.config import settings
-from app.services.telegram import telegram_service
 
 
 @router.post("/telegram", summary="WS24 — Telegram Notification Adapter")

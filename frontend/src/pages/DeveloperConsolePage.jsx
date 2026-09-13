@@ -59,6 +59,7 @@ import {
   getDeveloperEvalSuites
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import N8nMonitoringPage from './N8nMonitoringPage';
 
 export default function DeveloperConsolePage({ setActiveParentTab }) {
   const { user } = useAuth();
@@ -566,9 +567,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
       {/* ── Top Developer Welcome Banner ── */}
       <div className="glass-card" style={{
         padding: '24px 32px',
-        background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(15, 23, 42, 0.95) 70%)',
-        border: '1px solid rgba(14, 165, 233, 0.4)',
-        boxShadow: '0 8px 32px rgba(14, 165, 233, 0.15)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-glass)',
+        boxShadow: 'var(--shadow-card)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
@@ -580,19 +581,19 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             gap: '6px',
             padding: '4px 10px',
             borderRadius: '20px',
-            background: 'rgba(14, 165, 233, 0.2)',
-            border: '1px solid rgba(14, 165, 233, 0.4)',
-            color: '#38BDF8',
+            background: 'rgba(232, 101, 74, 0.12)',
+            border: '1px solid rgba(232, 101, 74, 0.25)',
+            color: 'var(--accent-coral)',
             fontSize: '0.75rem',
             fontWeight: 700,
             marginBottom: '8px'
           }}>
             <Terminal size={14} /> EXCLUSIVE DEVELOPER & ENGINEERING CONSOLE
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF' }}>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0' }}>
             Engineering Control Deck 🛠️
           </h2>
-          <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
             Live interactive API playground, Webhook dispatch simulator, Vector DB diagnostics &amp; real-time system health.
           </p>
         </div>
@@ -602,12 +603,12 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           <div style={{
             padding: '12px 18px',
             borderRadius: '12px',
-            background: 'rgba(15, 23, 42, 0.8)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'var(--bg-main)',
+            border: '1px solid var(--border-glass)',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>Active Tenant</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active Tenant</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0284C7', marginTop: '2px' }}>
               {systemHealth?.active_tenant || 'glg-default'}
             </div>
           </div>
@@ -615,12 +616,12 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           <div style={{
             padding: '12px 18px',
             borderRadius: '12px',
-            background: 'rgba(15, 23, 42, 0.8)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'var(--bg-main)',
+            border: '1px solid var(--border-glass)',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>Pinecone Index</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Pinecone Index</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
               1536-dim / Cosine
             </div>
           </div>
@@ -631,16 +632,17 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             style={{
               padding: '12px 18px',
               borderRadius: '12px',
-              background: 'rgba(14, 165, 233, 0.2)',
-              border: '1px solid rgba(14, 165, 233, 0.5)',
-              color: '#38BDF8',
+              background: 'linear-gradient(135deg, var(--accent-coral), #D95338)',
+              border: 'none',
+              color: '#FFFFFF',
               fontWeight: 700,
               fontSize: '0.85rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)'
             }}
           >
             <RefreshCw size={16} className={healthLoading ? 'spin-anim' : ''} />
@@ -653,12 +655,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
       <div style={{
         display: 'flex',
         gap: '8px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        borderBottom: '1px solid var(--border-glass)',
         paddingBottom: '4px',
         overflowX: 'auto'
       }}>
         {[
           { id: 'engineering_summary', label: 'Engineering Summary & Health', icon: LayoutDashboard, count: '6 Modules', highlight: true },
+          { id: 'n8n_health', label: 'n8n Workflow Health', icon: Workflow, count: '6 Workflows', highlight: true },
           { 
             id: 'evals_benchmarks', 
             label: 'AI Evals & Quality Gates', 
@@ -686,31 +689,31 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 borderRadius: '10px 10px 0 0',
                 border: 'none',
                 background: isActive 
-                  ? 'rgba(14, 165, 233, 0.18)' 
+                  ? 'var(--bg-card)' 
                   : tab.highlight 
-                  ? 'rgba(99, 102, 241, 0.08)' 
+                  ? 'rgba(232, 101, 74, 0.05)' 
                   : 'transparent',
-                borderBottom: isActive ? '2px solid #38BDF8' : '2px solid transparent',
-                color: isActive ? '#FFFFFF' : tab.highlight ? '#A5B4FC' : '#94A3B8',
+                borderBottom: isActive ? '2px solid var(--accent-coral)' : '2px solid transparent',
+                color: isActive ? 'var(--accent-coral)' : 'var(--text-muted)',
                 fontWeight: isActive ? 700 : 600,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                boxShadow: isActive ? '0 -2px 8px rgba(0,0,0,0.03)' : 'none'
               }}
             >
-              <Icon size={16} color={isActive ? '#38BDF8' : tab.highlight ? '#818CF8' : '#94A3B8'} />
+              <Icon size={16} color={isActive ? 'var(--accent-coral)' : 'var(--text-muted)'} />
               <span>{tab.label}</span>
               <span style={{
                 fontSize: '0.65rem',
                 padding: '2px 6px',
                 borderRadius: '6px',
                 background: isActive 
-                  ? 'rgba(14, 165, 233, 0.3)' 
-                  : tab.highlight 
-                  ? 'rgba(99, 102, 241, 0.2)' 
-                  : 'rgba(255, 255, 255, 0.05)',
-                color: isActive ? '#38BDF8' : tab.highlight ? '#C7D2FE' : '#64748B'
+                  ? 'rgba(232, 101, 74, 0.15)' 
+                  : 'var(--bg-main)',
+                color: isActive ? 'var(--accent-coral)' : 'var(--text-muted)',
+                fontWeight: 700
               }}>
                 {tab.count}
               </span>
@@ -726,9 +729,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           {/* Engineering Overview Hero Card */}
           <div className="glass-card" style={{
             padding: '24px 28px',
-            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
             borderRadius: '16px',
+            boxShadow: 'var(--shadow-card)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -742,7 +746,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   borderRadius: '20px',
                   background: 'rgba(16, 185, 129, 0.15)',
                   border: '1px solid rgba(16, 185, 129, 0.3)',
-                  color: '#34D399',
+                  color: '#059669',
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   display: 'flex',
@@ -751,20 +755,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 }}>
                   <CheckCircle2 size={13} /> ALL 6 ENGINEERING SUBSYSTEMS ONLINE
                 </span>
-                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
-                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-                  Uptime: <strong style={{ color: '#F1F5F9' }}>99.98%</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Uptime: <strong style={{ color: 'var(--text-main)' }}>99.98%</strong>
                 </span>
-                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
-                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-                  FastAPI Server: <strong style={{ color: '#38BDF8' }}>Port 8000</strong> (29 Routes Registered)
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  FastAPI Server: <strong style={{ color: '#0284C7' }}>Port 8000</strong> (29 Routes Registered)
                 </span>
               </div>
               
-              <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF' }}>
+              <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Full Architecture &amp; Development Health Summary
               </h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94A3B8' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Unified status control for n8n automations, Pinecone serverless vector index, Supabase PostgreSQL, LangGraph multi-agent supervisor, and social webhooks.
               </p>
             </div>
@@ -776,9 +780,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 style={{
                   padding: '10px 18px',
                   borderRadius: '10px',
-                  background: 'rgba(56, 189, 248, 0.15)',
-                  border: '1px solid rgba(56, 189, 248, 0.4)',
-                  color: '#38BDF8',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontWeight: 700,
                   fontSize: '0.82rem',
                   cursor: syncLoading ? 'not-allowed' : 'pointer',
@@ -792,29 +796,27 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 <span>{syncLoading ? 'Syncing...' : 'Sync Supabase & Pinecone'}</span>
               </button>
 
-              {setActiveParentTab && (
-                <button
-                  onClick={() => setActiveParentTab('n8n_monitoring')}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                    border: 'none',
-                    color: '#FFFFFF',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 16px rgba(99, 102, 241, 0.3)',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Workflow size={15} />
-                  <span>Open n8n Health Monitoring Page ➔</span>
-                </button>
-              )}
+              <button
+                onClick={() => setActiveTab('n8n_health')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, var(--accent-coral), #D95338)',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Workflow size={15} />
+                <span>Open n8n Health Monitoring Page ➔</span>
+              </button>
             </div>
           </div>
 
@@ -828,87 +830,84 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(192, 132, 252, 0.25)',
-              background: 'linear-gradient(180deg, rgba(192, 132, 252, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Workflow size={18} color="#C084FC" /> n8n Automation Engine
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(147, 51, 234, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9333EA'
+                    }}>
+                      <Workflow size={18} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>n8n Workflows</h4>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Multi-Channel Automation</span>
+                    </div>
+                  </div>
                   <span style={{
                     padding: '3px 8px',
-                    borderRadius: '6px',
-                    background: 'rgba(192, 132, 252, 0.2)',
-                    color: '#C084FC',
+                    borderRadius: '12px',
                     fontSize: '0.7rem',
-                    fontWeight: 800
+                    fontWeight: 700,
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    color: '#059669',
+                    border: '1px solid rgba(16, 185, 129, 0.25)'
                   }}>
-                    {n8nTelemetry?.overall_status || 'HEALTHY'} (6/6 Active)
+                    ● 6/6 Active
                   </span>
                 </div>
-                
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
-                  Automates social leads, Telegram bots, Google Sheets sync, email replies, and lead scoring.
+
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: '0 0 12px 0' }}>
+                  Cloud-hosted execution engine for WhatsApp, Telegram, Email, and Google Sheets sync automations.
                 </p>
 
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
-                  padding: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: 'var(--bg-main)',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
-                  fontSize: '0.72rem'
+                  fontSize: '0.75rem',
+                  marginBottom: '4px'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>Workflows:</span> <strong style={{ color: '#FFFFFF' }}>6 Online</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Nodes:</span> <strong style={{ color: '#34D399' }}>20 Active</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Latency:</span> <strong style={{ color: '#38BDF8' }}>148ms avg</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Executions:</span> <strong style={{ color: '#C084FC' }}>1,420+</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Nodes:</span> <strong style={{ color: '#059669' }}>20 Active</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Latency:</span> <strong style={{ color: '#0284C7' }}>148ms avg</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Executions:</span> <strong style={{ color: '#9333EA' }}>1,420+</strong></div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                {setActiveParentTab ? (
-                  <button
-                    onClick={() => setActiveParentTab('n8n_monitoring')}
-                    style={{
-                      flex: 1,
-                      padding: '8px',
-                      borderRadius: '8px',
-                      background: 'rgba(192, 132, 252, 0.15)',
-                      border: '1px solid rgba(192, 132, 252, 0.35)',
-                      color: '#C084FC',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>View n8n Health</span>
-                    <ArrowUpRight size={13} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setActiveTab('health_matrix')}
-                    style={{
-                      flex: 1,
-                      padding: '8px',
-                      borderRadius: '8px',
-                      background: 'rgba(192, 132, 252, 0.15)',
-                      border: '1px solid rgba(192, 132, 252, 0.35)',
-                      color: '#C084FC',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Inspect Telemetry
-                  </button>
-                )}
+                <button
+                  onClick={() => setActiveTab('n8n_health')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '8px',
+                    background: 'rgba(147, 51, 234, 0.1)',
+                    border: '1px solid rgba(147, 51, 234, 0.25)',
+                    color: '#9333EA',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>View n8n Health</span>
+                  <ArrowUpRight size={13} />
+                </button>
               </div>
             </div>
 
@@ -919,19 +918,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
-              background: 'linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={18} color="#38BDF8" /> Pinecone Vector Database
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Database size={18} color="#0284C7" /> Pinecone Vector Database
                   </span>
                   <span style={{
                     padding: '3px 8px',
                     borderRadius: '6px',
-                    background: 'rgba(14, 165, 233, 0.2)',
-                    color: '#38BDF8',
+                    background: 'rgba(14, 165, 233, 0.15)',
+                    color: '#0284C7',
                     fontSize: '0.7rem',
                     fontWeight: 800
                   }}>
@@ -939,7 +939,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
                   Serverless vector store running semantic embeddings and cosine similarity for real estate documents.
                 </p>
 
@@ -949,13 +949,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   gap: '8px',
                   padding: '10px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
+                  background: 'var(--bg-main)',
                   fontSize: '0.72rem'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>Index:</span> <strong style={{ color: '#FFFFFF' }}>real-state-automation</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Vectors:</span> <strong style={{ color: '#38BDF8' }}>86 Chunks</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Dimension:</span> <strong style={{ color: '#34D399' }}>1024 / Cosine</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Search:</span> <strong style={{ color: '#C084FC' }}>18ms avg</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Index:</span> <strong style={{ color: 'var(--text-main)' }}>real-state-automation</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Vectors:</span> <strong style={{ color: '#0284C7' }}>86 Chunks</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Dimension:</span> <strong style={{ color: '#059669' }}>1024 / Cosine</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Search:</span> <strong style={{ color: '#9333EA' }}>18ms avg</strong></div>
                 </div>
               </div>
 
@@ -966,9 +966,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(14, 165, 233, 0.15)',
-                    border: '1px solid rgba(14, 165, 233, 0.35)',
-                    color: '#38BDF8',
+                    background: 'rgba(14, 165, 233, 0.1)',
+                    border: '1px solid rgba(14, 165, 233, 0.25)',
+                    color: '#0284C7',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -991,19 +991,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(52, 211, 153, 0.25)',
-              background: 'linear-gradient(180deg, rgba(52, 211, 153, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Server size={18} color="#34D399" /> Supabase Cloud &amp; Storage
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Server size={18} color="#059669" /> Supabase Cloud &amp; Storage
                   </span>
                   <span style={{
                     padding: '3px 8px',
                     borderRadius: '6px',
-                    background: 'rgba(16, 185, 129, 0.2)',
-                    color: '#34D399',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#059669',
                     fontSize: '0.7rem',
                     fontWeight: 800
                   }}>
@@ -1011,7 +1012,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
                   Managed PostgreSQL database with pgvector, Row-Level Security, and file storage buckets.
                 </p>
 
@@ -1021,13 +1022,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   gap: '8px',
                   padding: '10px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
+                  background: 'var(--bg-main)',
                   fontSize: '0.72rem'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>REST API:</span> <strong style={{ color: '#34D399' }}>200 OK (14ms)</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Buckets:</span> <strong style={{ color: '#38BDF8' }}>3 Active</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Brochures:</span> <strong style={{ color: '#FFFFFF' }}>6 PDFs Synced</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Pgvector:</span> <strong style={{ color: '#C084FC' }}>knowledge_chunks</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>REST API:</span> <strong style={{ color: '#059669' }}>200 OK (14ms)</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Buckets:</span> <strong style={{ color: '#0284C7' }}>3 Active</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Brochures:</span> <strong style={{ color: 'var(--text-main)' }}>6 PDFs Synced</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Pgvector:</span> <strong style={{ color: '#9333EA' }}>knowledge_chunks</strong></div>
                 </div>
               </div>
 
@@ -1038,9 +1039,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                    color: '#34D399',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    color: '#059669',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -1063,19 +1064,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
-              background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Bot size={18} color="#FBBF24" /> LangGraph Multi-Agent AI
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bot size={18} color="#D97706" /> LangGraph Multi-Agent AI
                   </span>
                   <span style={{
                     padding: '3px 8px',
                     borderRadius: '6px',
-                    background: 'rgba(245, 158, 11, 0.2)',
-                    color: '#FBBF24',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#D97706',
                     fontSize: '0.7rem',
                     fontWeight: 800
                   }}>
@@ -1083,7 +1085,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
                   Stateful supervisor graph routing across Property, FAQ, Content, and Email response agents.
                 </p>
 
@@ -1093,13 +1095,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   gap: '8px',
                   padding: '10px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
+                  background: 'var(--bg-main)',
                   fontSize: '0.72rem'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>Primary LLM:</span> <strong style={{ color: '#FFFFFF' }}>LLaMA 3.3 70B</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Supervisor:</span> <strong style={{ color: '#FBBF24' }}>8 Intents</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Structured:</span> <strong style={{ color: '#34D399' }}>JSON Actions</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Response:</span> <strong style={{ color: '#38BDF8' }}>Multilingual</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Primary LLM:</span> <strong style={{ color: 'var(--text-main)' }}>LLaMA 3.3 70B</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Supervisor:</span> <strong style={{ color: '#D97706' }}>8 Intents</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Structured:</span> <strong style={{ color: '#059669' }}>JSON Actions</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Response:</span> <strong style={{ color: '#0284C7' }}>Multilingual</strong></div>
                 </div>
               </div>
 
@@ -1110,9 +1112,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    border: '1px solid rgba(245, 158, 11, 0.35)',
-                    color: '#FBBF24',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    color: '#D97706',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -1135,19 +1137,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(236, 72, 153, 0.25)',
-              background: 'linear-gradient(180deg, rgba(236, 72, 153, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Radio size={18} color="#F472B6" /> Multi-Channel Gateways
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Radio size={18} color="#DB2777" /> Multi-Channel Gateways
                   </span>
                   <span style={{
                     padding: '3px 8px',
                     borderRadius: '6px',
-                    background: 'rgba(236, 72, 153, 0.2)',
-                    color: '#F472B6',
+                    background: 'rgba(236, 72, 153, 0.15)',
+                    color: '#DB2777',
                     fontSize: '0.7rem',
                     fontWeight: 800
                   }}>
@@ -1155,7 +1158,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
                   Inbound and outbound message processing for WhatsApp, Telegram, Messenger, and Gmail.
                 </p>
 
@@ -1165,13 +1168,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   gap: '8px',
                   padding: '10px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
+                  background: 'var(--bg-main)',
                   fontSize: '0.72rem'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>Telegram Bot:</span> <strong style={{ color: '#38BDF8' }}>Active</strong></div>
-                  <div><span style={{ color: '#64748B' }}>WhatsApp:</span> <strong style={{ color: '#34D399' }}>Cloud API</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Messenger:</span> <strong style={{ color: '#60A5FA' }}>Webhook</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Gmail:</span> <strong style={{ color: '#F472B6' }}>OAuth2 / SMTP</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Telegram Bot:</span> <strong style={{ color: '#0284C7' }}>Active</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>WhatsApp:</span> <strong style={{ color: '#059669' }}>Cloud API</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Messenger:</span> <strong style={{ color: '#2563EB' }}>Webhook</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Gmail:</span> <strong style={{ color: '#DB2777' }}>OAuth2 / SMTP</strong></div>
                 </div>
               </div>
 
@@ -1182,9 +1185,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(236, 72, 153, 0.15)',
-                    border: '1px solid rgba(236, 72, 153, 0.35)',
-                    color: '#F472B6',
+                    background: 'rgba(236, 72, 153, 0.1)',
+                    border: '1px solid rgba(236, 72, 153, 0.25)',
+                    color: '#DB2777',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -1207,19 +1210,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: '16px',
-              border: '1px solid rgba(99, 102, 241, 0.25)',
-              background: 'linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%)'
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-card)',
+              boxShadow: 'var(--shadow-card)'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Lock size={18} color="#818CF8" /> Security &amp; RBAC Control
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lock size={18} color="#4F46E5" /> Security &amp; RBAC Control
                   </span>
                   <span style={{
                     padding: '3px 8px',
                     borderRadius: '6px',
-                    background: 'rgba(99, 102, 241, 0.2)',
-                    color: '#818CF8',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#4F46E5',
                     fontSize: '0.7rem',
                     fontWeight: 800
                   }}>
@@ -1227,7 +1231,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
                   Role-based access control (Developer, Admin, Manager, Agent, Viewer) and SSE live streams.
                 </p>
 
@@ -1237,13 +1241,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   gap: '8px',
                   padding: '10px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.6)',
+                  background: 'var(--bg-main)',
                   fontSize: '0.72rem'
                 }}>
-                  <div><span style={{ color: '#64748B' }}>Auth Engine:</span> <strong style={{ color: '#FFFFFF' }}>JWT Bearer</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Secret Check:</span> <strong style={{ color: '#34D399' }}>SHA-256</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Dev Console:</span> <strong style={{ color: '#818CF8' }}>Strictly Isolated</strong></div>
-                  <div><span style={{ color: '#64748B' }}>SSE Stream:</span> <strong style={{ color: '#38BDF8' }}>Real-time</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Auth Engine:</span> <strong style={{ color: 'var(--text-main)' }}>JWT Bearer</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Secret Check:</span> <strong style={{ color: '#059669' }}>SHA-256</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Dev Console:</span> <strong style={{ color: '#4F46E5' }}>Strictly Isolated</strong></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>SSE Stream:</span> <strong style={{ color: '#0284C7' }}>Real-time</strong></div>
                 </div>
               </div>
 
@@ -1254,9 +1258,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    background: 'rgba(99, 102, 241, 0.15)',
-                    border: '1px solid rgba(99, 102, 241, 0.35)',
-                    color: '#818CF8',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    color: '#4F46E5',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -1278,10 +1282,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Layers size={18} color="#38BDF8" /> Engineering &amp; Development Feature Registry
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Layers size={18} color="var(--accent-coral)" /> Engineering &amp; Development Feature Registry
                 </h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94A3B8' }}>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   Catalog of all production backend routes, AI subagents, and automation connectors.
                 </p>
               </div>
@@ -1290,9 +1294,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 fontSize: '0.75rem',
                 padding: '4px 10px',
                 borderRadius: '6px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: '#E2E8F0',
-                fontWeight: 600
+                background: 'var(--bg-main)',
+                color: 'var(--text-main)',
+                fontWeight: 600,
+                border: '1px solid var(--border-glass)'
               }}>
                 Total Registered: 29 Endpoints
               </span>
@@ -1301,7 +1306,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.12)', color: '#94A3B8' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-glass)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '10px 14px', fontWeight: 700 }}>SUBSYSTEM / FEATURE</th>
                     <th style={{ padding: '10px 14px', fontWeight: 700 }}>CATEGORY</th>
                     <th style={{ padding: '10px 14px', fontWeight: 700 }}>PRIMARY ENDPOINT / ROUTE</th>
@@ -1387,30 +1392,31 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     },
                   ].map((row, idx) => (
                     <tr key={idx} style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                      background: idx % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
+                      borderBottom: '1px solid var(--border-glass)',
+                      background: idx % 2 === 0 ? 'var(--bg-main)' : 'transparent'
                     }}>
-                      <td style={{ padding: '12px 14px', fontWeight: 700, color: '#FFFFFF' }}>
+                      <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-main)' }}>
                         {row.name}
                       </td>
                       <td style={{ padding: '12px 14px' }}>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          color: '#CBD5E1',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-glass)',
+                          color: 'var(--text-muted)',
                           fontSize: '0.72rem'
                         }}>
                           {row.cat}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#38BDF8', fontSize: '0.75rem' }}>
+                      <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#0284C7', fontSize: '0.75rem' }}>
                         {row.endpoint}
                       </td>
-                      <td style={{ padding: '12px 14px', color: '#94A3B8' }}>
+                      <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>
                         {row.tech}
                       </td>
-                      <td style={{ padding: '12px 14px', color: '#F1F5F9', fontWeight: 600 }}>
+                      <td style={{ padding: '12px 14px', color: 'var(--text-main)', fontWeight: 600 }}>
                         {row.latency}
                       </td>
                       <td style={{ padding: '12px 14px' }}>
@@ -1418,7 +1424,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                           padding: '2px 8px',
                           borderRadius: '4px',
                           background: 'rgba(16, 185, 129, 0.15)',
-                          color: '#34D399',
+                          color: '#059669',
                           fontSize: '0.7rem',
                           fontWeight: 700
                         }}>
@@ -1428,8 +1434,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                         <button
                           onClick={() => {
-                            if (row.tabTarget === 'parent_n8n' && setActiveParentTab) {
-                              setActiveParentTab('n8n_monitoring');
+                            if (row.tabTarget === 'parent_n8n') {
+                              setActiveTab('n8n_health');
                             } else {
                               setActiveTab(row.tabTarget);
                             }
@@ -1437,9 +1443,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                           style={{
                             padding: '4px 10px',
                             borderRadius: '6px',
-                            background: 'rgba(14, 165, 233, 0.15)',
-                            border: '1px solid rgba(14, 165, 233, 0.35)',
-                            color: '#38BDF8',
+                            background: 'rgba(232, 101, 74, 0.1)',
+                            border: '1px solid rgba(232, 101, 74, 0.3)',
+                            color: 'var(--accent-coral)',
                             fontSize: '0.72rem',
                             fontWeight: 700,
                             cursor: 'pointer'
@@ -1456,6 +1462,11 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           </div>
 
         </div>
+      )}
+
+      {/* ── TAB: N8N HEALTH & WORKFLOW MONITORING ── */}
+      {activeTab === 'n8n_health' && (
+        <N8nMonitoringPage />
       )}
 
       {/* ── TAB: AI EVALUATIONS & PRODUCTION QUALITY GATES ── */}
@@ -1514,14 +1525,15 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             {/* Hero Header & Execution Controls */}
             <div className="glass-card" style={{
               padding: '24px 28px',
-              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
               borderRadius: '16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: '20px'
+              gap: '20px',
+              boxShadow: 'var(--shadow-sm)'
             }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1529,22 +1541,22 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     padding: '4px 10px',
                     borderRadius: '20px',
                     background: gateStatus === 'PASSED' 
-                      ? 'rgba(16, 185, 129, 0.15)' 
+                      ? 'rgba(16, 185, 129, 0.12)' 
                       : gateStatus === 'FAILED'
-                      ? 'rgba(239, 68, 68, 0.15)'
-                      : 'rgba(56, 189, 248, 0.15)',
+                      ? 'rgba(239, 68, 68, 0.12)'
+                      : 'rgba(232, 101, 74, 0.12)',
                     border: `1px solid ${
                       gateStatus === 'PASSED' 
-                        ? 'rgba(16, 185, 129, 0.4)' 
+                        ? 'rgba(16, 185, 129, 0.3)' 
                         : gateStatus === 'FAILED'
-                        ? 'rgba(239, 68, 68, 0.4)'
-                        : 'rgba(56, 189, 248, 0.4)'
+                        ? 'rgba(239, 68, 68, 0.3)'
+                        : 'rgba(232, 101, 74, 0.3)'
                     }`,
                     color: gateStatus === 'PASSED' 
-                      ? '#34D399' 
+                      ? '#059669' 
                       : gateStatus === 'FAILED'
-                      ? '#F87171'
-                      : '#38BDF8',
+                      ? '#DC2626'
+                      : 'var(--accent-coral)',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     display: 'flex',
@@ -1559,22 +1571,22 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       <><ShieldCheck size={13} /> QUALITY GATES: STANDBY</>
                     )}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
-                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-                    Execution Engine: <strong style={{ color: '#38BDF8' }}>WebSocket Live Stream</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>•</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Execution Engine: <strong style={{ color: 'var(--accent-coral)' }}>WebSocket Live Stream</strong>
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
-                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-                    Last Run: <strong style={{ color: '#F1F5F9' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>•</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Last Run: <strong style={{ color: 'var(--text-main)' }}>
                       {evalsReport?.timestamp ? new Date(evalsReport.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Never'}
                     </strong>
                   </span>
                 </div>
                 
-                <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ShieldCheck size={22} color="#38BDF8" /> AI Evaluation Engine &amp; Production Quality Gates
+                <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={22} color="var(--accent-coral)" /> AI Evaluation Engine &amp; Production Quality Gates
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94A3B8', maxWidth: '820px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '820px' }}>
                   Automated multi-lingual benchmarks testing Intent Routing (Bangla/Banglish/EN), RAG Groundedness, Safety &amp; Guardrails, Self-Correcting Memory, and Financial Calculations with LLM-as-a-judge.
                 </p>
               </div>
@@ -1582,7 +1594,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {/* Suite Selector */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>BENCHMARK SUITE</label>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>BENCHMARK SUITE</label>
                   <select
                     value={selectedEvalSuite}
                     onChange={(e) => setSelectedEvalSuite(e.target.value)}
@@ -1590,9 +1602,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     style={{
                       padding: '8px 12px',
                       borderRadius: '8px',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: '#F1F5F9',
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-glass)',
+                      color: 'var(--text-main)',
                       fontSize: '0.8rem',
                       fontWeight: 600,
                       outline: 'none',
@@ -1610,7 +1622,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
                 {/* Sample Size Limit */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>SAMPLE LIMIT</label>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>SAMPLE LIMIT</label>
                   <input
                     type="number"
                     placeholder="All (Default)"
@@ -1621,9 +1633,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       width: '95px',
                       padding: '8px 10px',
                       borderRadius: '8px',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: '#F1F5F9',
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-glass)',
+                      color: 'var(--text-main)',
                       fontSize: '0.8rem',
                       outline: 'none'
                     }}
@@ -1640,8 +1652,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       padding: '9px 18px',
                       borderRadius: '8px',
                       background: evalsRunning 
-                        ? 'rgba(56, 189, 248, 0.3)' 
-                        : 'linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)',
+                        ? 'rgba(232, 101, 74, 0.3)' 
+                        : 'linear-gradient(135deg, var(--accent-coral) 0%, #D95338 100%)',
                       border: 'none',
                       color: '#FFFFFF',
                       fontWeight: 700,
@@ -1650,7 +1662,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: evalsRunning ? 'none' : '0 4px 14px rgba(14, 165, 233, 0.4)',
+                      boxShadow: evalsRunning ? 'none' : '0 4px 14px rgba(232, 101, 74, 0.35)',
                       transition: 'all 0.2s ease'
                     }}
                   >
@@ -1673,9 +1685,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     style={{
                       padding: '9px 12px',
                       borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      color: '#94A3B8',
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-glass)',
+                      color: 'var(--text-muted)',
                       cursor: 'pointer'
                     }}
                   >
@@ -1690,20 +1702,21 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <div className="glass-card" style={{
                 padding: '16px 20px',
                 borderRadius: '12px',
-                background: 'rgba(15, 23, 42, 0.9)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-glass)',
+                boxShadow: 'var(--shadow-sm)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Activity size={16} color="#38BDF8" className={evalsRunning ? 'spin-anim' : ''} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase' }}>
+                    <Activity size={16} color="var(--accent-coral)" className={evalsRunning ? 'spin-anim' : ''} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-coral)', textTransform: 'uppercase' }}>
                       Active Suite: {evalsProgress?.suite || selectedEvalSuite}
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: '#64748B' }}>•</span>
-                    <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>•</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                       Test {evalsProgress?.test_idx || 0} of {evalsProgress?.total_tests || 0}
                     </span>
                   </div>
@@ -1715,18 +1728,18 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                         borderRadius: '4px',
                         fontSize: '0.72rem',
                         fontWeight: 700,
-                        background: evalsProgress.passed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                        color: evalsProgress.passed ? '#34D399' : '#F87171'
+                        background: evalsProgress.passed ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        color: evalsProgress.passed ? '#059669' : '#DC2626'
                       }}>
                         {evalsProgress.passed ? 'PASS' : 'FAIL'}
                       </span>
                     )}
                     {evalsProgress?.latency_ms && (
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                         {evalsProgress.latency_ms}ms
                       </span>
                     )}
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#F1F5F9' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>
                       {evalsProgress?.pct || 0}%
                     </span>
                   </div>
@@ -1736,9 +1749,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 <div style={{
                   padding: '8px 12px',
                   borderRadius: '6px',
-                  background: 'rgba(0, 0, 0, 0.3)',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
                   fontSize: '0.78rem',
-                  color: '#CBD5E1',
+                  color: 'var(--text-main)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -1746,8 +1760,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap'
                 }}>
-                  <span style={{ color: '#64748B', fontWeight: 600 }}>QUERY:</span>
-                  <span style={{ color: '#38BDF8', fontFamily: 'monospace' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>QUERY:</span>
+                  <span style={{ color: 'var(--accent-coral)', fontFamily: 'monospace', fontWeight: 600 }}>
                     {evalsProgress?.query || 'Loading test case...'}
                   </span>
                 </div>
@@ -1756,17 +1770,17 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 <div style={{
                   height: '8px',
                   borderRadius: '4px',
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: 'rgba(0, 0, 0, 0.06)',
                   overflow: 'hidden',
                   position: 'relative'
                 }}>
                   <div style={{
                     height: '100%',
                     width: `${evalsProgress?.pct || 0}%`,
-                    background: 'linear-gradient(90deg, #38BDF8 0%, #818CF8 50%, #34D399 100%)',
+                    background: 'linear-gradient(90deg, var(--accent-coral) 0%, #F59E0B 50%, #10B981 100%)',
                     borderRadius: '4px',
                     transition: 'width 0.3s ease',
-                    boxShadow: '0 0 12px rgba(56, 189, 248, 0.6)'
+                    boxShadow: '0 0 10px rgba(232, 101, 74, 0.4)'
                   }} />
                 </div>
               </div>
@@ -1777,15 +1791,15 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <div style={{
                 padding: '12px 16px',
                 borderRadius: '10px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#FCA5A5',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#DC2626',
                 fontSize: '0.82rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                <AlertCircle size={16} color="#F87171" />
+                <AlertCircle size={16} color="#DC2626" />
                 <span>{evalsError}</span>
               </div>
             )}
@@ -1795,10 +1809,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <div className="glass-card" style={{
                 padding: '20px 24px',
                 borderRadius: '14px',
-                background: gateStatus === 'PASSED'
-                  ? 'linear-gradient(135deg, rgba(6, 78, 59, 0.35) 0%, rgba(15, 23, 42, 0.95) 100%)'
-                  : 'linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(15, 23, 42, 0.95) 100%)',
-                border: `1px solid ${gateStatus === 'PASSED' ? 'rgba(52, 211, 153, 0.4)' : 'rgba(248, 113, 113, 0.4)'}`,
+                background: 'var(--bg-card)',
+                border: `1px solid ${gateStatus === 'PASSED' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                boxShadow: 'var(--shadow-sm)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -1810,24 +1823,24 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     width: '48px',
                     height: '48px',
                     borderRadius: '12px',
-                    background: gateStatus === 'PASSED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    background: gateStatus === 'PASSED' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
                     {gateStatus === 'PASSED' ? (
-                      <Award size={26} color="#34D399" />
+                      <Award size={26} color="#059669" />
                     ) : (
-                      <XCircle size={26} color="#F87171" />
+                      <XCircle size={26} color="#DC2626" />
                     )}
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: gateStatus === 'PASSED' ? '#34D399' : '#F87171' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: gateStatus === 'PASSED' ? '#059669' : '#DC2626' }}>
                       {gateStatus === 'PASSED' 
                         ? 'PRODUCTION QUALITY GATE PASSED' 
                         : 'PRODUCTION QUALITY GATE BLOCKED'}
                     </h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#CBD5E1' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                       {evalsReport.gate_reason || (gateStatus === 'PASSED' 
                         ? 'All evaluation suites met or exceeded release criteria thresholds. Safe for automated deployment.' 
                         : 'One or more benchmark metrics fell below the required threshold.')}
@@ -1837,27 +1850,27 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
                 {/* Aggregate metrics pills */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>PASS RATE</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: passRate >= 95 ? '#34D399' : '#F87171' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>PASS RATE</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: passRate >= 95 ? '#059669' : '#DC2626' }}>
                       {passRate}%
                     </div>
                   </div>
-                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>PASSED / TOTAL</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F1F5F9' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>PASSED / TOTAL</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
                       {passedCases} / {totalCases}
                     </div>
                   </div>
-                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>FAILURES</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: failedCases > 0 ? '#F87171' : '#34D399' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>FAILURES</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: failedCases > 0 ? '#DC2626' : '#059669' }}>
                       {failedCases}
                     </div>
                   </div>
-                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>DURATION</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38BDF8' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>DURATION</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-coral)' }}>
                       {durationSec}s
                     </div>
                   </div>
@@ -1868,10 +1881,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             {/* 6 Core Quality Gate Cards Grid */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Gauge size={16} color="#38BDF8" /> 6 Critical Production Gate Thresholds
+                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Gauge size={16} color="var(--accent-coral)" /> 6 Critical Production Gate Thresholds
                 </h4>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Automated Threshold Validation</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Automated Threshold Validation</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
@@ -1885,32 +1898,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>1. Intent Routing Accuracy</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>1. Intent Routing Accuracy</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: ≥ 95.0%</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Multi-lingual intent classification across Bangla, Banglish, and English property search, booking, and support queries.
                       </p>
                     </div>
@@ -1926,32 +1940,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>2. RAG Groundedness</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>2. RAG Groundedness</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: ≥ 95.0%</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         LLM-as-a-judge verifying that property facts, unit sizes, and handover dates directly entail from retrieved knowledge chunks.
                       </p>
                     </div>
@@ -1967,32 +1982,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>3. Hallucination Rate</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>3. Hallucination Rate</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≤ 2.0%</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: ≤ 2.0%</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Strict refusal testing ensuring model refrains from fabricating non-existent projects or unverified pricing claims.
                       </p>
                     </div>
@@ -2008,32 +2024,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>4. Safety &amp; Guardrail Compliance</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>4. Safety &amp; Guardrail Compliance</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: 100.0% (Zero Tolerance)</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: 100.0% (Zero Tolerance)</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Adversarial jailbreaks, prompt injection, and PII leakage queries are blocked 100% of the time before inference.
                       </p>
                     </div>
@@ -2049,32 +2066,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>5. Self-Correcting Memory</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>5. Self-Correcting Memory</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: ≥ 95.0%</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: ≥ 95.0%</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Validates that multi-turn user contradictions automatically supersede invalidated premises without carry-over bias.
                       </p>
                     </div>
@@ -2090,32 +2108,33 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <div className="glass-card" style={{
                       padding: '18px 20px',
                       borderRadius: '12px',
-                      background: 'rgba(30, 41, 59, 0.7)',
-                      border: `1px solid ${passed === true ? 'rgba(52, 211, 153, 0.3)' : passed === false ? 'rgba(248, 113, 113, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${passed === true ? 'rgba(16, 185, 129, 0.3)' : passed === false ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-glass)'}`,
+                      boxShadow: 'var(--shadow-sm)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1' }}>6. Deterministic Financial Math</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>6. Deterministic Financial Math</span>
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          background: passed === true ? 'rgba(16, 185, 129, 0.2)' : passed === false ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#94A3B8'
+                          background: passed === true ? 'rgba(16, 185, 129, 0.12)' : passed === false ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+                          color: passed === true ? '#059669' : passed === false ? '#DC2626' : '#6B7280'
                         }}>
                           {passed === true ? 'PASS' : passed === false ? 'FAIL' : 'PENDING'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#34D399' : passed === false ? '#F87171' : '#F1F5F9' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 800, color: passed === true ? '#059669' : passed === false ? '#DC2626' : 'var(--text-main)' }}>
                           {val !== undefined ? `${(val * 100).toFixed(1)}%` : '---'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target: 100.0% (Exact Match)</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target: 100.0% (Exact Match)</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Ensures down payment schedules and monthly installments match exact financial Python tool computations.
                       </p>
                     </div>
@@ -2130,39 +2149,40 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <div className="glass-card" style={{
                 padding: '18px 24px',
                 borderRadius: '14px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-glass)',
+                boxShadow: 'var(--shadow-sm)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F1F5F9', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={16} color="#38BDF8" /> Pipeline Latency Distribution (Percentiles)
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} color="var(--accent-coral)" /> Pipeline Latency Distribution (Percentiles)
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Real-time measured across all suite queries</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Real-time measured across all suite queries</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P50 (Median)</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>P50 (Median)</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-coral)', fontFamily: 'monospace' }}>
                       {p50} ms
                     </div>
                   </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P90</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#818CF8', fontFamily: 'monospace' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>P90</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#6366F1', fontFamily: 'monospace' }}>
                       {p90} ms
                     </div>
                   </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P95</div>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>P95</div>
                     <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F59E0B', fontFamily: 'monospace' }}>
                       {p95} ms
                     </div>
                   </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>P99</div>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>P99</div>
                     <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#EC4899', fontFamily: 'monospace' }}>
                       {p99} ms
                     </div>
@@ -2175,18 +2195,19 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             <div className="glass-card" style={{
               padding: '24px',
               borderRadius: '16px',
-              background: 'rgba(15, 23, 42, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              boxShadow: 'var(--shadow-sm)',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Code2 size={18} color="#38BDF8" /> Suite Results &amp; Failure Inspector
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Code2 size={18} color="var(--accent-coral)" /> Suite Results &amp; Failure Inspector
                   </h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#94A3B8' }}>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     Detailed breakdown of benchmark suites and automated judge critiques for flagged test cases.
                   </p>
                 </div>
@@ -2210,9 +2231,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                         borderRadius: '6px',
                         fontSize: '0.72rem',
                         fontWeight: 600,
-                        border: 'none',
-                        background: evalFilterCategory === pill.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                        color: evalFilterCategory === pill.id ? '#38BDF8' : '#94A3B8',
+                        border: evalFilterCategory === pill.id ? '1px solid rgba(232, 101, 74, 0.4)' : '1px solid var(--border-glass)',
+                        background: evalFilterCategory === pill.id ? 'rgba(232, 101, 74, 0.12)' : 'var(--bg-main)',
+                        color: evalFilterCategory === pill.id ? 'var(--accent-coral)' : 'var(--text-muted)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
                       }}
@@ -2234,17 +2255,17 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       <div key={suiteKey} style={{
                         padding: '12px 14px',
                         borderRadius: '10px',
-                        background: 'rgba(0,0,0,0.25)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)'
+                        background: 'var(--bg-main)',
+                        border: '1px solid var(--border-glass)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#CBD5E1', textTransform: 'capitalize' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-main)', textTransform: 'capitalize' }}>
                             {suiteKey.replace(/_/g, ' ')}
                           </span>
                           <span style={{
                             fontSize: '0.72rem',
                             fontWeight: 700,
-                            color: passPct >= 95 ? '#34D399' : '#F87171'
+                            color: passPct >= 95 ? '#059669' : '#DC2626'
                           }}>
                             {passPct}%
                           </span>
@@ -2252,17 +2273,17 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                         <div style={{
                           height: '5px',
                           borderRadius: '3px',
-                          background: 'rgba(255, 255, 255, 0.08)',
+                          background: 'rgba(0, 0, 0, 0.06)',
                           overflow: 'hidden',
                           marginBottom: '6px'
                         }}>
                           <div style={{
                             height: '100%',
                             width: `${passPct}%`,
-                            background: passPct >= 95 ? '#34D399' : '#F87171'
+                            background: passPct >= 95 ? '#10B981' : '#EF4444'
                           }} />
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748B' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                           {passed} of {total} passed
                         </div>
                       </div>
@@ -2283,19 +2304,19 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       padding: '24px',
                       borderRadius: '12px',
                       background: 'rgba(16, 185, 129, 0.08)',
-                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
                       textAlign: 'center',
-                      color: '#34D399',
+                      color: '#059669',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       gap: '8px'
                     }}>
-                      <CheckCircle2 size={28} color="#34D399" />
+                      <CheckCircle2 size={28} color="#059669" />
                       <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
                         Zero Regressions Detected
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '500px' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '500px' }}>
                         All evaluated prompt tests satisfied their deterministic oracle conditions and factual entailment thresholds.
                       </div>
                     </div>
@@ -2304,7 +2325,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#F87171', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <AlertCircle size={15} />
                       Flagged Test Cases Requiring Inspection ({filteredFailures.length}):
                     </div>
@@ -2316,8 +2337,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                           key={failure.test_id || idx}
                           style={{
                             borderRadius: '10px',
-                            background: 'rgba(239, 68, 68, 0.06)',
-                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            background: 'rgba(239, 68, 68, 0.04)',
+                            border: '1px solid rgba(239, 68, 68, 0.18)',
                             padding: '12px 16px',
                             display: 'flex',
                             flexDirection: 'column',
@@ -2337,28 +2358,28 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                               <span style={{
                                 padding: '2px 6px',
                                 borderRadius: '4px',
-                                background: 'rgba(239, 68, 68, 0.2)',
-                                color: '#F87171',
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                color: '#DC2626',
                                 fontSize: '0.68rem',
                                 fontWeight: 700
                               }}>
                                 FAIL
                               </span>
-                              <span style={{ fontSize: '0.74rem', color: '#A5B4FC', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.74rem', color: '#6366F1', fontWeight: 600 }}>
                                 [{failure.suite}]
                               </span>
-                              <span style={{ fontSize: '0.78rem', color: '#E2E8F0', fontWeight: 700 }}>
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 700 }}>
                                 {failure.test_id}
                               </span>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               {failure.latency_ms && (
-                                <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                   {failure.latency_ms}ms
                                 </span>
                               )}
-                              <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                                 {isExpanded ? '▲ Less' : '▼ Details'}
                               </span>
                             </div>
@@ -2367,12 +2388,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                           {/* Query snippet */}
                           <div style={{
                             fontSize: '0.78rem',
-                            color: '#CBD5E1',
-                            background: 'rgba(0,0,0,0.25)',
+                            color: 'var(--text-main)',
+                            background: 'var(--bg-main)',
+                            border: '1px solid var(--border-glass)',
                             padding: '6px 10px',
                             borderRadius: '6px'
                           }}>
-                            <span style={{ color: '#64748B', fontWeight: 600 }}>QUERY:</span> {failure.query}
+                            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>QUERY:</span> {failure.query}
                           </div>
 
                           {/* Expanded details */}
@@ -2385,15 +2407,15 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                               fontSize: '0.76rem'
                             }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <div style={{ padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)' }}>
-                                  <div style={{ color: '#34D399', fontWeight: 700, marginBottom: '4px' }}>EXPECTED:</div>
-                                  <div style={{ color: '#E2E8F0', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                <div style={{ padding: '8px', borderRadius: '6px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                                  <div style={{ color: '#059669', fontWeight: 700, marginBottom: '4px' }}>EXPECTED:</div>
+                                  <div style={{ color: 'var(--text-main)', wordBreak: 'break-word', fontFamily: 'monospace' }}>
                                     {typeof failure.expected === 'object' ? JSON.stringify(failure.expected, null, 2) : String(failure.expected)}
                                   </div>
                                 </div>
-                                <div style={{ padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)' }}>
-                                  <div style={{ color: '#F87171', fontWeight: 700, marginBottom: '4px' }}>ACTUAL:</div>
-                                  <div style={{ color: '#E2E8F0', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                <div style={{ padding: '8px', borderRadius: '6px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                                  <div style={{ color: '#DC2626', fontWeight: 700, marginBottom: '4px' }}>ACTUAL:</div>
+                                  <div style={{ color: 'var(--text-main)', wordBreak: 'break-word', fontFamily: 'monospace' }}>
                                     {typeof failure.actual === 'object' ? JSON.stringify(failure.actual, null, 2) : String(failure.actual)}
                                   </div>
                                 </div>
@@ -2403,11 +2425,11 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                                 <div style={{
                                   padding: '8px 10px',
                                   borderRadius: '6px',
-                                  background: 'rgba(239, 68, 68, 0.12)',
+                                  background: 'rgba(239, 68, 68, 0.08)',
                                   border: '1px solid rgba(239, 68, 68, 0.25)',
-                                  color: '#FCA5A5'
+                                  color: '#DC2626'
                                 }}>
-                                  <strong style={{ color: '#F87171' }}>Judge Critique:</strong> {failure.critique}
+                                  <strong style={{ color: '#DC2626' }}>Judge Critique:</strong> {failure.critique}
                                 </div>
                               )}
                             </div>
@@ -2430,26 +2452,35 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           
           {/* Left: Request Builder */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="glass-card" style={{
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileCode size={18} color="#38BDF8" /> Request Constructor
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileCode size={18} color="var(--accent-coral)" /> Request Constructor
               </h3>
-              <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Headers: X-Automation-Secret &amp; Bearer JWT</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Headers: X-Automation-Secret &amp; Bearer JWT</span>
             </div>
 
             {/* Endpoint Selector */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Select API Route
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <span style={{
                   padding: '10px 14px',
                   borderRadius: '8px',
-                  background: httpMethod === 'POST' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                  border: httpMethod === 'POST' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(59, 130, 246, 0.4)',
-                  color: httpMethod === 'POST' ? '#34D399' : '#60A5FA',
+                  background: httpMethod === 'POST' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                  border: httpMethod === 'POST' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                  color: httpMethod === 'POST' ? '#059669' : '#2563EB',
                   fontWeight: 800,
                   fontSize: '0.8rem'
                 }}>
@@ -2462,9 +2493,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     flex: 1,
                     padding: '10px 14px',
                     borderRadius: '8px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
+                    background: 'var(--bg-main)',
+                    border: '1px solid var(--border-glass)',
+                    color: 'var(--text-main)',
                     fontSize: '0.85rem',
                     outline: 'none',
                     cursor: 'pointer'
@@ -2482,7 +2513,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
             {/* Request Body Editor */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Request Body (JSON)
               </label>
               <textarea
@@ -2494,8 +2525,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   flex: 1,
                   padding: '14px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.9)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  background: '#1E293B',
+                  border: '1px solid var(--border-glass)',
                   color: '#38BDF8',
                   fontFamily: 'monospace',
                   fontSize: '0.82rem',
@@ -2513,7 +2544,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               style={{
                 padding: '12px 20px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #0EA5E9, #2563EB)',
+                background: 'linear-gradient(135deg, var(--accent-coral) 0%, #D95338 100%)',
                 border: 'none',
                 color: '#FFFFFF',
                 fontWeight: 700,
@@ -2523,7 +2554,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 20px rgba(14, 165, 233, 0.4)'
+                boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)',
+                transition: 'all 0.2s ease'
               }}
             >
               {apiLoading ? (
@@ -2541,10 +2573,19 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           </div>
 
           {/* Right: Response Inspector */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="glass-card" style={{
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Code2 size={18} color="#34D399" /> Response Inspector
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Code2 size={18} color="#059669" /> Response Inspector
               </h3>
               
               {apiResponse && (
@@ -2553,8 +2594,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     <span style={{
                       padding: '4px 8px',
                       borderRadius: '6px',
-                      background: apiStatus === 200 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: apiStatus === 200 ? '#34D399' : '#F87171',
+                      background: apiStatus === 200 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: apiStatus === 200 ? '#059669' : '#DC2626',
                       fontSize: '0.75rem',
                       fontWeight: 700
                     }}>
@@ -2562,18 +2603,18 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     </span>
                   )}
                   {apiLatency && (
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                      Latency: <strong style={{ color: '#38BDF8' }}>{apiLatency}ms</strong>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Latency: <strong style={{ color: 'var(--accent-coral)' }}>{apiLatency}ms</strong>
                     </span>
                   )}
                   <button
                     onClick={() => copyToClipboard(apiResponse)}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-glass)',
                       borderRadius: '6px',
                       padding: '4px 8px',
-                      color: '#FFFFFF',
+                      color: 'var(--text-main)',
                       fontSize: '0.75rem',
                       cursor: 'pointer',
                       display: 'flex',
@@ -2581,7 +2622,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       gap: '4px'
                     }}
                   >
-                    {copiedResponse ? <Check size={14} color="#34D399" /> : <Copy size={14} />}
+                    {copiedResponse ? <Check size={14} color="#059669" /> : <Copy size={14} />}
                     <span>{copiedResponse ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
@@ -2593,13 +2634,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               minHeight: '300px',
               padding: '16px',
               borderRadius: '8px',
-              background: 'rgba(11, 15, 25, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: '#0F172A',
+              border: '1px solid var(--border-glass)',
               overflowY: 'auto'
             }}>
               {apiLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', color: '#94A3B8' }}>
-                  <RefreshCw size={24} className="spin-anim" color="#38BDF8" />
+                  <RefreshCw size={24} className="spin-anim" color="var(--accent-coral)" />
                   <span style={{ fontSize: '0.85rem' }}>Awaiting response from FastAPI supervisor graph...</span>
                 </div>
               ) : apiResponse ? (
@@ -2614,7 +2655,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   {JSON.stringify(apiResponse, null, 2)}
                 </pre>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '8px' }}>
                   <Terminal size={32} />
                   <span style={{ fontSize: '0.85rem' }}>Select an endpoint and hit "Send API Request" to view live response output.</span>
                 </div>
@@ -2629,13 +2670,22 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px' }}>
           
           {/* Left: Webhook Config */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Radio size={18} color="#38BDF8" /> Inbound Webhook Dispatcher
+          <div className="glass-card" style={{
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Radio size={18} color="var(--accent-coral)" /> Inbound Webhook Dispatcher
             </h3>
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Channel Source
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -2646,9 +2696,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     style={{
                       padding: '8px',
                       borderRadius: '8px',
-                      border: webhookChannel === ch ? '1px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
-                      background: webhookChannel === ch ? 'rgba(14, 165, 233, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                      color: webhookChannel === ch ? '#38BDF8' : '#94A3B8',
+                      border: webhookChannel === ch ? '1px solid rgba(232, 101, 74, 0.4)' : '1px solid var(--border-glass)',
+                      background: webhookChannel === ch ? 'rgba(232, 101, 74, 0.12)' : 'var(--bg-main)',
+                      color: webhookChannel === ch ? 'var(--accent-coral)' : 'var(--text-muted)',
                       fontWeight: 700,
                       fontSize: '0.8rem',
                       cursor: 'pointer',
@@ -2662,7 +2712,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Simulated Lead Name
               </label>
               <input
@@ -2673,9 +2723,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.85rem',
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -2684,7 +2734,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Target Project Context
               </label>
               <input
@@ -2695,9 +2745,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.85rem',
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -2706,7 +2756,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 Inbound Message Payload
               </label>
               <textarea
@@ -2717,9 +2767,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '8px',
-                  background: 'rgba(11, 15, 25, 0.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.85rem',
                   outline: 'none',
                   resize: 'vertical',
@@ -2744,7 +2794,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.4)'
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
               }}
             >
               {webhookLoading ? <RefreshCw size={16} className="spin-anim" /> : <Play size={16} />}
@@ -2753,40 +2803,49 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           </div>
 
           {/* Right: Trace & Intent Analysis */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={18} color="#FBBF24" /> Pipeline Diagnostic Trace
+          <div className="glass-card" style={{
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={18} color="#F59E0B" /> Pipeline Diagnostic Trace
             </h3>
 
             {webhookTrace ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Intent & Agent Badge */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Detected Intent</span>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38BDF8', marginTop: '2px' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Detected Intent</span>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-coral)', marginTop: '2px' }}>
                       {webhookTrace.diagnostic_trace?.detected_intent}
                     </div>
                   </div>
 
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Routed Agent</span>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#C084FC', marginTop: '2px' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Routed Agent</span>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#8B5CF6', marginTop: '2px' }}>
                       {webhookTrace.diagnostic_trace?.routed_agent}
                     </div>
                   </div>
 
-                  <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Latency</span>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
+                  <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Latency</span>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                       {webhookTrace.diagnostic_trace?.execution_latency_ms}ms
                     </div>
                   </div>
                 </div>
 
                 {/* Supervisor Guard Decisions */}
-                <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(11, 15, 25, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', display: 'block', marginBottom: '8px' }}>
+                <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
                     Supervisor Execution Steps:
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -2794,9 +2853,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       <span key={idx} style={{
                         padding: '4px 10px',
                         borderRadius: '6px',
-                        background: 'rgba(16, 185, 129, 0.15)',
+                        background: 'rgba(16, 185, 129, 0.12)',
                         border: '1px solid rgba(16, 185, 129, 0.3)',
-                        color: '#34D399',
+                        color: '#059669',
                         fontSize: '0.75rem',
                         fontWeight: 600
                       }}>
@@ -2807,17 +2866,17 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 </div>
 
                 {/* AI Generated Reply */}
-                <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8', display: 'block', marginBottom: '6px' }}>
+                <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(232, 101, 74, 0.06)', border: '1px solid rgba(232, 101, 74, 0.25)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-coral)', display: 'block', marginBottom: '6px' }}>
                     Generated Agent Reply:
                   </span>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#FFFFFF', lineHeight: 1.5 }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
                     "{webhookTrace.diagnostic_trace?.ai_generated_reply}"
                   </p>
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', color: '#64748B', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', color: 'var(--text-muted)', gap: '8px' }}>
                 <Radio size={32} />
                 <span style={{ fontSize: '0.85rem' }}>Configure webhook options on the left and click "Dispatch Webhook Event".</span>
               </div>
@@ -2831,14 +2890,23 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Query & Parameter Card */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Database size={18} color="#38BDF8" /> Pinecone Vector Search Diagnostic Benchmark
+          <div className="glass-card" style={{
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Database size={18} color="var(--accent-coral)" /> Pinecone Vector Search Diagnostic Benchmark
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '16px', alignItems: 'flex-end' }}>
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                   Semantic Search Query
                 </label>
                 <input
@@ -2850,9 +2918,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: '8px',
-                    background: 'rgba(11, 15, 25, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
+                    background: 'var(--bg-main)',
+                    border: '1px solid var(--border-glass)',
+                    color: 'var(--text-main)',
                     fontSize: '0.85rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -2861,8 +2929,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
-                  Top-K Chunks: <strong style={{ color: '#38BDF8' }}>{ragTopK}</strong>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                  Top-K Chunks: <strong style={{ color: 'var(--accent-coral)' }}>{ragTopK}</strong>
                 </label>
                 <input
                   type="range"
@@ -2870,13 +2938,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   max="10"
                   value={ragTopK}
                   onChange={(e) => setRagTopK(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#38BDF8', cursor: 'pointer' }}
+                  style={{ width: '100%', accentColor: 'var(--accent-coral)', cursor: 'pointer' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '6px', display: 'block' }}>
-                  Score Threshold: <strong style={{ color: '#38BDF8' }}>{ragThreshold}</strong>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                  Score Threshold: <strong style={{ color: 'var(--accent-coral)' }}>{ragThreshold}</strong>
                 </label>
                 <input
                   type="range"
@@ -2885,7 +2953,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   step="0.05"
                   value={ragThreshold}
                   onChange={(e) => setRagThreshold(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#38BDF8', cursor: 'pointer' }}
+                  style={{ width: '100%', accentColor: 'var(--accent-coral)', cursor: 'pointer' }}
                 />
               </div>
 
@@ -2895,7 +2963,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 style={{
                   padding: '10px 20px',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #0EA5E9, #6366F1)',
+                  background: 'linear-gradient(135deg, var(--accent-coral) 0%, #D95338 100%)',
                   border: 'none',
                   color: '#FFFFFF',
                   fontWeight: 700,
@@ -2904,7 +2972,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  height: '42px'
+                  height: '42px',
+                  boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)',
+                  transition: 'all 0.2s ease'
                 }}
               >
                 {ragLoading ? <RefreshCw size={16} className="spin-anim" /> : <Search size={16} />}
@@ -2915,21 +2985,30 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
           {/* Results Benchmark Visualizer */}
           {ragResults && (
-            <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="glass-card" style={{
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              borderRadius: '16px',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>
                   Matched Knowledge Chunks ({ragResults.matches_found})
                 </h4>
                 
                 {/* Latency Breakdown Badges */}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', fontSize: '0.75rem', fontWeight: 600 }}>
                     Embedding: {ragResults.latency_breakdown?.embedding_generation_ms}ms
                   </span>
-                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontSize: '0.75rem', fontWeight: 600 }}>
                     Pinecone Vector Search: {ragResults.latency_breakdown?.pinecone_vector_search_ms}ms
                   </span>
-                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(139, 92, 246, 0.15)', color: '#C084FC', fontSize: '0.75rem', fontWeight: 700 }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(232, 101, 74, 0.12)', color: 'var(--accent-coral)', fontSize: '0.75rem', fontWeight: 700 }}>
                     Total: {ragResults.latency_breakdown?.total_roundtrip_ms}ms
                   </span>
                 </div>
@@ -2941,18 +3020,18 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   <div key={idx} style={{
                     padding: '16px',
                     borderRadius: '10px',
-                    background: 'rgba(11, 15, 25, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: 'var(--bg-main)',
+                    border: '1px solid var(--border-glass)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)' }}>
                           📄 {chunk.document}
                         </span>
-                        <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.1)', color: '#94A3B8' }}>
+                        <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 0, 0, 0.05)', color: 'var(--text-muted)' }}>
                           {chunk.project}
                         </span>
                       </div>
@@ -2960,8 +3039,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       <span style={{
                         padding: '3px 8px',
                         borderRadius: '6px',
-                        background: chunk.cosine_similarity >= 0.85 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                        color: chunk.cosine_similarity >= 0.85 ? '#34D399' : '#FBBF24',
+                        background: chunk.cosine_similarity >= 0.85 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                        color: chunk.cosine_similarity >= 0.85 ? '#059669' : '#D97706',
                         fontWeight: 700,
                         fontSize: '0.75rem'
                       }}>
@@ -2969,7 +3048,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       </span>
                     </div>
 
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#D1D5DB', lineHeight: 1.5 }}>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
                       {chunk.snippet}
                     </p>
                   </div>
@@ -2987,9 +3066,10 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           {/* Database Sync Hero Action Banner */}
           <div className="glass-card" style={{
             padding: '24px',
-            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-glass)',
             borderRadius: '16px',
+            boxShadow: 'var(--shadow-sm)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -2999,11 +3079,11 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.4rem' }}>⚡</span>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   Supabase & Pinecone Vector Store Synchronizer
                 </h3>
               </div>
-              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#94A3B8' }}>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Ingests all workspace knowledge PDFs (6 files), generates 1024-dim multilingual embeddings, and syncs Pinecone index & Supabase storage.
               </p>
             </div>
@@ -3014,7 +3094,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               style={{
                 padding: '12px 24px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #0EA5E9, #6366F1)',
+                background: 'linear-gradient(135deg, var(--accent-coral) 0%, #D95338 100%)',
                 border: 'none',
                 color: '#FFFFFF',
                 fontWeight: 700,
@@ -3023,7 +3103,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                boxShadow: '0 4px 16px rgba(14, 165, 233, 0.35)',
+                boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)',
                 transition: 'all 0.2s ease'
               }}
             >
@@ -3036,20 +3116,20 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           {syncResult && (
             <div className="glass-card" style={{
               padding: '16px 20px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(52, 211, 153, 0.3)',
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
               borderRadius: '12px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <CheckCircle2 size={20} color="#34D399" />
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#34D399' }}>
+                <CheckCircle2 size={20} color="#059669" />
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#059669' }}>
                   {syncResult.message} ({syncResult.elapsed_ms}ms)
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: '#E2E8F0' }}>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)' }}>
                 <span>🌲 Pinecone Vectors: <strong>{syncResult.stats?.pinecone_upserted || 86}</strong></span>
                 <span>📂 PDFs Processed: <strong>{syncResult.stats?.pdf_files_processed || 6}</strong></span>
                 <span>☁️ Storage Uploads: <strong>{syncResult.stats?.supabase_storage_uploaded || 6}</strong></span>
@@ -3060,53 +3140,80 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
             
             {/* Supabase Postgres & Storage Card */}
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="glass-card" style={{
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              borderRadius: '14px',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Database size={16} color="#34D399" /> Supabase Database & Storage
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Database size={16} color="#059669" /> Supabase Database & Storage
                 </span>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontSize: '0.7rem', fontWeight: 700 }}>
+                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontSize: '0.7rem', fontWeight: 700 }}>
                   {systemHealth?.services?.supabase_postgres?.status || 'ONLINE'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>REST Ping Latency: <strong style={{ color: '#FFFFFF' }}>{systemHealth?.services?.supabase_postgres?.latency_ms || 14}ms</strong></div>
-                <div>Storage Buckets: <strong style={{ color: '#38BDF8' }}>brochures, floorplans, ocr-docs</strong></div>
-                <div>Pgvector Sync: <strong style={{ color: '#34D399' }}>Active (knowledge_chunks)</strong></div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>REST Ping Latency: <strong style={{ color: 'var(--text-main)' }}>{systemHealth?.services?.supabase_postgres?.latency_ms || 14}ms</strong></div>
+                <div>Storage Buckets: <strong style={{ color: 'var(--accent-coral)' }}>brochures, floorplans, ocr-docs</strong></div>
+                <div>Pgvector Sync: <strong style={{ color: '#059669' }}>Active (knowledge_chunks)</strong></div>
               </div>
             </div>
 
             {/* Pinecone Vector Store */}
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="glass-card" style={{
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              borderRadius: '14px',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Zap size={16} color="#38BDF8" /> Pinecone Vector Database
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap size={16} color="var(--accent-coral)" /> Pinecone Vector Database
                 </span>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(14, 165, 233, 0.2)', color: '#38BDF8', fontSize: '0.7rem', fontWeight: 700 }}>
+                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(232, 101, 74, 0.12)', color: 'var(--accent-coral)', fontSize: '0.7rem', fontWeight: 700 }}>
                   {systemHealth?.services?.pinecone_vector?.status || 'HEALTHY'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>Index Name: <strong style={{ color: '#FFFFFF' }}>{systemHealth?.services?.pinecone_vector?.index_name || 'real-state-automation'}</strong></div>
-                <div>Total Indexed Vectors: <strong style={{ color: '#38BDF8' }}>{systemHealth?.services?.pinecone_vector?.total_vector_count || 86} Live Vectors</strong></div>
-                <div>Dimensions & Metric: <strong style={{ color: '#C084FC' }}>1024 / Cosine</strong></div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>Index Name: <strong style={{ color: 'var(--text-main)' }}>{systemHealth?.services?.pinecone_vector?.index_name || 'real-state-automation'}</strong></div>
+                <div>Total Indexed Vectors: <strong style={{ color: 'var(--accent-coral)' }}>{systemHealth?.services?.pinecone_vector?.total_vector_count || 86} Live Vectors</strong></div>
+                <div>Dimensions & Metric: <strong style={{ color: '#8B5CF6' }}>1024 / Cosine</strong></div>
               </div>
             </div>
 
             {/* n8n Automation Engine */}
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="glass-card" style={{
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              borderRadius: '14px',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Activity size={16} color="#C084FC" /> n8n Telemetry Engine
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={16} color="#8B5CF6" /> n8n Telemetry Engine
                 </span>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(192, 132, 252, 0.2)', color: '#C084FC', fontSize: '0.7rem', fontWeight: 700 }}>
+                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(139, 92, 246, 0.12)', color: '#8B5CF6', fontSize: '0.7rem', fontWeight: 700 }}>
                   {systemHealth?.services?.n8n_telemetry_engine?.status || 'CONNECTED'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>Monitored Workflows: <strong style={{ color: '#FFFFFF' }}>6 Active</strong></div>
-                <div>Monitored Nodes: <strong style={{ color: '#FFFFFF' }}>20 Nodes</strong></div>
-                <div>Avg Execution Latency: <strong style={{ color: '#FFFFFF' }}>148ms</strong></div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>Monitored Workflows: <strong style={{ color: 'var(--text-main)' }}>6 Active</strong></div>
+                <div>Monitored Nodes: <strong style={{ color: 'var(--text-main)' }}>20 Nodes</strong></div>
+                <div>Avg Execution Latency: <strong style={{ color: 'var(--text-main)' }}>148ms</strong></div>
               </div>
             </div>
           </div>
@@ -3115,20 +3222,29 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
 
       {/* ── TAB 5: LIVE LOGS STREAM ── */}
       {activeTab === 'logs' && (
-        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="glass-card" style={{
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-glass)',
+          borderRadius: '16px',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Terminal size={16} color="#38BDF8" /> Real-time System Terminal
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Terminal size={16} color="var(--accent-coral)" /> Real-time System Terminal
               </span>
 
               <span style={{
                 fontSize: '0.72rem',
                 padding: '3px 10px',
                 borderRadius: '20px',
-                background: sseConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                border: sseConnected ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
-                color: sseConnected ? '#34D399' : '#FBBF24',
+                background: sseConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                border: sseConnected ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                color: sseConnected ? '#059669' : '#D97706',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
@@ -3152,9 +3268,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                     style={{
                       padding: '3px 8px',
                       borderRadius: '6px',
-                      border: logFilter === lvl ? '1px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
-                      background: logFilter === lvl ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                      color: logFilter === lvl ? '#38BDF8' : '#94A3B8',
+                      border: logFilter === lvl ? '1px solid rgba(232, 101, 74, 0.4)' : '1px solid var(--border-glass)',
+                      background: logFilter === lvl ? 'rgba(232, 101, 74, 0.12)' : 'var(--bg-main)',
+                      color: logFilter === lvl ? 'var(--accent-coral)' : 'var(--text-muted)',
                       fontSize: '0.7rem',
                       fontWeight: 600,
                       cursor: 'pointer'
@@ -3175,9 +3291,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 style={{
                   padding: '5px 10px',
                   borderRadius: '6px',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.75rem',
                   outline: 'none',
                   width: '160px'
@@ -3188,9 +3304,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 style={{
                   padding: '5px 10px',
                   borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-glass)',
+                  color: 'var(--text-main)',
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -3207,9 +3323,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 style={{
                   padding: '5px 10px',
                   borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  color: '#F87171',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#DC2626',
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer'
@@ -3224,8 +3340,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             height: '420px',
             padding: '14px',
             borderRadius: '8px',
-            background: 'rgba(11, 15, 25, 0.95)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: '#0F172A',
+            border: '1px solid var(--border-glass)',
             overflowY: 'auto',
             fontFamily: 'monospace',
             fontSize: '0.78rem',
@@ -3248,7 +3364,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 const msgStr = log.message || log.msg || '';
 
                 return (
-                  <div key={log.id || idx} style={{ display: 'flex', gap: '10px', alignItems: 'baseline', borderBottom: '1px solid rgba(255, 255, 255, 0.03)', paddingBottom: '3px' }}>
+                  <div key={log.id || idx} style={{ display: 'flex', gap: '10px', alignItems: 'baseline', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '3px' }}>
                     <span style={{ color: '#64748B', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>[{timeStr}]</span>
                     <span style={{ color: levelColor, fontWeight: 700, minWidth: '46px' }}>[{log.level}]</span>
                     <span style={{ color: '#C084FC', fontWeight: 600, whiteSpace: 'nowrap' }}>{log.module}:</span>

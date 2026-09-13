@@ -13,6 +13,8 @@ import {
   Plus
 } from 'lucide-react';
 import { uploadKnowledgeDocument, searchKnowledge, getKnowledgeDocuments } from '../services/api';
+import { useToast } from '../components/ui/Toast';
+import Pagination from '../components/ui/Pagination';
 
 const INITIAL_DOCS = [
   { id: 1, filename: 'GLG_Gulshan_Heights_Brochure.pdf', project: 'GLG Gulshan Heights', docType: 'Brochure & Catalog', chunks: 14, status: 'Completed', access: 'Public Customer', ocr: 'Text Extracted' },
@@ -21,6 +23,7 @@ const INITIAL_DOCS = [
 ];
 
 export default function KnowledgePage() {
+  const { showToast } = useToast();
   const [docs, setDocs] = useState(INITIAL_DOCS);
   const [selectedFile, setSelectedFile] = useState(null);
   const [docType, setDocType] = useState('FAQ');
@@ -53,6 +56,24 @@ export default function KnowledgePage() {
     }
   };
 
+  // Pagination & Filtering State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [searchDocQuery, setSearchDocQuery] = useState('');
+
+  const filteredDocs = docs.filter(d => 
+    !searchDocQuery.trim() || 
+    d.filename.toLowerCase().includes(searchDocQuery.toLowerCase()) || 
+    (d.project && d.project.toLowerCase().includes(searchDocQuery.toLowerCase())) || 
+    (d.docType && d.docType.toLowerCase().includes(searchDocQuery.toLowerCase()))
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchDocQuery]);
+
+  const paginatedDocs = filteredDocs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   // Modals & Panels State
   const [activeModal, setActiveModal] = useState(null); // 'chunk', 'conflict', 'faq', 'simulator'
   
@@ -80,7 +101,7 @@ export default function KnowledgePage() {
       await fetchLiveDocs();
       setSelectedFile(null);
     } catch (err) {
-      alert(`Upload Failed: ${err.message}`);
+      showToast(`Upload Failed: ${err.message}`, 'error');
     } finally {
       setUploading(false);
     }
@@ -112,7 +133,7 @@ export default function KnowledgePage() {
       {/* Top Action Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Knowledge Base & PDF OCR Manager</h2>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Knowledge Base &amp; PDF OCR Manager</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             RAG Vector Store (pgvector) • 34 Chunks Indexed • PDF OCR Processing Active
           </p>
@@ -136,15 +157,15 @@ export default function KnowledgePage() {
         
         {/* Upload Form */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UploadCloud size={20} color="#8B5CF6" /> Document & PDF OCR Uploader
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+            <UploadCloud size={20} color="var(--primary-coral)" /> Document &amp; PDF OCR Uploader
           </h3>
 
           <form onSubmit={handleFileUpload} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                📁 Document Category & Type
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                📁 Document Category &amp; Type
               </label>
               <select
                 className="glass-input"
@@ -162,7 +183,7 @@ export default function KnowledgePage() {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 🔒 Access Control Privacy Tag
               </label>
               <select
@@ -178,12 +199,13 @@ export default function KnowledgePage() {
             </div>
 
             <div style={{
-              border: '2px dashed var(--border-glass-hover)',
+              border: '2px dashed var(--border-glass)',
               borderRadius: '12px',
               padding: '24px',
               textAlign: 'center',
               cursor: 'pointer',
-              background: 'rgba(15, 23, 42, 0.4)'
+              background: 'var(--bg-main)',
+              transition: 'all 0.2s ease'
             }}>
               <input
                 type="file"
@@ -193,11 +215,11 @@ export default function KnowledgePage() {
                 onChange={(e) => setSelectedFile(e.target.files[0])}
               />
               <label htmlFor="file-input" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <FileText size={32} color="#C084FC" />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                <FileText size={32} color="var(--primary-coral)" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
                   {selectedFile ? selectedFile.name : 'Click to Browse Knowledge Document (PDF, TXT, MD)'}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   Supports PDF, TXT, MD up to 25MB
                 </span>
               </label>
@@ -209,7 +231,7 @@ export default function KnowledgePage() {
           </form>
 
           {uploadSuccess && (
-            <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', color: '#34D399', fontSize: '0.8rem' }}>
+            <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', color: '#059669', fontSize: '0.8rem', fontWeight: 600 }}>
               ✓ PDF OCR Complete: {uploadSuccess.chunks_indexed} Chunks Indexed into pgvector!
             </div>
           )}
@@ -217,87 +239,135 @@ export default function KnowledgePage() {
 
         {/* Document Table */}
         <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Indexed RAG Knowledge Documents</h3>
-            <span className="badge badge-emerald">{docs.length} Active Files</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)' }}>Indexed RAG Knowledge Documents</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: 0 }}>
+                {filteredDocs.length} of {docs.length} active documents
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }} />
+                <input
+                  type="text"
+                  placeholder="Filter documents..."
+                  value={searchDocQuery}
+                  onChange={(e) => setSearchDocQuery(e.target.value)}
+                  className="glass-input"
+                  style={{
+                    padding: '5px 10px 5px 28px',
+                    fontSize: '0.8rem',
+                    borderRadius: '10px',
+                    width: '180px'
+                  }}
+                />
+              </div>
+              <span className="badge badge-emerald">{filteredDocs.length} Files</span>
+            </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-glass)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '10px' }}>Filename</th>
-                <th style={{ padding: '10px' }}>Project</th>
-                <th style={{ padding: '10px' }}>Category</th>
-                <th style={{ padding: '10px' }}>Chunks</th>
-                <th style={{ padding: '10px' }}>Access Tag</th>
-                <th style={{ padding: '10px' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {docs.map((doc) => (
-                <tr key={doc.id} style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                  <td style={{ padding: '12px 10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FileText size={16} color="#8B5CF6" /> {doc.filename}
-                  </td>
-                  <td style={{ padding: '10px' }}>{doc.project}</td>
-                  <td style={{ padding: '10px' }}>
-                    <span className="badge badge-sky" style={{ fontSize: '0.75rem' }}>
-                      {doc.docType || 'General Document'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <span className="badge badge-violet">{doc.chunks} vector chunks</span>
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <select
-                      className="glass-input"
-                      style={{ 
-                        fontSize: '0.75rem', 
-                        padding: '3px 8px', 
-                        borderRadius: '12px',
-                        background: doc.access === 'Public Customer' ? 'rgba(16, 185, 129, 0.2)' : doc.access === 'Internal Sales Only' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                        color: doc.access === 'Public Customer' ? '#34D399' : doc.access === 'Internal Sales Only' ? '#FBBF24' : '#F87171',
-                        border: '1px solid var(--border-glass)'
-                      }}
-                      value={doc.access}
-                      onChange={(e) => {
-                        const newAccess = e.target.value;
-                        setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, access: newAccess } : d));
-                      }}
-                    >
-                      <option value="Public Customer">🟢 Public Customer</option>
-                      <option value="Internal Sales Only">🟡 Internal Sales Only</option>
-                      <option value="Legal Agreement">🔴 Confidential Legal</option>
-                    </select>
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <button
-                      onClick={() => setActiveModal('chunk')}
-                      className="glass-card"
-                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <Edit3 size={12} /> Inspect Chunks
-                    </button>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-glass)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '10px' }}>Filename</th>
+                  <th style={{ padding: '10px' }}>Project</th>
+                  <th style={{ padding: '10px' }}>Category</th>
+                  <th style={{ padding: '10px' }}>Chunks</th>
+                  <th style={{ padding: '10px' }}>Access Tag</th>
+                  <th style={{ padding: '10px' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedDocs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '28px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No documents match your filter.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedDocs.map((doc) => (
+                    <tr key={doc.id} style={{ borderBottom: '1px solid var(--border-glass)' }}>
+                      <td style={{ padding: '12px 10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                        <FileText size={16} color="var(--primary-coral)" /> {doc.filename}
+                      </td>
+                      <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{doc.project}</td>
+                      <td style={{ padding: '10px' }}>
+                        <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
+                          {doc.docType || 'General Document'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <span className="badge badge-violet" style={{ fontSize: '0.72rem' }}>{doc.chunks} vector chunks</span>
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <select
+                          className="glass-input"
+                          style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '4px 8px', 
+                            borderRadius: '12px',
+                            background: doc.access === 'Public Customer' ? 'rgba(16, 185, 129, 0.1)' : doc.access === 'Internal Sales Only' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: doc.access === 'Public Customer' ? '#059669' : doc.access === 'Internal Sales Only' ? '#D97706' : '#DC2626',
+                            border: '1px solid var(--border-glass)',
+                            fontWeight: 600
+                          }}
+                          value={doc.access}
+                          onChange={(e) => {
+                            const newAccess = e.target.value;
+                            setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, access: newAccess } : d));
+                          }}
+                        >
+                          <option value="Public Customer">🟢 Public Customer</option>
+                          <option value="Internal Sales Only">🟡 Internal Sales Only</option>
+                          <option value="Legal Agreement">🔴 Confidential Legal</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <button
+                          onClick={() => setActiveModal('chunk')}
+                          className="glass-card"
+                          style={{ padding: '5px 10px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-main)', fontWeight: 500 }}
+                        >
+                          <Edit3 size={12} /> Inspect Chunks
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredDocs.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20]}
+            itemLabel="documents"
+          />
         </div>
 
       </div>
 
       {/* MODAL 1: INTERACTIVE CHUNK EDITOR & SYNONYM EXPANSION */}
       {activeModal === 'chunk' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-card" style={{ width: '600px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>✏️ Interactive Chunk Editor & Synonym Expansion</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '600px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>✏️ Interactive Chunk Editor &amp; Synonym Expansion</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Inspect and edit 500-word text chunk boundaries before updating pgvector embeddings.
             </p>
 
             <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Chunk Text (500 Words Max)</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Chunk Text (500 Words Max)</label>
               <textarea
                 className="glass-input"
                 rows={4}
@@ -308,7 +378,7 @@ export default function KnowledgePage() {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Real Estate Synonyms & Terms Mapping</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Real Estate Synonyms &amp; Terms Mapping</label>
               <input
                 type="text"
                 className="glass-input"
@@ -320,8 +390,8 @@ export default function KnowledgePage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
               <button className="glass-card" style={{ padding: '8px 16px', cursor: 'pointer' }} onClick={() => setActiveModal(null)}>Cancel</button>
-              <button className="btn-gradient" onClick={() => { alert("Chunk & Synonyms Re-indexed into pgvector!"); setActiveModal(null); }}>
-                Save & Re-Index Chunk
+              <button className="btn-gradient" onClick={() => { showToast("Chunk & Synonyms Re-indexed into pgvector!", "success"); setActiveModal(null); }}>
+                Save &amp; Re-Index Chunk
               </button>
             </div>
           </div>
@@ -330,23 +400,23 @@ export default function KnowledgePage() {
 
       {/* MODAL 2: KNOWLEDGE CONFLICT DETECTOR ALERT */}
       {activeModal === 'conflict' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-card" style={{ width: '580px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#F59E0B' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '580px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#D97706' }}>
               <AlertTriangle size={24} />
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFF' }}>⚠️ Knowledge Conflict & Outdated Price Detector</h3>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>⚠️ Knowledge Conflict &amp; Outdated Price Detector</h3>
             </div>
 
-            <div style={{ padding: '16px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', fontSize: '0.85rem', lineHeight: '1.5' }}>
+            <div style={{ padding: '16px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '10px', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-main)' }}>
               <strong>Conflict Alert Detected in Project "GLG Gulshan Heights":</strong>
-              <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
-                <li>Document 1 (`GLG_Gulshan_Heights_Brochure.pdf`): Lists 3 BHK price as <strong>৳95 Lakhs</strong>.</li>
-                <li>Document 3 (`GLG_Grand_Residency_Pricing_2026.pdf`): Reference note lists Gulshan Heights price as <strong>৳90 Lakhs</strong>.</li>
+              <ul style={{ marginTop: '8px', paddingLeft: '20px', color: 'var(--text-muted)' }}>
+                <li>Document 1 (`GLG_Gulshan_Heights_Brochure.pdf`): Lists 3 BHK price as <strong style={{ color: '#059669' }}>৳95 Lakhs</strong>.</li>
+                <li>Document 3 (`GLG_Grand_Residency_Pricing_2026.pdf`): Reference note lists Gulshan Heights price as <strong style={{ color: '#DC2626' }}>৳90 Lakhs</strong>.</li>
               </ul>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button className="btn-gradient" onClick={() => { alert("Document 3 outdated price superseded!"); setActiveModal(null); }}>
+              <button className="btn-gradient" onClick={() => { showToast("Conflict resolved: Document 1 canonical price retained and synchronized across agent graph.", "success"); setActiveModal(null); }}>
                 Resolve Conflict (Keep Document 1 Price)
               </button>
             </div>
@@ -356,27 +426,27 @@ export default function KnowledgePage() {
 
       {/* MODAL 3: 1-CLICK SYNTHETIC FAQ GENERATOR */}
       {activeModal === 'faq' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-card" style={{ width: '600px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>❓ 1-Click Synthetic FAQ & Q&A Generator</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '600px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>❓ 1-Click Synthetic FAQ &amp; Q&amp;A Generator</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Auto-generated buyer Q&A pairs extracted from `GLG_Gulshan_Heights_Brochure.pdf`:
+              Auto-generated buyer Q&amp;A pairs extracted from `GLG_Gulshan_Heights_Brochure.pdf`:
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto' }}>
-              <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                <strong>Q: What is the down payment required for GLG Gulshan Heights?</strong>
+              <div style={{ padding: '12px 14px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                <strong style={{ color: 'var(--text-main)' }}>Q: What is the down payment required for GLG Gulshan Heights?</strong>
                 <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>A: Booking requires 20% down payment, with remaining 80% payable over 36 monthly installments.</p>
               </div>
-              <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                <strong>Q: Is car parking included in the unit price?</strong>
+              <div style={{ padding: '12px 14px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                <strong style={{ color: 'var(--text-main)' }}>Q: Is car parking included in the unit price?</strong>
                 <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>A: Yes, one reserved basement parking slot is included with each 3 BHK unit.</p>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-              <button className="glass-card" style={{ padding: '8px 16px' }} onClick={() => setActiveModal(null)}>Close</button>
-              <button className="btn-gradient" onClick={() => { alert("25 Q&A Pairs Added to FAQAgent!"); setActiveModal(null); }}>
+              <button className="glass-card" style={{ padding: '8px 16px', cursor: 'pointer' }} onClick={() => setActiveModal(null)}>Close</button>
+              <button className="btn-gradient" onClick={() => { showToast("25 Q&A Pairs successfully populated into FAQAgent memory database.", "success"); setActiveModal(null); }}>
                 Populate FAQAgent Database
               </button>
             </div>
@@ -386,9 +456,9 @@ export default function KnowledgePage() {
 
       {/* MODAL 4: LIVE RAG SEARCH SIMULATOR */}
       {activeModal === 'simulator' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-card" style={{ width: '680px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>🧪 Live RAG Search Simulator & Retrieval Tester</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '680px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)', boxShadow: '0 20px 50px rgba(0,0,0,0.15)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>🧪 Live RAG Search Simulator &amp; Retrieval Tester</h3>
 
             <form onSubmit={handleRunSim} style={{ display: 'flex', gap: '12px' }}>
               <input
@@ -406,21 +476,21 @@ export default function KnowledgePage() {
 
             {simResults && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-                <span style={{ fontSize: '0.8rem', color: '#C084FC', fontWeight: 600 }}>Top Vector Search Results (pgvector cosine distance):</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--primary-coral)', fontWeight: 600 }}>Top Vector Search Results (pgvector cosine distance):</span>
                 {simResults.map((res, i) => (
-                  <div key={i} style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                  <div key={i} style={{ padding: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.85rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 600, color: '#34D399' }}>Match Similarity: {(res.score * 100).toFixed(1)}%</span>
+                      <span style={{ fontWeight: 600, color: '#059669' }}>Match Similarity: {(res.score * 100).toFixed(1)}%</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{res.doc}</span>
                     </div>
-                    <p style={{ color: 'var(--text-main)', lineHeight: '1.4' }}>"{res.content}"</p>
+                    <p style={{ color: 'var(--text-main)', lineHeight: '1.5', margin: 0 }}>"{res.content}"</p>
                   </div>
                 ))}
               </div>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-              <button className="glass-card" style={{ padding: '8px 16px' }} onClick={() => setActiveModal(null)}>Close Simulator</button>
+              <button className="glass-card" style={{ padding: '8px 16px', cursor: 'pointer' }} onClick={() => setActiveModal(null)}>Close Simulator</button>
             </div>
           </div>
         </div>

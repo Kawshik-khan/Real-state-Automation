@@ -9,7 +9,7 @@ from app.agents.email_agent import email_agent
 from app.api.v1.email.endpoints import incoming_email_webhook, list_threads, approve_draft, get_thread
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_email_attachment_parser():
     """Verify text extraction from plain text / PDF simulation."""
     text_content = attachment_parser.extract_text_from_attachment(
@@ -20,7 +20,7 @@ async def test_email_attachment_parser():
     assert "4 BHK" in text_content
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_incoming_email_ingestion_and_ai_draft():
     """Verify incoming email webhook ingests payload and triggers EmailAgent."""
     payload = IncomingEmailPayload(
@@ -48,7 +48,7 @@ async def test_incoming_email_ingestion_and_ai_draft():
     assert "Re: Pricing Inquiry" in res["ai_draft"]["subject"]
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_customer_reply_to_existing_thread():
     """Verify customer reply links to previous thread and maintains conversation context."""
     # First turn

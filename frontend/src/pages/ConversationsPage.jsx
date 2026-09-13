@@ -21,6 +21,7 @@ import {
   CheckCircle2, 
   AlertTriangle 
 } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   getConversations, 
   toggleTakeover, 
@@ -31,6 +32,7 @@ import {
   getConversationsStreamUrl,
   getWebSocketUrl 
 } from '../services/api';
+import Pagination from '../components/ui/Pagination';
 
 const INITIAL_CONVERSATIONS = [
   {
@@ -119,9 +121,24 @@ const INITIAL_CONVERSATIONS = [
 ];
 
 export default function ConversationsPage() {
+  const { convId } = useParams();
+  const navigate = useNavigate();
+
   const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
-  const [selectedId, setSelectedId] = useState(INITIAL_CONVERSATIONS[0].id);
+  const [selectedId, setSelectedId] = useState(() => convId || INITIAL_CONVERSATIONS[0].id);
   const [replyText, setReplyText] = useState('');
+
+  // Sync route param convId if present
+  useEffect(() => {
+    if (convId && convId !== selectedId) {
+      setSelectedId(convId);
+    }
+  }, [convId]);
+
+  const handleSelectConversation = (id) => {
+    setSelectedId(id);
+    navigate(`/conversations/${id}`, { replace: true });
+  };
   
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -345,9 +362,6 @@ export default function ConversationsPage() {
     setReplyText('');
 
     if (inputMode === 'customer') {
-      // ----------------------------------------------------
-      // Role: CUSTOMER (Simulate incoming message & run AI)
-      // ----------------------------------------------------
       // 1. Optimistic append user message
       const userMsg = { sender: 'user', text, time: 'Just now' };
       setConversations(prev => prev.map(c => {
@@ -388,9 +402,7 @@ export default function ConversationsPage() {
       }
 
     } else {
-      // ----------------------------------------------------
-      // Role: HUMAN SALES AGENT (Manual Takeover Reply)
-      // ----------------------------------------------------
+      // Role: HUMAN SALES AGENT
       const agentMsg = { sender: 'human_agent', text, time: 'Just now' };
       setConversations(prev => prev.map(c => {
         if (c.id === selectedId) {
@@ -411,10 +423,11 @@ export default function ConversationsPage() {
   // Quick Action Buttons
   const handleQuickAction = (type) => {
     if (type === 'brochure') {
-      const msg = "📄 Here is our official GLG Assets Property Catalog & Brochure: https://glgassets.bd/brochure.pdf";
+      const activeProjectName = currentConv?.projectName || 'GLG Gulshan Heights';
+      const msg = `📄 Here is our official GLG Assets Property Catalog & Brochure for ${activeProjectName}: https://fdjzbtkypedzlkwpzzzt.supabase.co/storage/v1/object/public/brochures/gulshan_heights_brochure.pdf`;
       setReplyText(msg);
     } else if (type === 'visit') {
-      const msg = "📅 You can confirm your VIP site visit booking online here: https://glgassets.bd/book-visit";
+      const msg = `📅 You can confirm your VIP site visit booking online here: ${window.location.origin}/#book-visit or reply with your preferred date and time to schedule directly.`;
       setReplyText(msg);
     }
   };
@@ -462,13 +475,10 @@ export default function ConversationsPage() {
 
   // Search & Filtered Conversations
   const filteredConversations = conversations.filter(c => {
-    // Channel filter
     if (channelFilter !== 'all' && c.channel !== channelFilter) return false;
-    // Status filter
     if (statusFilter === 'active' && c.aiPaused) return false;
     if (statusFilter === 'takeover' && !c.aiPaused) return false;
     if (statusFilter === 'escalated' && c.status !== 'escalated') return false;
-    // Search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       const matchName = c.name?.toLowerCase().includes(query);
@@ -479,25 +489,36 @@ export default function ConversationsPage() {
     return true;
   });
 
+  const [convPage, setConvPage] = useState(1);
+  const convPageSize = 8;
+
+  useEffect(() => {
+    setConvPage(1);
+  }, [searchQuery, channelFilter, statusFilter]);
+
+  const paginatedConversations = filteredConversations.slice(
+    (convPage - 1) * convPageSize,
+    convPage * convPageSize
+  );
+
   return (
-    <div style={{ height: 'calc(100vh - 70px)', display: 'flex', position: 'relative' }}>
+    <div className="chat-page-container">
       
       {/* Toast Notification Alert Overlay */}
       {activeToast && (
         <div style={{
           position: 'absolute',
-          top: '16px',
-          right: '24px',
+          top: '20px',
+          right: '28px',
           zIndex: 1000,
-          background: activeToast.type === 'escalation' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          background: activeToast.type === 'escalation' ? '#DC2626' : '#059669',
           color: '#FFFFFF',
           padding: '12px 18px',
-          borderRadius: '12px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          backdropFilter: 'blur(8px)',
           maxWidth: '420px'
         }}>
           <Bell size={20} />
@@ -511,36 +532,38 @@ export default function ConversationsPage() {
         </div>
       )}
 
-      {/* Sidebar: Conversation List */}
-      <div style={{
-        width: '360px',
-        borderRight: '1px solid var(--border-glass)',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-card)'
-      }}>
-        {/* Search, Actions & Status */}
-        <div style={{ padding: '16px', borderBottom: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Left Floating Card: Inquiries List & Filters */}
+      <div className="chat-floating-card" style={{ width: '380px', flexShrink: 0 }}>
+        {/* Search, Actions & Status Header */}
+        <div style={{ padding: '16px 16px 12px 16px', borderBottom: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MessageSquare size={18} color="var(--primary)" /> Live Inquiries
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', margin: 0 }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '10px',
+                background: 'rgba(232, 101, 74, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <MessageSquare size={16} color="var(--primary-coral)" />
+              </div>
+              <span>Live Inquiries</span>
+              <span className="badge badge-coral" style={{ borderRadius: '999px', fontSize: '0.68rem', padding: '1px 8px' }}>
+                {filteredConversations.length}
+              </span>
             </h2>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 onClick={() => setShowNewLeadModal(true)}
                 title="Simulate New Incoming Lead"
+                className="btn-gradient"
                 style={{
-                  background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-                  border: 'none',
-                  color: '#FFF',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
+                  padding: '5px 12px',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
+                  borderRadius: '12px',
                   gap: '4px'
                 }}
               >
@@ -550,17 +573,26 @@ export default function ConversationsPage() {
           </div>
 
           {/* SSE Live Connection Badge */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '6px' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.72rem',
+            background: 'var(--bg-main)',
+            border: '1px solid var(--border-glass)',
+            padding: '6px 12px',
+            borderRadius: '12px'
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Radio size={12} color={sseConnected ? '#10B981' : '#F59E0B'} />
-              <span style={{ color: sseConnected ? '#34D399' : '#FBBF24', fontWeight: 600 }}>
+              <span className={sseConnected ? 'text-emerald-themed' : 'text-amber-themed'} style={{ fontWeight: 600 }}>
                 {sseConnected ? 'SSE Stream Live' : 'Connecting SSE...'}
               </span>
             </div>
             <button 
               onClick={loadConversations}
               title="Refresh list"
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             >
               <RefreshCw size={12} />
             </button>
@@ -574,15 +606,13 @@ export default function ConversationsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search buyer name, phone, text..." 
+              className="glass-input"
               style={{
                 width: '100%',
                 padding: '8px 12px 8px 34px',
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid var(--border-glass)',
-                borderRadius: '8px',
-                color: 'var(--text-light)',
                 fontSize: '0.82rem',
-                outline: 'none'
+                borderRadius: '12px',
+                background: 'var(--bg-input)'
               }}
             />
             {searchQuery && (
@@ -594,22 +624,24 @@ export default function ConversationsPage() {
             )}
           </div>
 
-          {/* Channel Filters */}
-          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
+          {/* Channel Filters (Smooth Rounded Pills) */}
+          <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
             {['all', 'email', 'whatsapp', 'telegram', 'facebook', 'instagram', 'website'].map(ch => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
                 style={{
-                  padding: '3px 7px',
-                  borderRadius: '6px',
-                  border: 'none',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  border: channelFilter === ch ? '1px solid var(--primary-coral)' : '1px solid var(--border-glass)',
                   fontSize: '0.68rem',
                   textTransform: 'capitalize',
                   cursor: 'pointer',
-                  background: channelFilter === ch ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
-                  color: channelFilter === ch ? '#FFF' : 'var(--text-muted)',
-                  whiteSpace: 'nowrap'
+                  background: channelFilter === ch ? 'var(--primary-coral)' : 'var(--bg-main)',
+                  color: channelFilter === ch ? '#FFFFFF' : 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease'
                 }}
               >
                 {ch === 'email' ? '✉️ Email' : ch}
@@ -617,10 +649,10 @@ export default function ConversationsPage() {
             ))}
           </div>
 
-          {/* Status Filters */}
-          <div style={{ display: 'flex', gap: '4px' }}>
+          {/* Status Filters (Segmented Pill Buttons) */}
+          <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-main)', padding: '3px', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
             {[
-              { id: 'all', label: 'All Status' },
+              { id: 'all', label: 'All' },
               { id: 'active', label: '🤖 AI Live' },
               { id: 'takeover', label: '👨‍💼 Takeover' },
               { id: 'escalated', label: '⚠️ Escalated' }
@@ -630,13 +662,16 @@ export default function ConversationsPage() {
                 onClick={() => setStatusFilter(st.id)}
                 style={{
                   flex: 1,
-                  padding: '3px 4px',
-                  borderRadius: '6px',
+                  padding: '5px 4px',
+                  borderRadius: '9px',
                   border: 'none',
                   fontSize: '0.65rem',
+                  fontWeight: 600,
                   cursor: 'pointer',
-                  background: statusFilter === st.id ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.2)',
-                  color: statusFilter === st.id ? '#FFF' : 'var(--text-muted)'
+                  background: statusFilter === st.id ? 'var(--primary-coral)' : 'transparent',
+                  color: statusFilter === st.id ? '#FFFFFF' : 'var(--text-muted)',
+                  boxShadow: statusFilter === st.id ? '0 2px 6px rgba(232, 101, 74, 0.25)' : 'none',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 {st.label}
@@ -645,52 +680,83 @@ export default function ConversationsPage() {
           </div>
         </div>
 
-        {/* List of Conversations */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* List of Conversations (Individual Rounded Cards) */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filteredConversations.length === 0 ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
               No matching live conversations found.
             </div>
           ) : (
-            filteredConversations.map(conv => {
+            paginatedConversations.map(conv => {
               const isSelected = conv.id === selectedId;
+              const initials = conv.name
+                ? conv.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                : 'U';
               return (
                 <div
                   key={conv.id}
-                  onClick={() => setSelectedId(conv.id)}
-                  style={{
-                    padding: '14px 16px',
-                    borderBottom: '1px solid var(--border-glass)',
-                    background: isSelected ? 'rgba(139, 92, 246, 0.14)' : 'transparent',
-                    borderLeft: isSelected ? '3px solid var(--primary)' : '3px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
+                  onClick={() => handleSelectConversation(conv.id)}
+                  className={`chat-inquiry-card ${isSelected ? 'selected' : ''}`}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{conv.name}</span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{conv.time}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: isSelected ? 'var(--grad-coral)' : 'rgba(232, 101, 74, 0.15)',
+                        color: isSelected ? '#FFFFFF' : 'var(--primary-coral)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}>
+                        {initials}
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {conv.name}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.66rem',
+                      color: 'var(--text-dim)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      padding: '2px 7px',
+                      borderRadius: '8px',
+                      flexShrink: 0
+                    }}>
+                      {conv.time}
+                    </span>
                   </div>
 
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{
+                    fontSize: '0.78rem',
+                    color: 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    lineHeight: 1.3
+                  }}>
                     {conv.lastMessage}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className={`badge badge-${conv.channel === 'whatsapp' ? 'emerald' : conv.channel === 'telegram' ? 'cyan' : conv.channel === 'facebook' ? 'blue' : 'violet'}`} style={{ fontSize: '0.62rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                    <span className={`badge badge-${conv.channel === 'whatsapp' ? 'emerald' : conv.channel === 'telegram' ? 'cyan' : conv.channel === 'facebook' ? 'blue' : 'violet'}`} style={{ fontSize: '0.62rem', borderRadius: '999px', padding: '2px 8px' }}>
                       {conv.channel}
                     </span>
 
                     {conv.aiPaused ? (
-                      <span className="badge badge-amber" style={{ fontSize: '0.62rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span className="badge badge-amber" style={{ fontSize: '0.62rem', borderRadius: '999px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <UserCheck size={10} /> Human Takeover
                       </span>
                     ) : conv.status === 'escalated' ? (
-                      <span className="badge badge-rose" style={{ fontSize: '0.62rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span className="badge badge-rose" style={{ fontSize: '0.62rem', borderRadius: '999px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <ShieldAlert size={10} /> Escalated
                       </span>
                     ) : (
-                      <span className="badge badge-cyan" style={{ fontSize: '0.62rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span className="badge badge-cyan" style={{ fontSize: '0.62rem', borderRadius: '999px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <Bot size={10} /> AI Agent ({Math.round((conv.confidence || 0.9) * 100)}%)
                       </span>
                     )}
@@ -700,10 +766,21 @@ export default function ConversationsPage() {
             })
           )}
         </div>
+
+        {filteredConversations.length > convPageSize && (
+          <Pagination
+            compact={true}
+            currentPage={convPage}
+            totalItems={filteredConversations.length}
+            pageSize={convPageSize}
+            onPageChange={setConvPage}
+            itemLabel="chats"
+          />
+        )}
       </div>
 
-      {/* Main Content: Chat Window & Controls */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
+      {/* Right Floating Card: Chat Window & Controls */}
+      <div className="chat-floating-card" style={{ flex: 1 }}>
         
         {/* Chat Window Header */}
         <div style={{
@@ -712,39 +789,56 @@ export default function ConversationsPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'var(--bg-card)'
+          background: 'rgba(255, 255, 255, 0.02)'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{selectedConv.name}</h3>
-              <span className={`badge badge-${selectedConv.channel === 'whatsapp' ? 'emerald' : selectedConv.channel === 'telegram' ? 'cyan' : selectedConv.channel === 'facebook' ? 'blue' : 'violet'}`} style={{ fontSize: '0.65rem' }}>
-                {selectedConv.channel}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              background: 'var(--grad-coral)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '0.92rem',
+              boxShadow: '0 4px 14px rgba(232, 101, 74, 0.3)'
+            }}>
+              {selectedConv.name ? selectedConv.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'U'}
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.08rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedConv.name}</h3>
+                <span className={`badge badge-${selectedConv.channel === 'whatsapp' ? 'emerald' : selectedConv.channel === 'telegram' ? 'cyan' : selectedConv.channel === 'facebook' ? 'blue' : 'violet'}`} style={{ fontSize: '0.65rem', borderRadius: '999px', padding: '2px 8px' }}>
+                  {selectedConv.channel}
+                </span>
+              </div>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                {selectedConv.phone} • Intent: <strong style={{ color: 'var(--primary-coral)' }}>{selectedConv.intent || 'property_inquiry'}</strong>
               </span>
             </div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              {selectedConv.phone} • Intent: <strong style={{ color: 'var(--primary-light)' }}>{selectedConv.intent || 'property_inquiry'}</strong>
-            </span>
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {/* AI Summary Button */}
             <button
               onClick={() => setShowAiSummaryModal(true)}
+              className="glass-card"
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-glass)',
-                color: 'var(--text-light)',
-                padding: '7px 12px',
-                borderRadius: '8px',
+                padding: '7px 14px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontSize: '0.78rem',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border-glass)'
               }}
             >
-              <Sparkles size={14} color="#F59E0B" /> AI Lead Summary
+              <Sparkles size={14} className="text-amber-themed" /> AI Lead Summary
             </button>
 
             {/* Toggle Takeover Button */}
@@ -753,7 +847,7 @@ export default function ConversationsPage() {
               className={selectedConv.aiPaused ? 'btn-gradient' : 'badge badge-amber'}
               style={{
                 padding: '7px 14px',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '0.8rem',
@@ -773,12 +867,12 @@ export default function ConversationsPage() {
             <button
               onClick={() => handleDeleteConversation(selectedConv.id)}
               title="Delete conversation"
+              className="text-rose-themed"
               style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#EF4444',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
                 padding: '7px 10px',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 cursor: 'pointer'
               }}
             >
@@ -790,7 +884,7 @@ export default function ConversationsPage() {
         {/* Quick Sales Action Shortcuts Bar */}
         <div style={{
           padding: '8px 24px',
-          background: 'rgba(0, 0, 0, 0.25)',
+          background: 'var(--bg-main)',
           borderBottom: '1px solid var(--border-glass)',
           display: 'flex',
           gap: '10px',
@@ -800,41 +894,45 @@ export default function ConversationsPage() {
           <button
             onClick={() => handleQuickAction('brochure')}
             style={{
-              background: 'rgba(139, 92, 246, 0.15)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              color: 'var(--text-light)',
-              padding: '4px 10px',
-              borderRadius: '6px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              color: 'var(--text-main)',
+              padding: '4px 12px',
+              borderRadius: '999px',
               cursor: 'pointer',
               fontSize: '0.72rem',
+              fontWeight: 500,
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '5px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
             }}
           >
-            <FileText size={12} color="#A78BFA" /> Insert Brochure Link
+            <FileText size={12} color="var(--primary-coral)" /> Insert Brochure Link
           </button>
           <button
             onClick={() => handleQuickAction('visit')}
             style={{
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: 'var(--text-light)',
-              padding: '4px 10px',
-              borderRadius: '6px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-glass)',
+              color: 'var(--text-main)',
+              padding: '4px 12px',
+              borderRadius: '999px',
               cursor: 'pointer',
               fontSize: '0.72rem',
+              fontWeight: 500,
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '5px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
             }}
           >
-            <Calendar size={12} color="#34D399" /> Insert Booking Link
+            <Calendar size={12} className="text-emerald-themed" /> Insert Booking Link
           </button>
         </div>
 
         {/* Messages Stream Area */}
-        <div style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {selectedConv.messages?.map((msg, idx) => {
             const isUser = msg.sender === 'user';
             const isHumanAgent = msg.sender === 'human_agent';
@@ -845,17 +943,18 @@ export default function ConversationsPage() {
                   alignSelf: isUser ? 'flex-start' : 'flex-end',
                   maxWidth: '68%',
                   background: isUser 
-                    ? 'rgba(255, 255, 255, 0.08)' 
+                    ? 'var(--bg-main)' 
                     : isHumanAgent 
                       ? 'linear-gradient(135deg, #F59E0B, #D97706)' 
-                      : 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-                  padding: '12px 16px',
-                  borderRadius: isUser ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
-                  color: '#FFFFFF',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                      : 'var(--grad-coral)',
+                  padding: '12px 18px',
+                  borderRadius: isUser ? '18px 18px 18px 6px' : '18px 18px 6px 18px',
+                  color: isUser ? 'var(--text-main)' : '#FFFFFF',
+                  border: isUser ? '1px solid var(--border-glass)' : 'none',
+                  boxShadow: isUser ? '0 2px 8px rgba(0,0,0,0.04)' : '0 4px 16px rgba(232, 101, 74, 0.25)'
                 }}
               >
-                <div style={{ fontSize: '0.68rem', opacity: 0.8, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                <div style={{ fontSize: '0.68rem', opacity: isUser ? 0.75 : 0.9, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
                   <span style={{ fontWeight: 700 }}>
                     {isUser ? selectedConv.name : isHumanAgent ? '👨‍💼 You (Sales Agent)' : '🤖 GLG AI Assistant'}
                   </span>
@@ -872,17 +971,18 @@ export default function ConversationsPage() {
           {isSending && (
             <div style={{
               alignSelf: 'flex-end',
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              padding: '10px 16px',
-              borderRadius: '16px 16px 4px 16px',
-              color: '#A78BFA',
+              background: 'rgba(232, 101, 74, 0.1)',
+              border: '1px solid rgba(232, 101, 74, 0.25)',
+              padding: '10px 18px',
+              borderRadius: '18px 18px 6px 18px',
+              color: 'var(--primary-coral)',
               fontSize: '0.8rem',
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>
-              <RefreshCw size={14} className="spin" /> GLG AI Agent is thinking & generating reply...
+              <RefreshCw size={14} className="spin-anim" /> GLG AI Agent is thinking &amp; generating reply...
             </div>
           )}
 
@@ -893,10 +993,10 @@ export default function ConversationsPage() {
         <div style={{
           padding: '16px 24px',
           borderTop: '1px solid var(--border-glass)',
-          background: 'var(--bg-card)',
+          background: 'rgba(255, 255, 255, 0.02)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px'
+          gap: '12px'
         }}>
           {/* Mode Switcher Banner */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -906,17 +1006,19 @@ export default function ConversationsPage() {
                 type="button"
                 onClick={() => setInputMode('customer')}
                 style={{
-                  padding: '3px 8px',
-                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '999px',
                   border: 'none',
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: inputMode === 'customer' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                  color: inputMode === 'customer' ? '#FFF' : 'var(--text-muted)',
+                  background: inputMode === 'customer' ? 'var(--primary-coral)' : 'var(--bg-main)',
+                  color: inputMode === 'customer' ? '#FFFFFF' : 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px',
+                  boxShadow: inputMode === 'customer' ? '0 2px 8px rgba(232, 101, 74, 0.3)' : 'none',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <User size={12} /> Test Customer Message (Triggers AI)
@@ -928,24 +1030,29 @@ export default function ConversationsPage() {
                   setInputMode('agent');
                 }}
                 style={{
-                  padding: '3px 8px',
-                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '999px',
                   border: 'none',
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: inputMode === 'agent' ? '#F59E0B' : 'rgba(255,255,255,0.05)',
-                  color: inputMode === 'agent' ? '#FFF' : 'var(--text-muted)',
+                  background: inputMode === 'agent' ? '#D97706' : 'var(--bg-main)',
+                  color: inputMode === 'agent' ? '#FFFFFF' : 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px',
+                  boxShadow: inputMode === 'agent' ? '0 2px 8px rgba(217, 119, 6, 0.3)' : 'none',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <UserCheck size={12} /> Human Agent Reply
               </button>
             </div>
 
-            <span style={{ fontSize: '0.7rem', color: inputMode === 'agent' ? '#F59E0B' : '#34D399' }}>
+            <span 
+              className={inputMode === 'agent' ? 'text-amber-themed' : 'text-emerald-themed'} 
+              style={{ fontSize: '0.7rem', fontWeight: 600 }}
+            >
               {inputMode === 'customer' 
                 ? '⚡ Sends message as customer & triggers AI graph pipeline' 
                 : '👨‍💼 Manual Human Sales Agent Takeover active'}
@@ -963,15 +1070,13 @@ export default function ConversationsPage() {
                   : "Type manual message as Human Sales Agent..."
               }
               disabled={isSending}
+              className="glass-input"
               style={{
                 flex: 1,
-                padding: '12px 16px',
-                background: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid var(--border-glass)',
-                borderRadius: '10px',
-                color: 'var(--text-light)',
+                padding: '12px 18px',
                 fontSize: '0.88rem',
-                outline: 'none'
+                borderRadius: '14px',
+                background: 'var(--bg-input)'
               }}
             />
             <button 
@@ -983,7 +1088,10 @@ export default function ConversationsPage() {
                 cursor: (!replyText.trim() || isSending) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                padding: '12px 20px',
+                borderRadius: '14px',
+                boxShadow: '0 4px 14px rgba(232, 101, 74, 0.25)'
               }}
             >
               <Send size={16} /> {inputMode === 'customer' ? 'Send & Test AI' : 'Send Agent Reply'}
@@ -998,58 +1106,61 @@ export default function ConversationsPage() {
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(0,0,0,0.5)',
           zIndex: 2000,
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          padding: '20px'
         }}>
-          <div style={{
+          <div className="glass-card" style={{
             background: 'var(--bg-card)',
-            border: '1px solid var(--border-glass)',
-            borderRadius: '16px',
-            width: '450px',
-            padding: '24px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            borderRadius: '24px',
+            width: '460px',
+            padding: '26px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+            border: '1px solid var(--border-glass)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Simulate Incoming Customer Lead</h3>
-              <button onClick={() => setShowNewLeadModal(false)} style={{ background: 'none', border: 'none', color: '#FFF', cursor: 'pointer' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Simulate Incoming Customer Lead</h3>
+              <button onClick={() => setShowNewLeadModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleCreateLead} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Customer Name *</label>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Customer Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Rafiq Islam"
                   value={newLeadForm.name}
                   onChange={e => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
-                  style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem' }}
+                  className="glass-input"
+                  style={{ width: '100%', background: 'var(--bg-input)', borderRadius: '12px' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Phone Number</label>
                 <input
                   type="text"
                   placeholder="+880 1711-000000"
                   value={newLeadForm.phone}
                   onChange={e => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
-                  style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem' }}
+                  className="glass-input"
+                  style={{ width: '100%', background: 'var(--bg-input)', borderRadius: '12px' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Lead Source Channel</label>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Lead Source Channel</label>
                 <select
                   value={newLeadForm.channel}
                   onChange={e => setNewLeadForm({ ...newLeadForm, channel: e.target.value })}
-                  style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem' }}
+                  className="glass-input"
+                  style={{ width: '100%', background: 'var(--bg-input)', borderRadius: '12px' }}
                 >
                   <option value="whatsapp">WhatsApp Business</option>
                   <option value="telegram">Telegram Bot / Channel</option>
@@ -1060,13 +1171,14 @@ export default function ConversationsPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Initial Customer Message</label>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Initial Customer Message</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. I need a 3 BHK luxury flat in Dhanmondi."
                   value={newLeadForm.message}
                   onChange={e => setNewLeadForm({ ...newLeadForm, message: e.target.value })}
-                  style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem' }}
+                  className="glass-input"
+                  style={{ width: '100%', background: 'var(--bg-input)', borderRadius: '12px' }}
                 />
               </div>
 
@@ -1074,16 +1186,17 @@ export default function ConversationsPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewLeadModal(false)}
-                  style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', color: '#FFF', cursor: 'pointer', fontSize: '0.85rem' }}
+                  className="glass-card"
+                  style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem', borderRadius: '12px' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="btn-gradient"
-                  style={{ padding: '8px 18px', cursor: 'pointer', fontSize: '0.85rem' }}
+                  style={{ padding: '8px 18px', cursor: 'pointer', fontSize: '0.85rem', borderRadius: '12px' }}
                 >
-                  Create & Simulate Lead
+                  Create &amp; Simulate Lead
                 </button>
               </div>
             </form>
@@ -1096,43 +1209,45 @@ export default function ConversationsPage() {
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(0,0,0,0.5)',
           zIndex: 2000,
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          padding: '20px'
         }}>
-          <div style={{
+          <div className="glass-card" style={{
             background: 'var(--bg-card)',
-            border: '1px solid var(--border-glass)',
-            borderRadius: '16px',
+            borderRadius: '24px',
             width: '500px',
-            padding: '24px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            padding: '26px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+            border: '1px solid var(--border-glass)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={18} color="#F59E0B" /> AI Lead Requirement Intelligence
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                <Sparkles size={18} color="#D97706" /> AI Lead Requirement Intelligence
               </h3>
-              <button onClick={() => setShowAiSummaryModal(false)} style={{ background: 'none', border: 'none', color: '#FFF', cursor: 'pointer' }}>
+              <button onClick={() => setShowAiSummaryModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>Buyer Name:</strong> {selectedConv.name}
+              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
+                <strong style={{ color: 'var(--text-muted)' }}>Buyer Name:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{selectedConv.name}</span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>Detected Intent:</strong> <span className="badge badge-cyan">{selectedConv.intent || 'property_search'}</span>
+              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
+                <strong style={{ color: 'var(--text-muted)' }}>Detected Intent:</strong> <span className="badge badge-cyan" style={{ borderRadius: '999px' }}>{selectedConv.intent || 'property_search'}</span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>AI Confidence Score:</strong> {Math.round((selectedConv.confidence || 0.9) * 100)}%
+              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
+                <strong style={{ color: 'var(--text-muted)' }}>AI Confidence Score:</strong> <span className="text-emerald-themed" style={{ fontWeight: 700 }}>{Math.round((selectedConv.confidence || 0.9) * 100)}%</span>
               </div>
-              <div style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '14px', borderRadius: '10px' }}>
-                <strong style={{ color: '#A78BFA', display: 'block', marginBottom: '6px' }}>Requirements Summary:</strong>
-                {selectedConv.lastMessage ? `Customer expressed: "${selectedConv.lastMessage}". System recommends offering GLG Gulshan Heights or Banani Crest units with customized 3-year installment plans.` : 'No key requirements recorded yet.'}
+              <div style={{ background: 'rgba(232, 101, 74, 0.08)', border: '1px solid rgba(232, 101, 74, 0.25)', padding: '14px 16px', borderRadius: '14px' }}>
+                <strong style={{ color: 'var(--primary-coral)', display: 'block', marginBottom: '6px' }}>Requirements Summary:</strong>
+                <span style={{ color: 'var(--text-main)' }}>
+                  {selectedConv.lastMessage ? `Customer expressed: "${selectedConv.lastMessage}". System recommends offering GLG Gulshan Heights or Banani Crest units with customized 3-year installment plans.` : 'No key requirements recorded yet.'}
+                </span>
               </div>
             </div>
 
@@ -1140,7 +1255,7 @@ export default function ConversationsPage() {
               <button
                 onClick={() => setShowAiSummaryModal(false)}
                 className="btn-gradient"
-                style={{ padding: '8px 20px', cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ padding: '8px 20px', cursor: 'pointer', fontSize: '0.85rem', borderRadius: '12px' }}
               >
                 Close Summary
               </button>
@@ -1148,6 +1263,7 @@ export default function ConversationsPage() {
           </div>
         </div>
       )}
+
 
     </div>
   );

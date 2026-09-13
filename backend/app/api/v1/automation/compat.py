@@ -7,7 +7,9 @@ for everything) to the actual backend route structure.
 These are thin stubs that redirect or serve as aliases.
 """
 from datetime import datetime
+
 from fastapi import APIRouter, Depends
+
 from app.dependencies import require_automation_secret as _auth
 
 router = APIRouter()

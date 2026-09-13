@@ -5,10 +5,6 @@ import json
 import os
 import sys
 
-backend_path = r"d:\Softwear Project\Realstate Automation\backend"
-if backend_path not in sys.path:
-    sys.path.insert(0, backend_path)
-
 from app.api.v1.email.endpoints import (
     approve_draft,
     edit_and_send_draft,

@@ -3,8 +3,10 @@
 All routers use these dependencies for X-Automation-Secret validation and Role-Based Access Control (RBAC).
 """
 
-from fastapi import Depends, HTTPException, Header, status
-from typing import Optional, List, Callable, Union
+from typing import Callable, List, Optional, Union
+
+from fastapi import Depends, Header, HTTPException, status
+
 from app.config import settings
 from app.core.security import decode_access_token
 from app.models.user import UserRole
@@ -35,12 +37,7 @@ async def require_automation_secret(
     if not secret:
         raise HTTPException(status_code=401, detail="Authentication header required (X-Automation-Secret or Bearer token)")
 
-    valid_secrets = {
-        getattr(settings, "automation_shared_secret", "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"),
-        "glg-secret-key",
-        "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
-    }
-    if secret not in valid_secrets:
+    if secret != settings.automation_shared_secret:
         raise HTTPException(status_code=403, detail="Invalid automation secret")
 
     return {
@@ -72,12 +69,7 @@ async def get_current_user(
         return payload
 
     # If valid secret passed, return system admin context
-    valid_secrets = {
-        getattr(settings, "automation_shared_secret", "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"),
-        "glg-secret-key",
-        "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
-    }
-    if token in valid_secrets:
+    if token == settings.automation_shared_secret:
         return {
             "sub": "sys-admin-000",
             "email": "admin@glgassets.com",

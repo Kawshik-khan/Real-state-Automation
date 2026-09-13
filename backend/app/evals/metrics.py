@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Sequence, Any
+from typing import Any, Sequence
 
 
 def calculate_classification_metrics(predictions: Sequence[str], targets: Sequence[str]) -> dict[str, float]:

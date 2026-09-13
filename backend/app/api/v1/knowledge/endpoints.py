@@ -1,16 +1,15 @@
 """Knowledge Services — Document upload with chunking + embedding + pgvector storage + OCR support."""
 
-import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.config import settings
 from app.dependencies import require_roles
 from app.models.user import UserRole
-from app.config import settings
-from app.services.llm import llm_service
 from app.rag.pipeline import rag
+from app.services.llm import llm_service
 
 router = APIRouter()
 _knowledge_auth = require_roles([UserRole.ADMIN, UserRole.DEVELOPER])
@@ -24,6 +23,7 @@ def _extract_text_from_file(filename: str, content: bytes) -> str:
         # Try pypdf / PyPDF2 / pdfplumber for PDF text extraction
         try:
             import io
+
             from pypdf import PdfReader
             reader = PdfReader(io.BytesIO(content))
             pages_text = [page.extract_text() or "" for page in reader.pages]
@@ -35,6 +35,7 @@ def _extract_text_from_file(filename: str, content: bytes) -> str:
 
         try:
             import io
+
             import pdfplumber
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 pages_text = [page.extract_text() or "" for page in pdf.pages]

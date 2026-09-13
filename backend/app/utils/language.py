@@ -6,7 +6,7 @@ Uses multi-signal classifier: Bengali script ratio + Romanized Bangla core lexic
 """
 
 import re
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Bengali script range: U+0980 to U+09FF
 BENGALI_REGEX = re.compile(r"[\u0980-\u09FF]")

@@ -6,19 +6,72 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  PYTHONIOENCODING: "utf-8"
+
 jobs:
+
+  # ── Stage 1: Backend Lint ──
+  backend-lint:
+    name: Backend Lint (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff lint
+        run: ruff check backend/app/ --select E,F,I --ignore E501
+
+      - name: Verify imports resolve
+        env:
+          AUTOMATION_SHARED_SECRET: "ci-test-secret"
+          DATABASE_URL: "postgresql+asyncpg://localhost:5432/test"
+        run: |
+          pip install -e ".[test]"
+          python -c "from app.main import app; print('✅ All imports resolved successfully')"
+        working-directory: .
+
+  # ── Stage 2: Backend Tests ──
   backend-tests:
     name: Backend Test Suite (Pytest)
     runs-on: ubuntu-latest
+    needs: backend-lint
+
+    env:
+      AUTOMATION_SHARED_SECRET: "test-ci-secret-key"
+      JWT_SECRET: "test-jwt-secret-key-for-ci-minimum-32-chars-long"
+      PASSWORD_HASH_SALT: "glg_assets_salt_2026"
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/glg_assets_test"
+      DEFAULT_TENANT_ID: "glg-assets-test"
+      CORS_ORIGINS: "*"
+      OPENAI_API_KEY: ""
+      OPENAI_MODEL: "gpt-4o-mini"
+      OPENAI_BASE_URL: ""
+      VECTOR_STORE_PROVIDER: "pgvector"
+      PINECONE_API_KEY: ""
+      SUPABASE_URL: ""
+      SUPABASE_SERVICE_ROLE_KEY: ""
+      GMAIL_USER_EMAIL: ""
+      GMAIL_APP_PASSWORD: ""
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
       - name: Install dependencies
@@ -27,9 +80,9 @@ jobs:
           pip install -e ".[test]"
 
       - name: Run pytest
-        run: |
-          pytest backend/tests
+        run: pytest backend/tests/ -v --tb=short -x
 
+  # ── Stage 3: Frontend Build ──
   frontend-build:
     name: Frontend Production Build (Vite)
     runs-on: ubuntu-latest
@@ -38,10 +91,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
           cache-dependency-path: "frontend/package-lock.json"
 
@@ -52,3 +105,29 @@ jobs:
       - name: Build Frontend bundle
         working-directory: ./frontend
         run: npm run build
+
+  # ── Stage 4: Docker Build Validation ──
+  docker-build:
+    name: Docker Image Build Check
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: docker build -t glg-backend-ci:${{ github.sha }} -f backend/Dockerfile backend/
+
+      - name: Verify container starts and passes healthcheck
+        run: |
+          docker run -d --name ci-test \
+            -e AUTOMATION_SHARED_SECRET=ci-test \
+            -e DATABASE_URL=postgresql+asyncpg://localhost:5432/test \
+            -p 8000:8000 \
+            glg-backend-ci:${{ github.sha }}
+          sleep 5
+          docker logs ci-test || true
+          curl -f http://localhost:8000/health || (docker logs ci-test && exit 1)
+          docker stop ci-test
+          docker rm ci-test

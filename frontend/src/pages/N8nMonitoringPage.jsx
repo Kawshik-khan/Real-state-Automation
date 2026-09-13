@@ -146,15 +146,15 @@ const DEFAULT_TELEMETRY = {
 const getNodeTypeIcon = (nodeType) => {
   if (!nodeType) return <Cpu size={16} />;
   const t = nodeType.toLowerCase();
-  if (t.includes('webhook') || t.includes('trigger')) return <Zap size={16} color="#38BDF8" />;
-  if (t.includes('code')) return <Terminal size={16} color="#F59E0B" />;
-  if (t.includes('http')) return <Server size={16} color="#A855F7" />;
-  if (t.includes('telegram')) return <Wifi size={16} color="#22D3EE" />;
-  if (t.includes('openai')) return <Cpu size={16} color="#10B981" />;
-  if (t.includes('postgres') || t.includes('db')) return <Layers size={16} color="#3B82F6" />;
-  if (t.includes('pinecone') || t.includes('vector')) return <Layers size={16} color="#EC4899" />;
-  if (t.includes('email') || t.includes('imap') || t.includes('smtp')) return <Activity size={16} color="#F43F5E" />;
-  return <Cpu size={16} color="#9CA3AF" />;
+  if (t.includes('webhook') || t.includes('trigger')) return <Zap size={16} color="#0284C7" />;
+  if (t.includes('code')) return <Terminal size={16} color="#D97706" />;
+  if (t.includes('http')) return <Server size={16} color="#7C3AED" />;
+  if (t.includes('telegram')) return <Wifi size={16} color="#0891B2" />;
+  if (t.includes('openai')) return <Cpu size={16} color="#059669" />;
+  if (t.includes('postgres') || t.includes('db')) return <Layers size={16} color="#2563EB" />;
+  if (t.includes('pinecone') || t.includes('vector')) return <Layers size={16} color="#E8654A" />;
+  if (t.includes('email') || t.includes('imap') || t.includes('smtp')) return <Activity size={16} color="#DC2626" />;
+  return <Cpu size={16} color="#6B7280" />;
 };
 
 export default function N8nMonitoringPage() {
@@ -176,7 +176,6 @@ export default function N8nMonitoringPage() {
       if (data && data.metrics) {
         setTelemetry(data);
         setIsLiveConnection(true);
-        // Expand all workflows on initial load
         setExpandedWorkflows(prev => {
           if (Object.keys(prev).length === 0) {
             const initialExpanded = {};
@@ -224,7 +223,6 @@ export default function N8nMonitoringPage() {
       showNotification(result.message || `Workflow ${nextActive ? 'enabled' : 'disabled'}`, 'success');
       fetchTelemetry();
     } catch (err) {
-      // Local fallback state toggle
       setTelemetry(prev => {
         if (!prev) return prev;
         const updatedWfs = prev.workflows.map(wf => wf.id === workflowId ? { ...wf, active: nextActive } : wf);
@@ -250,7 +248,6 @@ export default function N8nMonitoringPage() {
       showNotification(result.message || 'Latency ping test completed', 'success');
       fetchTelemetry();
     } catch (err) {
-      // Local fallback latency ping simulation
       const pingMs = Math.floor(Math.random() * 80) + 15;
       setTelemetry(prev => {
         if (!prev) return prev;
@@ -280,9 +277,9 @@ export default function N8nMonitoringPage() {
 
   if (loading && !telemetry) {
     return (
-      <div style={{ padding: '40px', color: '#FFFFFF', textAlign: 'center' }}>
-        <RefreshCw size={32} className="spin" style={{ color: '#8B5CF6', marginBottom: '16px' }} />
-        <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>Initializing n8n Workflow & Node Health Monitor...</p>
+      <div style={{ padding: '40px', color: 'var(--text-main)', textAlign: 'center' }}>
+        <RefreshCw size={32} className="spin" style={{ color: 'var(--primary-coral)', marginBottom: '16px' }} />
+        <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>Initializing n8n Workflow &amp; Node Health Monitor...</p>
       </div>
     );
   }
@@ -302,14 +299,14 @@ export default function N8nMonitoringPage() {
   });
 
   return (
-    <div style={{ padding: '24px 32px', color: '#FFFFFF', maxWidth: '1600px', margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px', color: 'var(--text-main)', maxWidth: '1600px', margin: '0 auto' }}>
       
       {/* Header & Controls Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, background: 'linear-gradient(135deg, #FFFFFF, #9CA3AF)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              n8n Workflow & Node Health Command
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+              n8n Workflow &amp; Node Health Command
             </h1>
             <span style={{
               padding: '4px 10px',
@@ -319,16 +316,15 @@ export default function N8nMonitoringPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: currentTelemetry.overall_status === 'HEALTHY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-              color: currentTelemetry.overall_status === 'HEALTHY' ? '#34D399' : '#FBBF24',
-              border: `1px solid ${currentTelemetry.overall_status === 'HEALTHY' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+              background: currentTelemetry.overall_status === 'HEALTHY' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+              color: currentTelemetry.overall_status === 'HEALTHY' ? '#059669' : '#D97706',
+              border: `1px solid ${currentTelemetry.overall_status === 'HEALTHY' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`
             }}>
               <span style={{
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                background: currentTelemetry.overall_status === 'HEALTHY' ? '#10B981' : '#F59E0B',
-                boxShadow: `0 0 10px ${currentTelemetry.overall_status === 'HEALTHY' ? '#10B981' : '#F59E0B'}`
+                background: currentTelemetry.overall_status === 'HEALTHY' ? '#10B981' : '#F59E0B'
               }} />
               SYSTEM {currentTelemetry.overall_status || 'HEALTHY'}
             </span>
@@ -345,13 +341,14 @@ export default function N8nMonitoringPage() {
             padding: '6px 12px',
             borderRadius: '8px',
             background: isLiveConnection ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-            color: isLiveConnection ? '#34D399' : '#FBBF24',
+            color: isLiveConnection ? '#059669' : '#D97706',
             border: `1px solid ${isLiveConnection ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`,
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            fontWeight: 600
           }}>
-            <Radio size={12} className={isLiveConnection ? 'spin' : ''} />
+            <Radio size={12} />
             {isLiveConnection ? 'LIVE FASTAPI' : 'STANDALONE TELEMETRY'}
           </span>
 
@@ -362,16 +359,17 @@ export default function N8nMonitoringPage() {
             fontSize: '0.85rem',
             color: 'var(--text-muted)',
             cursor: 'pointer',
-            background: 'rgba(15, 23, 42, 0.6)',
+            background: 'var(--bg-card)',
             padding: '8px 14px',
             borderRadius: '10px',
-            border: '1px solid var(--border-glass)'
+            border: '1px solid var(--border-glass)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
           }}>
             <input 
               type="checkbox" 
               checked={autoRefresh} 
               onChange={e => setAutoRefresh(e.target.checked)} 
-              style={{ accentColor: '#8B5CF6' }}
+              style={{ accentColor: 'var(--primary-coral)' }}
             />
             Auto-refresh (10s)
           </label>
@@ -379,22 +377,21 @@ export default function N8nMonitoringPage() {
           <button
             onClick={() => fetchTelemetry(true)}
             disabled={refreshing}
+            className="glass-card"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               padding: '8px 16px',
               borderRadius: '10px',
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.4)',
-              color: '#C084FC',
+              color: 'var(--primary-coral)',
               fontWeight: 600,
               fontSize: '0.85rem',
               cursor: 'pointer',
               transition: 'all 0.2s ease'
             }}
           >
-            <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
+            <RefreshCw size={16} className={refreshing ? 'spin-anim' : ''} />
             {refreshing ? 'Refreshing...' : 'Refresh Telemetry'}
           </button>
         </div>
@@ -406,9 +403,9 @@ export default function N8nMonitoringPage() {
           marginBottom: '20px',
           padding: '12px 20px',
           borderRadius: '12px',
-          background: actionMessage.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-          border: `1px solid ${actionMessage.type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-          color: actionMessage.type === 'error' ? '#FCA5A5' : '#6EE7B7',
+          background: actionMessage.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+          border: `1px solid ${actionMessage.type === 'error' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+          color: actionMessage.type === 'error' ? '#DC2626' : '#059669',
           fontSize: '0.9rem',
           fontWeight: 600,
           display: 'flex',
@@ -428,81 +425,60 @@ export default function N8nMonitoringPage() {
         marginBottom: '28px'
       }}>
         {/* Active Workflows */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          border: '1px solid var(--border-glass)',
-          borderRadius: '16px',
-          padding: '20px',
-          backdropFilter: 'blur(20px)'
-        }}>
+        <div className="glass-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Active Workflows</span>
-            <Activity size={20} color="#34D399" />
+            <Activity size={20} color="#059669" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FFFFFF' }}>
-            {metrics.active_workflows} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {metrics.total_workflows}</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            {metrics.active_workflows} <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 500 }}>/ {metrics.total_workflows}</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#34D399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+          <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
             <CheckCircle2 size={12} /> {metrics.inactive_workflows === 0 ? 'All 100% Running' : `${metrics.inactive_workflows} Paused`}
           </span>
         </div>
 
         {/* Avg System Latency */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          border: '1px solid var(--border-glass)',
-          borderRadius: '16px',
-          padding: '20px',
-          backdropFilter: 'blur(20px)'
-        }}>
+        <div className="glass-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Avg Response Latency</span>
-            <Clock size={20} color="#C084FC" />
+            <Clock size={20} color="var(--primary-coral)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FFFFFF' }}>
-            {metrics.avg_system_latency_ms} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>ms</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            {metrics.avg_system_latency_ms} <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 500 }}>ms</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#C084FC', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary-coral)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
             <Zap size={12} /> End-to-end node average
           </span>
         </div>
 
         {/* Total Inspected Nodes */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          border: '1px solid var(--border-glass)',
-          borderRadius: '16px',
-          padding: '20px',
-          backdropFilter: 'blur(20px)'
-        }}>
+        <div className="glass-card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Nodes Inspected</span>
-            <Cpu size={20} color="#38BDF8" />
+            <Cpu size={20} color="#0284C7" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FFFFFF' }}>
-            {metrics.total_nodes} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>nodes</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            {metrics.total_nodes} <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 500 }}>nodes</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+          <span style={{ fontSize: '0.75rem', color: '#0284C7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
             <ShieldCheck size={12} /> {metrics.healthy_nodes} Healthy
           </span>
         </div>
 
         {/* Node Processing Errors */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          border: metrics.degraded_nodes > 0 || metrics.failed_nodes > 0 ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--border-glass)',
-          borderRadius: '16px',
+        <div className="glass-card" style={{
           padding: '20px',
-          backdropFilter: 'blur(20px)'
+          border: metrics.degraded_nodes > 0 || metrics.failed_nodes > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-glass)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>Node Processing Issues</span>
-            <AlertTriangle size={20} color={issues.length > 0 ? "#F59E0B" : "#34D399"} />
+            <AlertTriangle size={20} color={issues.length > 0 ? "#D97706" : "#059669"} />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: issues.length > 0 ? "#F59E0B" : "#FFFFFF" }}>
-            {issues.length} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>issues</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: issues.length > 0 ? "#D97706" : "var(--text-main)" }}>
+            {issues.length} <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 500 }}>issues</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: issues.length > 0 ? '#FBBF24' : '#34D399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+          <span style={{ fontSize: '0.75rem', color: issues.length > 0 ? '#D97706' : '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
             {issues.length > 0 ? `${metrics.degraded_nodes} Degraded / ${metrics.failed_nodes} Failed` : '0 Node Execution Errors'}
           </span>
         </div>
@@ -511,25 +487,26 @@ export default function N8nMonitoringPage() {
       {/* Filter and Search Bar */}
       <div style={{
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '20px',
-        background: 'rgba(15, 23, 42, 0.6)',
+        background: 'var(--bg-card)',
         padding: '12px 20px',
         borderRadius: '14px',
         border: '1px solid var(--border-glass)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
         flexWrap: 'wrap',
         gap: '12px'
       }}>
         {/* Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(11, 15, 25, 0.8)', padding: '8px 14px', borderRadius: '10px', width: '320px', border: '1px solid var(--border-glass)' }}>
-          <Search size={16} color="var(--text-muted)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 14px', borderRadius: '10px', width: '320px', border: '1px solid var(--border-glass)' }}>
+          <Search size={16} color="var(--text-dim)" />
           <input
             type="text"
             placeholder="Filter workflows or node types..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            style={{ background: 'transparent', border: 'none', color: '#FFFFFF', outline: 'none', fontSize: '0.85rem', width: '100%' }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '0.85rem', width: '100%' }}
           />
         </div>
 
@@ -546,8 +523,9 @@ export default function N8nMonitoringPage() {
                 fontWeight: 600,
                 border: 'none',
                 cursor: 'pointer',
-                background: statusFilter === status ? 'var(--grad-violet)' : 'rgba(255, 255, 255, 0.05)',
-                color: statusFilter === status ? '#FFFFFF' : 'var(--text-muted)'
+                background: statusFilter === status ? 'var(--primary-coral)' : 'var(--bg-main)',
+                color: statusFilter === status ? '#FFFFFF' : 'var(--text-muted)',
+                transition: 'all 0.2s ease'
               }}
             >
               {status}
@@ -558,8 +536,8 @@ export default function N8nMonitoringPage() {
 
       {/* Workflow & Node Pipeline Section */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '36px' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Layers size={20} color="#8B5CF6" /> Workflows & Real-Time Node Health Pipeline
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Layers size={20} color="var(--primary-coral)" /> Workflows &amp; Real-Time Node Health Pipeline
         </h2>
 
         {filteredWorkflows.map(wf => {
@@ -569,12 +547,9 @@ export default function N8nMonitoringPage() {
           return (
             <div
               key={wf.id}
+              className="glass-card"
               style={{
-                background: 'rgba(15, 23, 42, 0.7)',
-                border: wf.active ? '1px solid var(--border-glass)' : '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '16px',
                 overflow: 'hidden',
-                backdropFilter: 'blur(20px)',
                 opacity: wf.active ? 1 : 0.75,
                 transition: 'all 0.2s ease'
               }}
@@ -583,10 +558,10 @@ export default function N8nMonitoringPage() {
               <div
                 style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '20px 24px',
-                  background: 'rgba(11, 15, 25, 0.4)',
+                  background: 'var(--bg-card)',
                   borderBottom: isExpanded ? '1px solid var(--border-glass)' : 'none',
                   cursor: 'pointer'
                 }}
@@ -598,43 +573,35 @@ export default function N8nMonitoringPage() {
                     width: '40px',
                     height: '40px',
                     borderRadius: '12px',
-                    background: wf.active ? 'rgba(139, 92, 246, 0.15)' : 'rgba(156, 163, 175, 0.1)',
+                    background: wf.active ? 'rgba(232, 101, 74, 0.1)' : 'rgba(156, 163, 175, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: `1px solid ${wf.active ? 'rgba(139, 92, 246, 0.3)' : 'rgba(156, 163, 175, 0.2)'}`
+                    border: `1px solid ${wf.active ? 'rgba(232, 101, 74, 0.25)' : 'rgba(156, 163, 175, 0.2)'}`
                   }}>
-                    <Zap size={20} color={wf.active ? '#C084FC' : '#9CA3AF'} />
+                    <Zap size={20} color={wf.active ? 'var(--primary-coral)' : '#9CA3AF'} />
                   </div>
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#FFFFFF' }}>{wf.name}</h3>
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        background: wf.active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: wf.active ? '#34D399' : '#FCA5A5',
-                        border: `1px solid ${wf.active ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                      }}>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>{wf.name}</h3>
+                      <span className={wf.active ? 'badge badge-emerald' : 'badge badge-rose'} style={{ fontSize: '0.7rem' }}>
                         {wf.active ? 'RUNNING' : 'PAUSED'}
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      <span>Category: <strong style={{ color: '#D1D5DB' }}>{wf.category}</strong></span>
-                      <span>• Trigger: <strong style={{ color: '#D1D5DB' }}>{wf.trigger}</strong></span>
-                      <span>• Total Runs: <strong style={{ color: '#D1D5DB' }}>{wf.total_executions.toLocaleString()}</strong></span>
-                      <span>• Success Rate: <strong style={{ color: '#34D399' }}>{wf.success_rate}%</strong></span>
+                      <span>Category: <strong style={{ color: 'var(--text-main)' }}>{wf.category}</strong></span>
+                      <span>• Trigger: <strong style={{ color: 'var(--text-main)' }}>{wf.trigger}</strong></span>
+                      <span>• Total Runs: <strong style={{ color: 'var(--text-main)' }}>{wf.total_executions.toLocaleString()}</strong></span>
+                      <span>• Success Rate: <strong style={{ color: '#059669' }}>{wf.success_rate}%</strong></span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right Controls */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} onClick={e => e.stopPropagation()}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#C084FC', background: 'rgba(139, 92, 246, 0.1)', padding: '4px 10px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-coral)', background: 'rgba(232, 101, 74, 0.08)', padding: '4px 10px', borderRadius: '8px' }}>
                     {wf.avg_latency_ms} ms avg
                   </span>
 
@@ -648,16 +615,16 @@ export default function N8nMonitoringPage() {
                       gap: '6px',
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      background: 'rgba(56, 189, 248, 0.15)',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
-                      color: '#38BDF8',
+                      background: 'rgba(2, 132, 199, 0.1)',
+                      border: '1px solid rgba(2, 132, 199, 0.25)',
+                      color: '#0284C7',
                       fontSize: '0.8rem',
                       fontWeight: 600,
                       cursor: wf.active ? 'pointer' : 'not-allowed',
                       opacity: wf.active ? 1 : 0.5
                     }}
                   >
-                    <Play size={14} className={isTesting ? 'spin' : ''} />
+                    <Play size={14} className={isTesting ? 'spin-anim' : ''} />
                     {isTesting ? 'Pinging...' : 'Test Latency'}
                   </button>
 
@@ -670,9 +637,9 @@ export default function N8nMonitoringPage() {
                       gap: '6px',
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      background: wf.active ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                      border: `1px solid ${wf.active ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                      color: wf.active ? '#FCA5A5' : '#6EE7B7',
+                      background: wf.active ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      border: `1px solid ${wf.active ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                      color: wf.active ? '#DC2626' : '#059669',
                       fontSize: '0.8rem',
                       fontWeight: 600,
                       cursor: 'pointer'
@@ -693,12 +660,12 @@ export default function N8nMonitoringPage() {
 
               {/* Node Pipeline Breakdown */}
               {isExpanded && (
-                <div style={{ padding: '24px', background: 'rgba(15, 23, 42, 0.4)' }}>
+                <div style={{ padding: '24px', background: 'var(--bg-main)' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '16px' }}>
                     EXECUTION NODE GRAPH ({wf.nodes.length} NODES)
                   </div>
 
-                  {/* Horizontal / Grid Visual Node Pipeline */}
+                  {/* Visual Node Pipeline Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
                     {wf.nodes.map((node, index) => {
                       const isHealthy = node.status === 'HEALTHY';
@@ -709,14 +676,14 @@ export default function N8nMonitoringPage() {
                         <div
                           key={node.id}
                           style={{
-                            background: 'rgba(11, 15, 25, 0.8)',
-                            border: isErr ? '1px solid #EF4444' : isWarn ? '1px solid #F59E0B' : '1px solid var(--border-glass)',
+                            background: 'var(--bg-card)',
+                            border: isErr ? '1px solid #DC2626' : isWarn ? '1px solid #D97706' : '1px solid var(--border-glass)',
                             borderRadius: '14px',
                             padding: '16px',
                             display: 'flex',
                             flexDirection: 'column',
-                            justify: 'space-between',
-                            position: 'relative'
+                            justifyContent: 'space-between',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
                           }}
                         >
                           {/* Node Step Number */}
@@ -726,15 +693,7 @@ export default function N8nMonitoringPage() {
                             </span>
 
                             {/* Node Health Badge */}
-                            <span style={{
-                              fontSize: '0.65rem',
-                              fontWeight: 800,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: isHealthy ? 'rgba(16, 185, 129, 0.15)' : isWarn ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                              color: isHealthy ? '#34D399' : isWarn ? '#FBBF24' : '#FCA5A5',
-                              border: `1px solid ${isHealthy ? 'rgba(16, 185, 129, 0.3)' : isWarn ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                            }}>
+                            <span className={isHealthy ? 'badge badge-emerald' : isWarn ? 'badge badge-amber' : 'badge badge-rose'} style={{ fontSize: '0.65rem' }}>
                               {node.status}
                             </span>
                           </div>
@@ -744,7 +703,8 @@ export default function N8nMonitoringPage() {
                             <div style={{
                               padding: '8px',
                               borderRadius: '8px',
-                              background: 'rgba(255, 255, 255, 0.05)',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-glass)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center'
@@ -752,7 +712,7 @@ export default function N8nMonitoringPage() {
                               {getNodeTypeIcon(node.type)}
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#FFFFFF' }}>{node.name}</div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>{node.name}</div>
                               <code style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{node.type}</code>
                             </div>
                           </div>
@@ -760,14 +720,14 @@ export default function N8nMonitoringPage() {
                           {/* Node Latency & Last Run Footer */}
                           <div style={{
                             display: 'flex',
-                            justify: 'space-between',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             paddingTop: '10px',
-                            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                            borderTop: '1px solid var(--border-glass)',
                             fontSize: '0.75rem',
                             color: 'var(--text-muted)'
                           }}>
-                            <span>Latency: <strong style={{ color: node.latency_ms > 200 ? '#F59E0B' : '#34D399' }}>{node.latency_ms} ms</strong></span>
+                            <span>Latency: <strong style={{ color: node.latency_ms > 200 ? '#D97706' : '#059669' }}>{node.latency_ms} ms</strong></span>
                             <span>{node.last_run}</span>
                           </div>
 
@@ -777,9 +737,9 @@ export default function N8nMonitoringPage() {
                               marginTop: '10px',
                               padding: '8px 10px',
                               borderRadius: '8px',
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#FCA5A5',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#DC2626',
                               fontSize: '0.72rem'
                             }}>
                               ⚠️ {node.error}
@@ -797,19 +757,13 @@ export default function N8nMonitoringPage() {
       </div>
 
       {/* Node Errors & Diagnostics Panel */}
-      <div style={{
-        background: 'rgba(15, 23, 42, 0.7)',
-        border: '1px solid var(--border-glass)',
-        borderRadius: '16px',
-        padding: '24px',
-        backdropFilter: 'blur(20px)'
-      }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-          <AlertTriangle size={20} color="#F59E0B" /> Node Processing Exceptions & Diagnostic Log
+      <div className="glass-card" style={{ padding: '24px' }}>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <AlertTriangle size={20} color="#D97706" /> Node Processing Exceptions &amp; Diagnostic Log
         </h2>
 
         {issues.length === 0 ? (
-          <div style={{ padding: '30px', textAlign: 'center', color: '#34D399', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+          <div style={{ padding: '30px', textAlign: 'center', color: '#059669', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
             <CheckCircle2 size={32} style={{ marginBottom: '8px' }} />
             <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>No Active Node Processing Exceptions</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>All n8n workflow nodes are executing cleanly within latency parameters.</p>
@@ -820,7 +774,7 @@ export default function N8nMonitoringPage() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-glass)', color: 'var(--text-muted)' }}>
                   <th style={{ padding: '12px 16px' }}>Severity</th>
-                  <th style={{ padding: '12px 16px' }}>Workflow & Node</th>
+                  <th style={{ padding: '12px 16px' }}>Workflow &amp; Node</th>
                   <th style={{ padding: '12px 16px' }}>Error Details</th>
                   <th style={{ padding: '12px 16px' }}>Failing Param</th>
                   <th style={{ padding: '12px 16px' }}>Suggested Remediation</th>
@@ -829,36 +783,28 @@ export default function N8nMonitoringPage() {
               </thead>
               <tbody>
                 {issues.map((issue, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: 'rgba(11, 15, 25, 0.4)' }}>
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-glass)', background: 'var(--bg-card)' }}>
                     <td style={{ padding: '14px 16px' }}>
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        fontWeight: 800,
-                        background: issue.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                        color: issue.severity === 'CRITICAL' ? '#FCA5A5' : '#FBBF24',
-                        border: `1px solid ${issue.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
-                      }}>
+                      <span className={issue.severity === 'CRITICAL' ? 'badge badge-rose' : 'badge badge-amber'} style={{ fontSize: '0.7rem' }}>
                         {issue.severity}
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      <strong style={{ color: '#FFFFFF', display: 'block' }}>{issue.node_name}</strong>
+                      <strong style={{ color: 'var(--text-main)', display: 'block' }}>{issue.node_name}</strong>
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{issue.workflow_name}</span>
                     </td>
-                    <td style={{ padding: '14px 16px', color: '#FCA5A5' }}>
+                    <td style={{ padding: '14px 16px', color: '#DC2626' }}>
                       {issue.error_message}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      <code style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px', color: '#E5E7EB', fontSize: '0.75rem' }}>
+                      <code style={{ background: 'var(--bg-card)', border: '1px solid var(--border-glass)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.75rem' }}>
                         {issue.failing_parameter}
                       </code>
                     </td>
-                    <td style={{ padding: '14px 16px', color: '#9CA3AF', fontSize: '0.8rem' }}>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                       {issue.remediation}
                     </td>
-                    <td style={{ padding: '14px 16px', color: '#F59E0B', fontWeight: 700 }}>
+                    <td style={{ padding: '14px 16px', color: '#D97706', fontWeight: 700 }}>
                       {issue.latency_ms} ms
                     </td>
                   </tr>

@@ -4,12 +4,11 @@ State is AIState (Pydantic BaseModel). Nodes receive and return dicts
 of fields to update — LangGraph merges them into the state object.
 """
 from __future__ import annotations
-from typing import Any
-from langgraph.graph import StateGraph, END
-from langgraph.graph.state import CompiledStateGraph
-from app.agents.state import AIState
-from app.agents.state import ModerationResult, IntentResult, Action, LeadScore, UserBeliefState
 
+from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
+
+from app.agents.state import Action, AIState, IntentResult, LeadScore, ModerationResult
 
 # ── Entry ───────────────────────────────────────────────────
 
@@ -59,8 +58,8 @@ async def blocked_node(state: AIState) -> dict:
 # ── Memory & Dynamic Belief Reconciliation ──────────────────
 
 async def memory_load_node(state: AIState) -> dict:
-    from app.services.memory import conversation_memory
     from app.services.belief_memory import belief_memory_service
+    from app.services.memory import conversation_memory
 
     history = await conversation_memory.get_history(state.conversation_id)
     beliefs = await belief_memory_service.get_beliefs(state.conversation_id)
@@ -117,11 +116,8 @@ async def supervisor_node(state: AIState) -> dict:
     # Banglish / Bangla property inquiry safeguard
     property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
     if any(kw in msg_lower for kw in property_keywords):
-        loc = ""
-        for known_loc in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara"]:
-            if known_loc in msg_lower:
-                loc = known_loc.title()
-                break
+        from app.services.location_service import location_service
+        loc = await location_service.resolve_location_from_text(msg_lower)
         return {
             "intent": IntentResult(
                 intent="property_search",
@@ -194,13 +190,11 @@ async def property_agent_node(state: AIState) -> dict:
         reconciled_beds = state.beliefs.bedrooms or entities.get("bedrooms", 0)
 
         if not entities.get("location") and not reconciled_loc and state.history:
+            from app.services.location_service import location_service
             for turn in reversed(state.history):
-                content_lower = turn.get("content", "").lower()
-                for known_loc in ["baridhara", "gulshan 2", "gulshan 1", "gulshan", "banani", "dhanmondi", "uttara"]:
-                    if known_loc in content_lower:
-                        reconciled_loc = known_loc.title()
-                        break
-                if reconciled_loc:
+                found_loc = await location_service.resolve_location_from_text(turn.get("content", ""))
+                if found_loc:
+                    reconciled_loc = found_loc
                     break
 
         if reconciled_loc:
@@ -286,23 +280,23 @@ async def greeting_handler_node(state: AIState) -> dict:
     is_english = is_english_query(state.message) if state.message else False
     if is_english:
         reply = (
-            f"👋 Welcome to *GLG Assets*! I'm your AI real estate assistant.\n\n"
-            f"I can help you with:\n"
-            f"🏢 *Property Search* — Find your dream home\n"
-            f"📋 *Project Info* — Details about our developments\n"
-            f"❓ *FAQs* — Answer your questions\n"
-            f"📅 *Schedule Visit* — Book a site tour\n\n"
-            f"How can I help you today? 😊"
+            "👋 Welcome to *GLG Assets*! I'm your AI real estate assistant.\n\n"
+            "I can help you with:\n"
+            "🏢 *Property Search* — Find your dream home\n"
+            "📋 *Project Info* — Details about our developments\n"
+            "❓ *FAQs* — Answer your questions\n"
+            "📅 *Schedule Visit* — Book a site tour\n\n"
+            "How can I help you today? 😊"
         )
     else:
         reply = (
-            f"👋 *GLG Assets*-এ আপনাকে স্বাগতম! আমি আপনার AI রিয়েল এস্টেট অ্যাসিস্ট্যান্ট।\n\n"
-            f"আমি আপনাকে যেভাবে সাহায্য করতে পারি:\n"
-            f"🏢 *প্রপার্টি সার্চ* — আপনার স্বপ্নের বাড়ি খুঁজুন\n"
-            f"📋 *প্রজেক্ট তথ্য* — আমাদের প্রজেক্ট সমূহের বিস্তারিত\n"
-            f"❓ *FAQs* — যেকোনো প্রশ্নের উত্তর\n"
-            f"📅 *সাইট ভিজিট* — ভিজিট সিডিউল বুক করুন\n\n"
-            f"আজ আপনাকে কীভাবে সাহায্য করতে পারি? 😊"
+            "👋 *GLG Assets*-এ আপনাকে স্বাগতম! আমি আপনার AI রিয়েল এস্টেট অ্যাসিস্ট্যান্ট।\n\n"
+            "আমি আপনাকে যেভাবে সাহায্য করতে পারি:\n"
+            "🏢 *প্রপার্টি সার্চ* — আপনার স্বপ্নের বাড়ি খুঁজুন\n"
+            "📋 *প্রজেক্ট তথ্য* — আমাদের প্রজেক্ট সমূহের বিস্তারিত\n"
+            "❓ *FAQs* — যেকোনো প্রশ্নের উত্তর\n"
+            "📅 *সাইট ভিজিট* — ভিজিট সিডিউল বুক করুন\n\n"
+            "আজ আপনাকে কীভাবে সাহায্য করতে পারি? 😊"
         )
     return {
         "agent_reply": reply,
@@ -313,8 +307,8 @@ async def greeting_handler_node(state: AIState) -> dict:
 
 
 async def booking_handler_node(state: AIState) -> dict:
-    from app.utils.language import is_english_query
     from app.repositories.contact_repository import contact_repository
+    from app.utils.language import is_english_query
 
     is_english = is_english_query(state.message) if state.message else False
     contact_card = contact_repository.format_contact_card(is_english=is_english)
@@ -341,9 +335,9 @@ async def booking_handler_node(state: AIState) -> dict:
 
 
 async def fallback_handler_node(state: AIState) -> dict:
-    from app.services.llm import llm_service
     from app.prompts.fallback import FALLBACK_PROMPT
     from app.services.grounding_validator import grounding_validator
+    from app.services.llm import llm_service
     from app.utils.language import is_english_query
 
     context_messages = [{"role": "system", "content": FALLBACK_PROMPT}]
@@ -416,9 +410,9 @@ Respond with JSON: {{"safe": true, "reason": ""}} or {{"safe": false, "reason": 
 # ── Response Builder ────────────────────────────────────────
 
 async def response_builder_node(state: AIState) -> dict:
-    from app.services.memory import conversation_memory
-    from app.services.belief_memory import belief_memory_service
     from app.schemas.chat import MemoryEntry
+    from app.services.belief_memory import belief_memory_service
+    from app.services.memory import conversation_memory
 
     user_entry = MemoryEntry(role="user", content=state.message)
     await conversation_memory.add(state.conversation_id, user_entry)

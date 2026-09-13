@@ -3,18 +3,23 @@
 Strictly restricted to users with the DEVELOPER role.
 """
 
-import time
+import asyncio
+import json
 import os
 import sys
+import time
 from datetime import datetime
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.models.user import UserRole
-from app.dependencies import require_roles
 from app.config import settings
+from app.dependencies import require_roles
+from app.models.user import UserRole
 from app.services.llm import llm_service
+from app.services.log_streamer import log_streamer
 
 router = APIRouter(tags=["Developer Console"])
 
@@ -275,11 +280,6 @@ async def trigger_database_sync(
     }
 
 
-from fastapi import Request
-from fastapi.responses import StreamingResponse
-import json
-import asyncio
-from app.services.log_streamer import log_streamer
 
 
 @router.get("/logs", summary="Get recent real-time system logs from buffer")
@@ -356,8 +356,9 @@ async def run_ai_evaluations(
 ) -> Dict[str, Any]:
     """Runs automated benchmarks with live WebSocket progress streaming and returns scorecard."""
     import asyncio
-    from app.evals.engine import evaluation_engine
+
     from app.api.v1.ws.websocket import manager as ws_manager
+    from app.evals.engine import evaluation_engine
 
     suite_name = body.suite if body else "all"
     sample_size = body.sample_size if body else None

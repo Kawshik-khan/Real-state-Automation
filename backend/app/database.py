@@ -3,7 +3,11 @@
 Provides async engine, session factory, connection checks, and Supabase init_db.
 Import get_session as a FastAPI dependency in route handlers.
 """
+import socket
+import time
 from typing import AsyncGenerator
+from urllib.parse import urlparse
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -19,6 +23,7 @@ engine = create_async_engine(
     max_overflow=20,
     pool_recycle=300,
     pool_pre_ping=True,
+    connect_args={"timeout": 3, "command_timeout": 5} if "postgresql" in settings.database_url else {}
 )
 
 async_session_factory = async_sessionmaker(
@@ -37,8 +42,33 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+
+_db_status = {"reachable": None, "checked_at": 0}
+
+def is_db_reachable(timeout: float = 0.3) -> bool:
+    """Fast non-blocking socket pre-flight check to verify if the DB port is open."""
+    now = time.time()
+    if now - _db_status["checked_at"] < 15.0 and _db_status["reachable"] is not None:
+        return _db_status["reachable"]
+    try:
+        clean = settings.database_url.replace("postgresql+asyncpg://", "http://").replace("postgresql://", "http://")
+        p = urlparse(clean)
+        host = p.hostname or "localhost"
+        port = p.port or 5432
+        with socket.create_connection((host, port), timeout=timeout):
+            _db_status["reachable"] = True
+            _db_status["checked_at"] = now
+            return True
+    except Exception:
+        _db_status["reachable"] = False
+        _db_status["checked_at"] = now
+        return False
+
+
 async def check_connection() -> bool:
     """Verify the database is reachable. Returns True if connected."""
+    if not is_db_reachable():
+        return False
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
