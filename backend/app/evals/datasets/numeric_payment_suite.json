@@ -1,0 +1,18 @@
+[
+  {
+    "id": "num_01",
+    "description": "Down payment 20% calculation on BDT 4.5 Crore",
+    "property_price": 45000000.0,
+    "down_payment_pct": 20.0,
+    "expected_down_payment": 9000000.0,
+    "tenure_months": 36,
+    "expected_monthly_installment": 1000000.0
+  },
+  {
+    "id": "num_02",
+    "description": "Token booking fee calculation 2% on BDT 2.0 Crore",
+    "property_price": 20000000.0,
+    "token_fee_pct": 2.0,
+    "expected_token_fee": 400000.0
+  }
+]

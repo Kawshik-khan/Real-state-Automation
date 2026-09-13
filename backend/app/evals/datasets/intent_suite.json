@@ -1,0 +1,114 @@
+[
+  {
+    "id": "intent_01",
+    "query": "Do you have any 3 bedroom luxury apartments available in Gulshan?",
+    "expected_intent": "property_search",
+    "language": "en",
+    "expected_entities": { "location": "Gulshan", "bedrooms": 3 }
+  },
+  {
+    "id": "intent_02",
+    "query": "Banani te 3BHK flat ache? Dam koto porbe?",
+    "expected_intent": "property_search",
+    "language": "banglish",
+    "expected_entities": { "location": "Banani", "bedrooms": 3 }
+  },
+  {
+    "id": "intent_03",
+    "query": "Gulshan e duplex flat er price koto?",
+    "expected_intent": "property_search",
+    "language": "banglish",
+    "expected_entities": { "location": "Gulshan" }
+  },
+  {
+    "id": "intent_04",
+    "query": "Uttara te kon kon project handover ready ache?",
+    "expected_intent": "property_search",
+    "language": "banglish",
+    "expected_entities": { "location": "Uttara" }
+  },
+  {
+    "id": "intent_05",
+    "query": "আপনার গুলশান প্রজেক্টে কি ৪ বেডরুমের ফ্ল্যাট আছে?",
+    "expected_intent": "property_search",
+    "language": "bn",
+    "expected_entities": { "location": "Gulshan", "bedrooms": 4 }
+  },
+  {
+    "id": "intent_06",
+    "query": "I want to schedule a site visit for Gulshan Heights tomorrow at 3 PM",
+    "expected_intent": "booking",
+    "language": "en",
+    "expected_entities": { "project": "Gulshan Heights" }
+  },
+  {
+    "id": "intent_07",
+    "query": "Ami flat ta dekhte chai, kobe visit kora jabe?",
+    "expected_intent": "booking",
+    "language": "banglish",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_08",
+    "query": "Please have someone from your sales team call me regarding purchase",
+    "expected_intent": "lead",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_09",
+    "query": "What are the legal documents and RAJUK approvals required for purchase?",
+    "expected_intent": "faq",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_10",
+    "query": "Installment plan er process ta ki? Bank loan facilities ache?",
+    "expected_intent": "faq",
+    "language": "banglish",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_11",
+    "query": "Write a compelling Facebook post caption for our new luxury project launch",
+    "expected_intent": "content_request",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_12",
+    "query": "Generate an Instagram reel description with hashtags for Banani Crest",
+    "expected_intent": "content_request",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_13",
+    "query": "Hello, good morning!",
+    "expected_intent": "greeting",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_14",
+    "query": "Assalamu Alaikum",
+    "expected_intent": "greeting",
+    "language": "banglish",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_15",
+    "query": "Who is the Prime Minister of Australia?",
+    "expected_intent": "chitchat",
+    "language": "en",
+    "expected_entities": {}
+  },
+  {
+    "id": "intent_16",
+    "query": "I am extremely angry because your sales representative did not call me back as promised!",
+    "expected_intent": "complaint",
+    "language": "en",
+    "expected_entities": {}
+  }
+]

@@ -1,0 +1,55 @@
+[
+  {
+    "id": "rag_01",
+    "query": "What are the key amenities, pool facilities, and security systems at GLG Gulshan Heights?",
+    "expected_project": "GLG Gulshan Heights",
+    "expected_facts": [
+      "rooftop infinity pool",
+      "three-tier security",
+      "smart automation"
+    ],
+    "must_not_contain": [
+      "helipad",
+      "submarine dock"
+    ],
+    "category": "amenities"
+  },
+  {
+    "id": "rag_02",
+    "query": "What is the expected handover timeline for Banani Crest?",
+    "expected_project": "GLG Banani Crest",
+    "expected_facts": [
+      "2026",
+      "handover"
+    ],
+    "must_not_contain": [
+      "2030"
+    ],
+    "category": "timeline"
+  },
+  {
+    "id": "rag_03",
+    "query": "What are the payment plan options and down payment requirements for GLG Grand Residency?",
+    "expected_project": "GLG Grand Residency",
+    "expected_facts": [
+      "installment",
+      "down payment"
+    ],
+    "must_not_contain": [
+      "free apartment",
+      "0% down payment guaranteed"
+    ],
+    "category": "pricing"
+  },
+  {
+    "id": "rag_04",
+    "query": "Does GLG Assets offer commercial space rockets for Martian colonization?",
+    "expected_project": null,
+    "expected_refusal": true,
+    "must_not_contain": [
+      "Falcon 9",
+      "Starship rocket available for sale"
+    ],
+    "category": "hallucination_refusal"
+  }
+]

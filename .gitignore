@@ -58,7 +58,8 @@ __pycache__/
 venv/
 ENV/
 .pytest_cache/
-.benchmarks/
+.benchmarks/reports/
+!.benchmarks/datasets/
 .coverage
 htmlcov/
 *.log

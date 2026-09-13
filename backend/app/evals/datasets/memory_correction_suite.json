@@ -1,0 +1,24 @@
+[
+  {
+    "id": "mem_01",
+    "description": "Explicit location switch with budget upgrade",
+    "turn_1": "I want a 3 bedroom apartment in Banani with budget 3.5 Crore",
+    "turn_2": "Actually, skip Banani, I changed my mind. Look for Gulshan 2 instead, and my budget is 5 Crore",
+    "expected_beliefs": {
+      "preferred_locations": ["Gulshan 2"],
+      "excluded_locations_or_absent": ["Banani"],
+      "budget_max": 50000000.0,
+      "bedrooms": 3
+    }
+  },
+  {
+    "id": "mem_02",
+    "description": "Negative exclusion of ground floor",
+    "turn_1": "Show me flats in Uttara",
+    "turn_2": "Do not show me ground floor units. No ground floor please.",
+    "expected_beliefs": {
+      "preferred_locations": ["Uttara"],
+      "negative_constraints_contain": ["ground floor"]
+    }
+  }
+]
