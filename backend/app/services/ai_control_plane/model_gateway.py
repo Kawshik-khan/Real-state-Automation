@@ -17,7 +17,6 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-
 from app.config import settings
 
 logger = logging.getLogger(__name__)

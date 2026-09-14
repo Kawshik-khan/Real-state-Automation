@@ -9,14 +9,13 @@ Provides tiered limits based on caller identity:
 import re
 from typing import Tuple
 
+from app.config import settings
+from app.core.redis_client import resilient_store
+from app.core.security import decode_access_token
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-
-from app.config import settings
-from app.core.redis_client import resilient_store
-from app.core.security import decode_access_token
 
 # Tiered Limit Definitions
 AUTH_LOGIN_LIMIT = "5/minute"     # Strict brute-force credential defense
