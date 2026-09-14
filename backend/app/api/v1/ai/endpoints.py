@@ -201,7 +201,10 @@ async def ai_translate(body: dict, auth: dict = Depends(_auth)):
         {"role": "system", "content": f"You are a translator. Translate the following text to {target}. Respond with ONLY the translated text, no explanations."},
         {"role": "user", "content": text}
     ]
-    translated = await llm_service.chat(messages, temperature=0.1)
+    try:
+        translated = await llm_service.chat(messages, temperature=0.1)
+    except Exception:
+        translated = text
 
     return {
         "success": True,

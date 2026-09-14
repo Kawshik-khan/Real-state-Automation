@@ -11,7 +11,7 @@ class LLMService:
     def get_client(self) -> Optional[AsyncOpenAI]:
         if not settings.openai_api_key:
             return None
-        kwargs = {"api_key": settings.openai_api_key}
+        kwargs = {"api_key": settings.openai_api_key, "timeout": 20.0}
         if settings.openai_base_url:
             kwargs["base_url"] = settings.openai_base_url
         return AsyncOpenAI(**kwargs)
@@ -29,7 +29,7 @@ class LLMService:
     ) -> str:
         client = self.get_client()
         if not client:
-            return json.dumps({"reply": "AI service not configured", "intent": "fallback", "confidence": 0.5})
+            raise ConnectionError("AI service not configured: OPENAI_API_KEY is missing or empty")
         
         target_model = self.model
         kwargs = dict(model=target_model, messages=messages, temperature=temperature, max_tokens=max_tokens)
@@ -41,16 +41,19 @@ class LLMService:
                 resp = await client.chat.completions.create(**kwargs)
                 return resp.choices[0].message.content or ""
             except RateLimitError as rle:
-                if attempt == 3:
-                    print(f"[LLMService Error] Rate limit exceeded after 4 attempts: {rle}")
-                    raise rle
-                # Fallback to gpt-oss-20b if 120b is rate limited on Groq
                 if "120b" in kwargs["model"]:
                     print("[LLMService RateLimit] Falling back from 120b to gpt-oss-20b for fast recovery...")
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
+                elif "20b" in kwargs["model"]:
+                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.6-27b...")
+                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    continue
+                if attempt == 3:
+                    print(f"[LLMService Error] Rate limit exceeded after 4 attempts: {rle}")
+                    raise rle
                 err_msg = str(rle)
-                wait_sec = 2.0 * (2 ** attempt)
+                wait_sec = min(10.0, 1.5 * (2 ** attempt))
                 if "try again in " in err_msg:
                     try:
                         wait_sec = min(15.0, float(err_msg.split("try again in ")[1].split("s")[0]) + 0.5)
@@ -58,6 +61,19 @@ class LLMService:
                         pass
                 print(f"[LLMService RateLimit] Rate limited on {kwargs['model']}. Waiting {wait_sec:.1f}s before retry {attempt+1}...")
                 await asyncio.sleep(wait_sec)
+            except Exception as ex:
+                print(f"[LLMService Error] Attempt {attempt+1} failed with {type(ex).__name__}: {ex}")
+                if "120b" in kwargs["model"]:
+                    print("[LLMService Error] Falling back from 120b to gpt-oss-20b...")
+                    kwargs["model"] = "openai/gpt-oss-20b"
+                    continue
+                elif "20b" in kwargs["model"]:
+                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.6-27b...")
+                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    continue
+                if attempt == 3:
+                    raise ex
+                await asyncio.sleep(1.0)
 
         return ""
 
@@ -93,15 +109,19 @@ class LLMService:
                         content = content.split("```")[-1].strip()
                 return json.loads(content)
             except RateLimitError as rle:
-                if attempt == 3:
-                    print(f"[LLMService Error] structured_chat rate limit exceeded: {rle}")
-                    break
                 if "120b" in kwargs["model"]:
                     print("[LLMService RateLimit] Falling back from 120b to gpt-oss-20b in structured_chat...")
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
+                elif "20b" in kwargs["model"]:
+                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.6-27b in structured_chat...")
+                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    continue
+                if attempt == 3:
+                    print(f"[LLMService Error] structured_chat rate limit exceeded: {rle}")
+                    break
                 err_msg = str(rle)
-                wait_sec = 2.0 * (2 ** attempt)
+                wait_sec = min(10.0, 1.5 * (2 ** attempt))
                 if "try again in " in err_msg:
                     try:
                         wait_sec = min(15.0, float(err_msg.split("try again in ")[1].split("s")[0]) + 0.5)
@@ -110,8 +130,18 @@ class LLMService:
                 print(f"[LLMService RateLimit] Waiting {wait_sec:.1f}s in structured_chat retry {attempt+1}...")
                 await asyncio.sleep(wait_sec)
             except Exception as e:
-                print(f"[LLMService Error] structured_chat failed: {e}")
-                return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
+                print(f"[LLMService Error] structured_chat attempt {attempt+1} failed with {type(e).__name__}: {e}")
+                if "120b" in kwargs["model"]:
+                    print("[LLMService Error] Falling back from 120b to gpt-oss-20b in structured_chat...")
+                    kwargs["model"] = "openai/gpt-oss-20b"
+                    continue
+                elif "20b" in kwargs["model"]:
+                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.6-27b in structured_chat...")
+                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    continue
+                if attempt == 3:
+                    return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
+                await asyncio.sleep(1.0)
 
         return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
 

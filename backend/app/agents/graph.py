@@ -137,9 +137,41 @@ async def supervisor_node(state: AIState) -> dict:
             "messages_used": state.messages_used + 1
         }
 
+    import re
+
+    # Non-property retail goods inquiry safeguard -> routes cleanly to fallback_handler
+    consumer_retail_terms = [
+        "jacket", "shirt", "pant", "t-shirt", "dress", "clothing", "shoe", "shoes",
+        "chocolate", "kitkat", "candy", "phone", "iphone", "laptop",
+        "watch", "car", "bike", "food", "grocery", "groceries", "medicine", "ticket"
+    ]
+    if any(re.search(rf"\b{re.escape(term)}\b", msg_lower) for term in consumer_retail_terms):
+        return {
+            "intent": IntentResult(
+                intent="other",
+                confidence=0.98,
+                entities={"location": "", "project": "", "bedrooms": 0, "budget": ""},
+            ),
+            "intent_classified": True,
+            "messages_used": state.messages_used + 1,
+        }
+
     # Banglish / Bangla property inquiry safeguard
-    property_keywords = ["ki ache", "konta ache", "kothay ache", "flat ache", "apartment", "project", "banani", "gulshan", "uttara", "dhanmondi", "dam koto", "price"]
-    if any(kw in msg_lower for kw in property_keywords):
+    # Require explicit property indicators (or recognized project/locations), not generic single words like "price"
+    real_estate_explicit_terms = [
+        "flat", "apartment", "plot", "duplex", "penthouse", "bhk", "building",
+        "floor plan", "sqft", "square feet", "handover", "booking"
+    ]
+    location_terms = ["banani", "gulshan", "uttara", "dhanmondi", "baridhara", "mirpur"]
+    property_phrases = [
+        "ki ache", "konta ache", "kothay ache", "flat ache", "ongoing project",
+        "dam koto", "price koto", "koto dam", "flat price", "apartment price"
+    ]
+    has_explicit_re = any(term in msg_lower for term in real_estate_explicit_terms)
+    has_loc = any(loc in msg_lower for loc in location_terms)
+    has_prop_phrase = any(phrase in msg_lower for phrase in property_phrases)
+
+    if (has_explicit_re or (has_loc and (has_prop_phrase or "project" in msg_lower)) or has_prop_phrase):
         from app.services.location_service import location_service
         loc = await location_service.resolve_location_from_text(msg_lower)
         return {
@@ -214,12 +246,18 @@ async def property_agent_node(state: AIState) -> dict:
         reconciled_beds = state.beliefs.bedrooms or entities.get("bedrooms", 0)
 
         if not entities.get("location") and not reconciled_loc and state.history:
-            from app.services.location_service import location_service
-            for turn in reversed(state.history):
-                found_loc = await location_service.resolve_location_from_text(turn.get("content", ""))
-                if found_loc:
-                    reconciled_loc = found_loc
-                    break
+            # Only inherit past location if current message is an inquiry follow-up, not a new topic
+            is_followup = any(kw in state.message.lower() for kw in [
+                "ar ki", "konta", "details", "bistatito", "floor plan", "brochure",
+                "price", "dam", "size", "handover", "amenities", "pool", "bhk", "bedroom"
+            ])
+            if is_followup:
+                from app.services.location_service import location_service
+                for turn in reversed(state.history):
+                    found_loc = await location_service.resolve_location_from_text(turn.get("content", ""))
+                    if found_loc:
+                        reconciled_loc = found_loc
+                        break
 
         if reconciled_loc:
             entities["location"] = reconciled_loc
@@ -377,12 +415,18 @@ async def fallback_handler_node(state: AIState) -> dict:
     try:
         reply = await llm_service.chat(context_messages, temperature=0.2)
     except Exception:
-        reply = (
-            "I apologize, but I'm having trouble retrieving verified records right now. "
-            "Please try again or connect directly with our advisory team."
-            if is_en
-            else "আমি দুঃখিত, এই মুহূর্তে ভেরিফায়েড রেকর্ড পেতে কিছুটা সমস্যা হচ্ছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা আমাদের টিমের সাথে যোগাযোগ করুন।"
-        )
+        if is_en:
+            reply = (
+                "Thank you for contacting GLG Assets Limited. We are a premier luxury real-estate developer in Bangladesh. "
+                "We assist exclusively with property inquiries, project developments, and site visits in Dhaka. "
+                "Please let us know if you would like information regarding our luxury residential or commercial properties."
+            )
+        else:
+            reply = (
+                "GLG Assets Limited-এ যোগাযোগ করার জন্য ধন্যবাদ। আমরা বাংলাদেশের একটি প্রিমিয়াম লাক্সারি রিয়েল-এস্টেট ডেভেলপার প্রতিষ্ঠান। "
+                "আমরা শুধুমাত্র ফ্ল্যাট, অ্যাপার্টমেন্ট ও আবাসন প্রকল্প সম্পর্কিত তথ্য ও সেবা প্রদান করে থাকি। "
+                "আমাদের চলমান বা আসন্ন আবাসন প্রকল্প সম্পর্কে যেকোনো তথ্যের জন্য আমাদের জানাতে পারেন।"
+            )
 
     # Validate fallback response
     val = grounding_validator.validate(reply_text=reply, is_english=is_en)
