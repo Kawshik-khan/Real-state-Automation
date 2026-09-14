@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.agents.social_bridge_agent import social_bridge_agent
 from app.config import settings
@@ -342,7 +342,7 @@ async def lead_capture(body: dict, auth: dict = Depends(_auth)):
 
 @router.post("/telegram", summary="Telegram Bot Webhook & AI RAG Processing")
 @router.post("/telegram/webhook", summary="Telegram Bot Webhook Endpoint")
-async def telegram_webhook(body: dict):
+async def telegram_webhook(request: Request, body: dict):
     """Processes incoming Telegram updates, executes RAG + AI graph pipeline, and sends reply."""
     from app.api.v1.ai.endpoints import ai_chat
     from app.schemas.chat import ChatRequest
@@ -364,7 +364,7 @@ async def telegram_webhook(body: dict):
             conversation_id=conv_id,
             channel="telegram",
         )
-        ai_response = await ai_chat(chat_req, auth={"tenant_id": "glg-assets-main"})
+        ai_response = await ai_chat(request=request, body=chat_req, auth={"tenant_id": "glg-assets-main"})
         reply_text = ai_response.get("reply") if isinstance(ai_response, dict) else str(ai_response)
     except Exception as err:
         print(f"[Telegram Webhook AI Error]: {err}")

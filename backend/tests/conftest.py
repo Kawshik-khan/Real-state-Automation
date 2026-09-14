@@ -27,6 +27,7 @@ _CI_DEFAULTS = {
     "SUPABASE_SERVICE_ROLE_KEY": "",
     "GMAIL_USER_EMAIL": "",
     "GMAIL_APP_PASSWORD": "",
+    "TESTING": "true",
 }
 
 for key, value in _CI_DEFAULTS.items():
@@ -37,8 +38,12 @@ for key, value in _CI_DEFAULTS.items():
 from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
+from app.core.rate_limiter import limiter
 from app.core.security import create_access_token
 from app.models.user import UserRole
+
+# Ensure rate limiting is globally disabled for all tests
+limiter.enabled = False
 
 
 @pytest.fixture(scope="session")

@@ -274,7 +274,7 @@ async def api_chat_handler(request: Request, body: dict = None, auth: dict = Dep
         chat_req = ChatRequest(**body)
     else:
         chat_req = body
-    return await ai_chat(chat_req, auth=auth)
+    return await ai_chat(request=request, body=chat_req, auth=auth)
 
 @app.post("/api/content", tags=["MVP API"])
 async def api_content_handler(body: dict, auth: dict = Depends(_auth)):

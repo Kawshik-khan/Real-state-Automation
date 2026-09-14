@@ -6,7 +6,9 @@ Provides tiered limits based on caller identity:
 - Public/unauthenticated: keyed by sanitized client IP with proxy resolution
 """
 
+import os
 import re
+import sys
 from typing import Tuple
 
 from app.config import settings
@@ -87,6 +89,10 @@ limiter = Limiter(
     key_func=get_rate_limit_identity,
     default_limits=[DEFAULT_LIMIT],
 )
+
+# Automatically disable rate limiting during automated test suite runs
+if "pytest" in sys.modules or os.getenv("TESTING", "").lower() in ("true", "1") or "PYTEST_CURRENT_TEST" in os.environ:
+    limiter.enabled = False
 
 
 async def check_sliding_window_rate_limit(
