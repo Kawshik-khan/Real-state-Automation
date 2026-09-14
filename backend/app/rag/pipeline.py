@@ -57,13 +57,22 @@ class RAGPipeline:
             return []
 
         # Step 1: Query rewriting
-        rewritten = await query_rewriter.rewrite(query_text)
-        search_queries = rewritten.get("queries", [query_text])
-        merged_filters = {**(filters or {}), **rewritten.get("filters", {})}
-        keywords = rewritten.get("keywords", [])
+        try:
+            rewritten = await query_rewriter.rewrite(query_text)
+            search_queries = rewritten.get("queries", [query_text])
+            merged_filters = {**(filters or {}), **rewritten.get("filters", {})}
+            keywords = rewritten.get("keywords", [])
+        except Exception:
+            search_queries = [query_text]
+            merged_filters = filters or {}
+            keywords = []
 
         # Step 2: Get query embedding
-        query_emb = await llm_service.embed(query_text)
+        query_emb = []
+        try:
+            query_emb = await llm_service.embed(query_text)
+        except Exception:
+            pass
 
         # Step 3: Run Vector Search and Keyword Search
         vector_results: list[dict] = []
@@ -90,8 +99,11 @@ class RAGPipeline:
                 deduped.append(r)
 
         # Step 5: Re-rank candidates using LLM Reranker
-        ranked = await reranker.rerank(query_text, deduped, top_k=top_k)
-        return ranked
+        try:
+            ranked = await reranker.rerank(query_text, deduped, top_k=top_k)
+            return ranked if ranked else deduped[:top_k]
+        except Exception:
+            return deduped[:top_k]
 
     async def build_context(self, chunks: list[dict]) -> str:
         """Build a context string from retrieved chunks for LLM consumption."""

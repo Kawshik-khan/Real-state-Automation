@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Home,
-  LayoutDashboard, 
   BookOpen, 
   MessageSquare, 
   Building2, 
@@ -14,14 +14,73 @@ import {
   Moon, 
   HelpCircle, 
   LogOut, 
-  Zap 
+  Zap,
+  SlidersHorizontal,
+  ChevronRight,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { CONTROL_PLANE_SECTIONS } from '../ai-control-plane/ControlPlaneNav';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
   const { user, logout } = useAuth();
   const userRole = user?.role || 'viewer';
+  const navigate = useNavigate();
   const [hoveredItem, setHoveredItem] = useState(null);
+
+  // AI Studio Cascading Flyout Menu State
+  const [aiFlyoutOpen, setAiFlyoutOpen] = useState(false);
+  const [activeFlyoutCategory, setActiveFlyoutCategory] = useState('AGENTS');
+  const flyoutTimerRef = useRef(null);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    };
+  }, []);
+
+  const handleAiButtonEnter = () => {
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+    setHoveredItem('ai_customization');
+    setAiFlyoutOpen(true);
+  };
+
+  const handleAiButtonLeave = () => {
+    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    flyoutTimerRef.current = setTimeout(() => {
+      setAiFlyoutOpen(false);
+      setHoveredItem((prev) => (prev === 'ai_customization' ? null : prev));
+    }, 240);
+  };
+
+  const handleFlyoutContainerEnter = () => {
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+    setAiFlyoutOpen(true);
+    setHoveredItem('ai_customization');
+  };
+
+  const handleFlyoutContainerLeave = () => {
+    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    flyoutTimerRef.current = setTimeout(() => {
+      setAiFlyoutOpen(false);
+      setHoveredItem((prev) => (prev === 'ai_customization' ? null : prev));
+    }, 240);
+  };
+
+  const handleSelectSubcategory = (viewId) => {
+    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    setAiFlyoutOpen(false);
+    setHoveredItem(null);
+    setActiveTab('ai_customization');
+    navigate(`/ai-studio?view=${viewId}`);
+  };
 
   // Theme state
   const [theme, setTheme] = useState(() => {
@@ -57,6 +116,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'content', label: 'Content Engine', icon: Sparkles, roles: ['agent'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
     { id: 'developer_console', label: 'Developer', icon: Terminal, roles: ['developer'] },
+    { id: 'ai_customization', label: 'AI Studio', icon: SlidersHorizontal, roles: ['developer'], badge: 'PRO', badgeColor: '#E8654A' },
     { id: 'n8n_monitoring', label: 'n8n Health', icon: Workflow, roles: ['developer'] },
   ];
 
@@ -85,9 +145,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       userSelect: 'none',
       background: 'transparent',
       border: 'none',
-      overflowY: 'auto',
-      scrollbarWidth: 'none',
-      msOverflowStyle: 'none'
+      overflow: 'visible'
     }}>
       {/* Top: Brand Logo */}
       <div 
@@ -155,6 +213,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             const isHovered = hoveredItem === item.id;
+            const isAiStudio = item.id === 'ai_customization';
+
+            // Selected category section in AI Studio flyout
+            const selectedFlyoutSection = isAiStudio
+              ? (CONTROL_PLANE_SECTIONS.find((s) => (s.category || s.id) === activeFlyoutCategory) ||
+                 CONTROL_PLANE_SECTIONS.find((s) => s.category === 'AGENTS') ||
+                 CONTROL_PLANE_SECTIONS[1])
+              : null;
 
             return (
               <div 
@@ -164,9 +230,27 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                 <button
                   id={`nav-item-${item.id}`}
                   data-testid={`nav-item-${item.id}`}
-                  onClick={() => setActiveTab(item.id)}
-                  onMouseEnter={() => setHoveredItem(item.id)}
-                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setHoveredItem(null);
+                    setAiFlyoutOpen(false);
+                  }}
+                  onMouseEnter={() => {
+                    if (isAiStudio) {
+                      handleAiButtonEnter();
+                    } else {
+                      if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+                      setAiFlyoutOpen(false);
+                      setHoveredItem(item.id);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (isAiStudio) {
+                      handleAiButtonLeave();
+                    } else {
+                      setHoveredItem(null);
+                    }
+                  }}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
                   style={{
@@ -225,19 +309,25 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                   )}
                 </button>
 
-                {/* Floating Glass Tooltip to the Right */}
-                {isHovered && (
+                {/* Floating Glass Tooltip for standard items */}
+                {isHovered && !isAiStudio && (
                   <div style={{
                     position: 'absolute',
                     left: 'calc(100% + 14px)',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: 'rgba(18, 20, 32, 0.92)',
-                    backdropFilter: 'blur(14px)',
-                    WebkitBackdropFilter: 'blur(14px)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
-                    color: '#FFFFFF',
+                    background: isDark 
+                      ? 'rgba(24, 27, 44, 0.96)' 
+                      : 'rgba(255, 255, 255, 0.98)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: isDark 
+                      ? '1px solid rgba(255, 255, 255, 0.14)' 
+                      : '1px solid rgba(0, 0, 0, 0.08)',
+                    boxShadow: isDark 
+                      ? '0 8px 24px rgba(0, 0, 0, 0.35)' 
+                      : '0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04)',
+                    color: isDark ? '#FFFFFF' : '#0F172A',
                     padding: '6px 12px',
                     borderRadius: '8px',
                     fontSize: '0.76rem',
@@ -253,14 +343,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                     {/* Small Arrow indicator */}
                     <div style={{
                       position: 'absolute',
-                      left: '-5px',
+                      left: '-4px',
                       top: '50%',
                       transform: 'translateY(-50%) rotate(45deg)',
                       width: '8px',
                       height: '8px',
-                      background: 'rgba(18, 20, 32, 0.92)',
-                      borderLeft: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
+                      background: isDark ? 'rgba(24, 27, 44, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+                      borderLeft: isDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid rgba(0, 0, 0, 0.08)',
+                      borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid rgba(0, 0, 0, 0.08)'
                     }} />
                     <span>{item.label}</span>
                     {item.badge && (
@@ -275,6 +365,326 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                         {item.badge}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {/* Rich Cascading Flyout Menu for AI Studio */}
+                {isAiStudio && aiFlyoutOpen && (
+                  <div 
+                    id="ai-studio-cascading-flyout"
+                    onMouseEnter={handleFlyoutContainerEnter}
+                    onMouseLeave={handleFlyoutContainerLeave}
+                    style={{
+                      position: 'absolute',
+                      left: '100%',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      paddingLeft: '14px',
+                      zIndex: 1000,
+                      animation: 'flyoutFadeSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      pointerEvents: 'auto'
+                    }}
+                  >
+                    {/* Visual Pointing Indicator */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '9px',
+                      top: '50%',
+                      transform: 'translateY(-50%) rotate(45deg)',
+                      width: '10px',
+                      height: '10px',
+                      background: isDark ? 'rgba(18, 20, 32, 0.98)' : '#F8FAFC',
+                      borderLeft: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.1)',
+                      borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.1)',
+                      zIndex: 3
+                    }} />
+
+                    {/* 2-Column Cascading Flyout Container */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      borderRadius: '16px',
+                      background: isDark ? 'rgba(18, 20, 32, 0.98)' : 'rgba(255, 255, 255, 0.99)',
+                      backdropFilter: 'blur(28px) saturate(190%)',
+                      WebkitBackdropFilter: 'blur(28px) saturate(190%)',
+                      border: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.1)',
+                      boxShadow: isDark 
+                        ? '0 24px 64px -8px rgba(0, 0, 0, 0.75), 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.12)' 
+                        : '0 24px 64px -8px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15, 23, 42, 0.08), inset 0 1px 2px #FFFFFF',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      zIndex: 2,
+                      minWidth: '465px',
+                      maxWidth: '490px'
+                    }}>
+                      {/* Column 1: Main Categories */}
+                      <div style={{
+                        width: '185px',
+                        minWidth: '185px',
+                        padding: '12px 8px',
+                        borderRight: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #F1F5F9',
+                        background: isDark ? 'rgba(255, 255, 255, 0.02)' : '#F8FAFC',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px'
+                      }}>
+                        {/* Header */}
+                        <div style={{
+                          padding: '2px 8px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid #E2E8F0',
+                          marginBottom: '4px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary-coral, #E8654A)' }} />
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.08em',
+                              color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#64748B'
+                            }}>
+                              AI Studio
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.58rem',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: 'rgba(232, 101, 74, 0.12)',
+                            color: 'var(--primary-coral, #E8654A)'
+                          }}>
+                            27 TOOLS
+                          </span>
+                        </div>
+
+                        {/* Category List */}
+                        {CONTROL_PLANE_SECTIONS.map((sec) => {
+                          const SecIcon = sec.icon;
+                          const catKey = sec.category || sec.id;
+                          const isSelected = activeFlyoutCategory === catKey;
+                          const isLive = sec.badge === 'LIVE';
+
+                          return (
+                            <div
+                              key={catKey}
+                              onMouseEnter={() => setActiveFlyoutCategory(catKey)}
+                              onClick={() => {
+                                if (sec.id === 'overview') {
+                                  handleSelectSubcategory('overview');
+                                } else if (sec.items?.length) {
+                                  handleSelectSubcategory(sec.items[0].id);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 10px',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.14s ease',
+                                background: isSelected 
+                                  ? (isDark ? 'rgba(232, 101, 74, 0.22)' : 'rgba(232, 101, 74, 0.1)') 
+                                  : 'transparent',
+                                color: isSelected 
+                                  ? 'var(--primary-coral, #E8654A)' 
+                                  : (isDark ? 'rgba(255, 255, 255, 0.82)' : '#334155'),
+                                fontWeight: isSelected ? 700 : 500,
+                                fontSize: '0.78rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <SecIcon 
+                                  size={15} 
+                                  color={isSelected ? 'var(--primary-coral, #E8654A)' : (isDark ? 'rgba(255, 255, 255, 0.55)' : '#64748B')} 
+                                />
+                                <span>{sec.label}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isLive && (
+                                  <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 6px', borderRadius: '20px', background: '#10B981', color: '#FFF' }}>
+                                    LIVE
+                                  </span>
+                                )}
+                                {sec.count && (
+                                  <span style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    padding: '2px 7px',
+                                    borderRadius: '20px',
+                                    background: isSelected ? 'rgba(232, 101, 74, 0.22)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0'),
+                                    color: isSelected ? 'var(--primary-coral, #E8654A)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : '#64748B')
+                                  }}>
+                                    {sec.count}
+                                  </span>
+                                )}
+                                <ChevronRight 
+                                  size={13} 
+                                  style={{ 
+                                    opacity: isSelected ? 1 : 0.35, 
+                                    transform: isSelected ? 'translateX(2px)' : 'none', 
+                                    transition: 'all 0.15s ease' 
+                                  }} 
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Column 2: Subcategories for Active Category */}
+                      <div style={{
+                        flex: 1,
+                        padding: '12px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        background: isDark ? 'rgba(18, 20, 32, 0.98)' : '#FFFFFF'
+                      }}>
+                        <div>
+                          {/* Subcategory Header */}
+                          <div style={{
+                            padding: '2px 4px 8px',
+                            borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #F1F5F9',
+                            marginBottom: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                              {selectedFlyoutSection?.label} Modules
+                            </span>
+                            <span style={{ fontSize: '0.64rem', color: isDark ? 'rgba(255, 255, 255, 0.45)' : '#94A3B8' }}>
+                              {selectedFlyoutSection?.items?.length ? `${selectedFlyoutSection.items.length} tools available` : 'Live Dashboard'}
+                            </span>
+                          </div>
+
+                          {/* Render Subcategories or Overview Card */}
+                          {(!selectedFlyoutSection?.items || selectedFlyoutSection.id === 'overview' || selectedFlyoutSection.category === 'OVERVIEW') ? (
+                            <div style={{
+                              padding: '16px 14px',
+                              borderRadius: '16px',
+                              background: isDark ? 'rgba(255, 255, 255, 0.03)' : '#F8FAFC',
+                              border: isDark ? '1px solid rgba(255, 255, 255, 0.07)' : '1px solid #E2E8F0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                                  Real-Time AI Telemetry
+                                </span>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: '#10B981', color: '#FFF' }}>
+                                  LIVE
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.72rem', color: isDark ? 'rgba(255, 255, 255, 0.6)' : '#64748B', lineHeight: 1.4 }}>
+                                Live metrics, token consumption (USD & BDT), P50/P95/P99 latency, provider statuses, and active agent execution runs.
+                              </p>
+                              <button
+                                onClick={() => handleSelectSubcategory('overview')}
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '10px 14px',
+                                  borderRadius: '14px',
+                                  background: 'var(--primary-coral, #E8654A)',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 4px 12px rgba(232, 101, 74, 0.3)'
+                                }}
+                              >
+                                <span>Open AI Overview</span>
+                                <ArrowRight size={13} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {selectedFlyoutSection.items.map((sub) => {
+                                const SubIcon = sub.icon;
+                                return (
+                                  <div
+                                    key={sub.id}
+                                    id={`flyout-sub-${sub.id}`}
+                                    onClick={() => handleSelectSubcategory(sub.id)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px',
+                                      padding: '8px 10px',
+                                      borderRadius: '12px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                      background: 'transparent'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(232, 101, 74, 0.07)';
+                                      e.currentTarget.style.transform = 'translateX(2px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = 'transparent';
+                                      e.currentTarget.style.transform = 'translateX(0)';
+                                    }}
+                                  >
+                                    <div style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '10px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: 'rgba(232, 101, 74, 0.1)',
+                                      color: 'var(--primary-coral, #E8654A)',
+                                      flexShrink: 0
+                                    }}>
+                                      <SubIcon size={14} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.77rem', fontWeight: 600, color: isDark ? '#FFFFFF' : '#0F172A', whiteSpace: 'nowrap' }}>
+                                          {sub.label}
+                                        </span>
+                                        {sub.badge && (
+                                          <span style={{
+                                            fontSize: '0.56rem',
+                                            fontWeight: 800,
+                                            padding: '2px 6px',
+                                            borderRadius: '20px',
+                                            background: sub.badge === 'SANDBOX' ? '#3B82F6' : '#E8654A',
+                                            color: '#FFFFFF'
+                                          }}>
+                                            {sub.badge}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{
+                                        fontSize: '0.66rem',
+                                        color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#64748B',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                      }}>
+                                        {sub.desc}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -319,10 +729,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               left: 'calc(100% + 14px)',
               top: '50%',
               transform: 'translateY(-50%)',
-              background: 'rgba(18, 20, 32, 0.92)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
+              background: isDark ? 'rgba(24, 27, 44, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid rgba(0, 0, 0, 0.08)',
+              boxShadow: isDark 
+                ? '0 8px 24px rgba(0, 0, 0, 0.35)' 
+                : '0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04)',
+              color: isDark ? '#FFFFFF' : '#0F172A',
               padding: '5px 10px',
               borderRadius: '8px',
               fontSize: '0.74rem',
@@ -364,10 +778,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               left: 'calc(100% + 14px)',
               top: '50%',
               transform: 'translateY(-50%)',
-              background: 'rgba(18, 20, 32, 0.92)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
+              background: isDark ? 'rgba(24, 27, 44, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid rgba(0, 0, 0, 0.08)',
+              boxShadow: isDark 
+                ? '0 8px 24px rgba(0, 0, 0, 0.35)' 
+                : '0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04)',
+              color: isDark ? '#FFFFFF' : '#0F172A',
               padding: '5px 10px',
               borderRadius: '8px',
               fontSize: '0.74rem',
@@ -409,9 +827,13 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               left: 'calc(100% + 14px)',
               top: '50%',
               transform: 'translateY(-50%)',
-              background: 'rgba(18, 20, 32, 0.92)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: isDark ? 'rgba(24, 27, 44, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: isDark ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(239, 68, 68, 0.2)',
+              boxShadow: isDark 
+                ? '0 8px 24px rgba(0, 0, 0, 0.35)' 
+                : '0 8px 24px rgba(239, 68, 68, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04)',
               color: '#EF4444',
               padding: '5px 10px',
               borderRadius: '8px',

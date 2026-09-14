@@ -217,3 +217,46 @@ class CalendarMilestoneRecord(Base):
     badge_variant: Mapped[str] = mapped_column(String(32), default="emerald")
     tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AgentConfigurationRecord(Base):
+    __tablename__ = "agent_configurations"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    agent_key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider: Mapped[str] = mapped_column(String(64), default="groq")
+    model: Mapped[str] = mapped_column(String(128), default="llama-3.3-70b-versatile")
+    fallback_model: Mapped[str | None] = mapped_column(String(128), default="llama-3.1-8b-instant")
+    temperature: Mapped[float] = mapped_column(Float, default=0.2)
+    top_p: Mapped[float] = mapped_column(Float, default=0.9)
+    max_tokens: Mapped[int] = mapped_column(Integer, default=1024)
+    presence_penalty: Mapped[float] = mapped_column(Float, default=0.0)
+    frequency_penalty: Mapped[float] = mapped_column(Float, default=0.0)
+    system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    rag_settings: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    lora_adapter: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class FineTuningJobRecord(Base):
+    __tablename__ = "fine_tuning_jobs"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    job_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    base_model: Mapped[str] = mapped_column(String(128), nullable=False)
+    target_agent: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="running")  # queued, running, completed, failed
+    dataset_samples: Mapped[int] = mapped_column(Integer, default=0)
+    epochs: Mapped[int] = mapped_column(Integer, default=3)
+    current_epoch: Mapped[int] = mapped_column(Integer, default=1)
+    learning_rate: Mapped[float] = mapped_column(Float, default=0.0002)
+    training_loss: Mapped[float] = mapped_column(Float, default=0.45)
+    loss_history: Mapped[list | None] = mapped_column(JSON, default=list)
+    adapter_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+

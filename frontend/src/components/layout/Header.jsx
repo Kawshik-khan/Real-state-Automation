@@ -184,7 +184,7 @@ export default function Header({
               paddingRight: searchQuery ? '30px' : '10px',
               width: '100%', 
               height: '38px',
-              borderRadius: '10px',
+              borderRadius: '14px',
               fontSize: '0.82rem'
             }}
           />
@@ -217,7 +217,7 @@ export default function Header({
           onChange={(val) => onChangeProperty && onChangeProperty(val)}
           options={dynamicPropertyOptions}
           minWidth="150px"
-          buttonStyle={{ height: '38px', borderRadius: '10px' }}
+          buttonStyle={{ height: '38px', borderRadius: '14px' }}
           ariaLabel="Select Property"
         />
 
@@ -227,7 +227,7 @@ export default function Header({
           onChange={(val) => onChangeChannel && onChangeChannel(val)}
           options={channelOptions}
           minWidth="140px"
-          buttonStyle={{ height: '38px', borderRadius: '10px' }}
+          buttonStyle={{ height: '38px', borderRadius: '14px' }}
           ariaLabel="Select Channel"
         />
 
@@ -237,7 +237,7 @@ export default function Header({
           onChange={(val) => onChangeDateRange && onChangeDateRange(val)}
           options={dateRangeOptions}
           minWidth="125px"
-          buttonStyle={{ height: '38px', borderRadius: '10px' }}
+          buttonStyle={{ height: '38px', borderRadius: '14px' }}
           ariaLabel="Select Date Range"
         />
 
@@ -351,7 +351,7 @@ export default function Header({
               background: 'var(--bg-card)',
               border: '1px solid var(--border-glass)',
               boxShadow: 'var(--shadow-dropdown)',
-              borderRadius: '12px',
+              borderRadius: '18px',
               padding: '14px',
               zIndex: 100,
               display: 'flex',
@@ -429,7 +429,7 @@ export default function Header({
               background: 'var(--bg-card)',
               border: '1px solid var(--border-glass)',
               boxShadow: 'var(--shadow-dropdown)',
-              borderRadius: '12px',
+              borderRadius: '18px',
               padding: '12px',
               zIndex: 100,
               display: 'flex',

@@ -529,6 +529,60 @@ VALUES
 ('HITL Booking Escalation Review', 'Rahim Chowdhury (Penthouse Inquirer)', CURRENT_DATE + INTERVAL '8 days', 'Needs Confirmation', 'escalation', 'action_required', 'rose');
 
 -- ----------------------------------------------------------------------------
+-- 10. AGENT CONFIGURATIONS & FINE-TUNING TABLES
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.agent_configurations (
+    id VARCHAR(64) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    agent_key VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    provider VARCHAR(64) DEFAULT 'groq',
+    model VARCHAR(128) DEFAULT 'llama-3.3-70b-versatile',
+    fallback_model VARCHAR(128) DEFAULT 'llama-3.1-8b-instant',
+    temperature FLOAT DEFAULT 0.2,
+    top_p FLOAT DEFAULT 0.9,
+    max_tokens INT DEFAULT 1024,
+    presence_penalty FLOAT DEFAULT 0.0,
+    frequency_penalty FLOAT DEFAULT 0.0,
+    system_prompt TEXT NOT NULL,
+    rag_settings JSONB DEFAULT '{}'::jsonb,
+    lora_adapter VARCHAR(128),
+    is_active BOOLEAN DEFAULT TRUE,
+    tenant_id VARCHAR(128) DEFAULT 'glg-assets-main',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+CREATE TABLE IF NOT EXISTS public.fine_tuning_jobs (
+    id VARCHAR(64) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    job_name VARCHAR(256) NOT NULL,
+    base_model VARCHAR(128) NOT NULL,
+    target_agent VARCHAR(64) NOT NULL,
+    status VARCHAR(32) DEFAULT 'running',
+    dataset_samples INT DEFAULT 0,
+    epochs INT DEFAULT 3,
+    current_epoch INT DEFAULT 1,
+    learning_rate FLOAT DEFAULT 0.0002,
+    training_loss FLOAT DEFAULT 0.45,
+    loss_history JSONB DEFAULT '[]'::jsonb,
+    adapter_id VARCHAR(128),
+    tenant_id VARCHAR(128) DEFAULT 'glg-assets-main',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Enable RLS
+ALTER TABLE public.agent_configurations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fine_tuning_jobs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation_agent_configurations ON public.agent_configurations
+FOR ALL USING (tenant_id = 'glg-assets-main') WITH CHECK (tenant_id = 'glg-assets-main');
+
+CREATE POLICY tenant_isolation_fine_tuning_jobs ON public.fine_tuning_jobs
+FOR ALL USING (tenant_id = 'glg-assets-main') WITH CHECK (tenant_id = 'glg-assets-main');
+
+-- ----------------------------------------------------------------------------
 -- SUCCESS VERIFICATION QUERY
 -- ----------------------------------------------------------------------------
 SELECT 
@@ -537,3 +591,4 @@ SELECT
     (SELECT COUNT(*) FROM ad_campaigns) AS total_campaigns,
     (SELECT COUNT(*) FROM calendar_milestones) AS total_milestones,
     (SELECT COUNT(*) FROM knowledge_documents) AS total_documents;
+

@@ -51,7 +51,7 @@ export default function Modal({
           maxWidth,
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border-glass)',
-          borderRadius: '16px',
+          borderRadius: '22px',
           boxShadow: 'var(--shadow-dropdown)',
           padding: '24px 28px',
           display: 'flex',

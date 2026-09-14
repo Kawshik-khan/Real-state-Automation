@@ -69,20 +69,20 @@ class BeliefMemoryService:
 
         # Attempt to load from database
         try:
-            from sqlalchemy import text
-
-            from app.database import async_session_factory
-            async with async_session_factory() as session:
-                result = await session.execute(
-                    text("SELECT beliefs FROM conversations WHERE conversation_id = :cid"),
-                    {"cid": conversation_id},
-                )
-                row = result.fetchone()
-                if row and row[0]:
-                    data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                    beliefs = UserBeliefState(**data)
-                    self._cache[conversation_id] = beliefs
-                    return beliefs
+            from app.database import async_session_factory, is_db_reachable
+            if is_db_reachable():
+                from sqlalchemy import text
+                async with async_session_factory() as session:
+                    result = await session.execute(
+                        text("SELECT beliefs FROM conversations WHERE conversation_id = :cid"),
+                        {"cid": conversation_id},
+                    )
+                    row = result.fetchone()
+                    if row and row[0]:
+                        data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                        beliefs = UserBeliefState(**data)
+                        self._cache[conversation_id] = beliefs
+                        return beliefs
         except Exception:
             pass
 
@@ -94,20 +94,20 @@ class BeliefMemoryService:
         """Persist belief state into cache and PostgreSQL."""
         self._cache[conversation_id] = beliefs
         try:
-            from sqlalchemy import text
-
-            from app.database import async_session_factory
-            beliefs_json = json.dumps(beliefs.model_dump())
-            async with async_session_factory() as session:
-                await session.execute(
-                    text("""
-                        UPDATE conversations 
-                        SET beliefs = CAST(:b AS jsonb) 
-                        WHERE conversation_id = :cid
-                    """),
-                    {"b": beliefs_json, "cid": conversation_id},
-                )
-                await session.commit()
+            from app.database import async_session_factory, is_db_reachable
+            if is_db_reachable():
+                from sqlalchemy import text
+                beliefs_json = json.dumps(beliefs.model_dump())
+                async with async_session_factory() as session:
+                    await session.execute(
+                        text("""
+                            UPDATE conversations 
+                            SET beliefs = CAST(:b AS jsonb) 
+                            WHERE conversation_id = :cid
+                        """),
+                        {"b": beliefs_json, "cid": conversation_id},
+                    )
+                    await session.commit()
         except Exception:
             # Fallback for SQLite or environments without beliefs column
             pass
@@ -116,15 +116,15 @@ class BeliefMemoryService:
         """Clear customer beliefs."""
         self._cache.pop(conversation_id, None)
         try:
-            from sqlalchemy import text
-
-            from app.database import async_session_factory
-            async with async_session_factory() as session:
-                await session.execute(
-                    text("UPDATE conversations SET beliefs = NULL WHERE conversation_id = :cid"),
-                    {"cid": conversation_id},
-                )
-                await session.commit()
+            from app.database import async_session_factory, is_db_reachable
+            if is_db_reachable():
+                from sqlalchemy import text
+                async with async_session_factory() as session:
+                    await session.execute(
+                        text("UPDATE conversations SET beliefs = NULL WHERE conversation_id = :cid"),
+                        {"cid": conversation_id},
+                    )
+                    await session.commit()
         except Exception:
             pass
 

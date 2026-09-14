@@ -20,22 +20,46 @@ def entry_node(state: AIState) -> dict:
 
 async def moderation_node(state: AIState) -> dict:
     from app.services.llm import llm_service
+    from app.services.llm_guardrails import llm_guardrails
 
-    if not state.message.strip():
+    if not state.message or not state.message.strip():
         return {"moderation": ModerationResult(action="allow"), "moderated": True}
 
+    # 1. Deterministic Pre-Guard (Prompt Injection, Jailbreak Defense & PII Redaction)
+    guard_res = llm_guardrails.pre_guard(state.message)
+    if guard_res.action == "block":
+        return {
+            "moderation": ModerationResult(
+                action="block",
+                reason=guard_res.reason or "Message blocked by AI safety guardrail.",
+            ),
+            "moderated": True,
+            "message": guard_res.sanitized_text,
+        }
+
+    clean_message = guard_res.sanitized_text if guard_res.action == "sanitize" else state.message
+
+    # 2. LLM-based Moderation
     try:
         result = await llm_service.structured_chat(
             [
                 {"role": "system", "content": MODERATION_PROMPT},
-                {"role": "user", "content": state.message},
+                {"role": "user", "content": clean_message},
             ],
             json_schema={},
             temperature=0.1,
         )
-        return {"moderation": ModerationResult(**result), "moderated": True}
+        return {
+            "moderation": ModerationResult(**result),
+            "moderated": True,
+            "message": clean_message,
+        }
     except Exception:
-        return {"moderation": ModerationResult(action="allow"), "moderated": True}
+        return {
+            "moderation": ModerationResult(action="allow"),
+            "moderated": True,
+            "message": clean_message,
+        }
 
 
 def moderation_router(state: AIState) -> str:
@@ -231,8 +255,9 @@ async def property_agent_node(state: AIState) -> dict:
             pass
 
         reply = await property_agent.handle(state.message, entities, extra_context=agent_context)
+        final_rag_context = rag_context if rag_context else agent_context
         return {"agent_reply": reply, "agent_used": "property_agent", "agent_done": True,
-                "rag_context": rag_context, "rag_done": rag_done}
+                "rag_context": final_rag_context, "rag_done": rag_done}
     except Exception as e:
         return {"agent_reply": "I'm sorry, I couldn't find property information right now. Please try again.",
                 "agent_used": "property_agent", "agent_done": True, "agent_error": str(e)}
@@ -383,6 +408,10 @@ async def safety_check_node(state: AIState) -> dict:
     sanitized_reply = state.agent_reply
     if not val_res.is_grounded and val_res.sanitized_reply:
         sanitized_reply = val_res.sanitized_reply
+
+    # Apply Post-Guard output secret leak protection
+    from app.services.llm_guardrails import llm_guardrails
+    sanitized_reply, _ = llm_guardrails.post_guard(sanitized_reply)
 
     prompt = f"""You are a safety checker. Review this message for harmful or inappropriate content.
 Reply should be allowed for a real-estate customer communication channel.
@@ -553,7 +582,7 @@ Analyze the user's message and classify their intent into exactly one of these c
 - lead: Wants to be contacted or expressing interest in buying/renting
 - complaint: Has a complaint or issue
 - greeting: Saying hello or starting a conversation
-- chitchat: General conversation not related to real estate
+- chitchat: General conversation, trivia, or general knowledge not related to real estate
 - other: None of the above
 CRITICAL RULE FOR BANGLISH: If the message asks "ki ache", "konta ache", or specifies a location like "Banani", classify as property_search.
 Respond as JSON:

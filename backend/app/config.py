@@ -23,11 +23,16 @@ class Settings(BaseSettings):
     supabase_bucket_floorplans: str = "floorplans"
     supabase_bucket_ocr: str = "ocr-documents"
 
+    # Redis / Distributed Cache
+    redis_url: Optional[str] = None
+
     # Security
     automation_shared_secret: str = "change-me-to-a-random-secret"
     jwt_secret: Optional[str] = None  # Falls back to automation_shared_secret if unset
     password_hash_salt: str = "glg_assets_salt_2026"
     api_key: Optional[str] = None
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 7
 
     # CORS — comma-separated origins; "*" for development
     cors_origins: str = "*"

@@ -79,6 +79,9 @@ async def check_connection() -> bool:
 
 async def init_db():
     """Initialize database tables and enable pgvector & uuid-ossp extensions on Supabase/PostgreSQL."""
+    # Ensure all AI Control Plane models are registered in Base.metadata
+    import app.models.ai_control_plane  # noqa: F401
+
     async with engine.begin() as conn:
         # Enable pgvector & UUID extensions natively
         try:
@@ -87,5 +90,6 @@ async def init_db():
         except Exception:
             pass
         
-        # Create all 9 tables defined in Base.metadata
+        # Create all tables defined in Base.metadata
         await conn.run_sync(Base.metadata.create_all)
+

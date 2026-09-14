@@ -33,9 +33,9 @@ class FAQAgent:
                 title = "Contact Information" if is_english else "যোগাযোগের বিবরণ"
                 return f"📋 *{title}*\n\n{contact_card}"
 
-        # 2. Check Approved Policy Repository Match
+        # 2. Check Approved Policy Repository Match (only return static card if no specific RAG extra_context exists)
         matched_policy = policy_repository.match_policy(message)
-        if matched_policy:
+        if matched_policy and not extra_context:
             title = matched_policy["title_en"] if is_english else matched_policy["title_bn"]
             body = matched_policy["answer_en"] if is_english else matched_policy["answer_bn"]
             return f"📋 *{title}*\n\n{body}"

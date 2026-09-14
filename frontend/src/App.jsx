@@ -14,6 +14,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SocialAnalyticsPage from './pages/SocialAnalyticsPage';
 import N8nMonitoringPage from './pages/N8nMonitoringPage';
 import DeveloperConsolePage from './pages/DeveloperConsolePage';
+import AgentCustomizationPage from './pages/AgentCustomizationPage';
 import RoleReportsPage from './pages/RoleReportsPage';
 import ManagerDashboardPage from './pages/ManagerDashboardPage';
 import EmailInboxPage from './pages/EmailInboxPage';
@@ -50,6 +51,7 @@ export const getDefaultTabForRole = (role) => {
 export const TAB_TO_PATH = {
   overview: '/overview',
   developer_console: '/developer',
+  ai_customization: '/ai-studio',
   analytics: '/analytics',
   social_analytics: '/social-analytics',
   role_reports: '/reports',
@@ -67,6 +69,8 @@ export const PATH_TO_TAB = {
   '/dashboard': 'overview',
   '/developer': 'developer_console',
   '/developer-console': 'developer_console',
+  '/ai-studio': 'ai_customization',
+  '/agent-customization': 'ai_customization',
   '/analytics': 'analytics',
   '/social-analytics': 'social_analytics',
   '/reports': 'role_reports',
@@ -89,6 +93,7 @@ function DashboardApp() {
   const getTabFromPath = (pathname) => {
     if (pathname.startsWith('/conversations')) return 'conversations';
     if (pathname.startsWith('/properties')) return 'properties';
+    if (pathname.startsWith('/ai-studio') || pathname.startsWith('/agent-customization')) return 'ai_customization';
     if (pathname.startsWith('/developer')) return 'developer_console';
     if (pathname.startsWith('/social')) return 'social_analytics';
     if (pathname.startsWith('/n8n')) return 'n8n_monitoring';
@@ -157,6 +162,7 @@ function DashboardApp() {
     switch (activeTab) {
       case 'overview': return 'Dashboard Overview';
       case 'developer_console': return 'Engineering & Developer Console';
+      case 'ai_customization': return 'AI & Agent Customization Studio';
       case 'analytics': return 'Analytics & Executive Command Center';
       case 'social_analytics': return 'Social Media KPI & Campaign Analytics';
       case 'role_reports': return 'Executive Cross-Role Operational Reports';
@@ -261,6 +267,8 @@ function DashboardApp() {
             <Route path="/social-analytics" element={<SocialAnalyticsPage />} />
             <Route path="/developer" element={<DeveloperConsolePage setActiveParentTab={handleSetActiveTab} />} />
             <Route path="/developer-console" element={<Navigate to="/developer" replace />} />
+            <Route path="/ai-studio" element={<AgentCustomizationPage setActiveParentTab={handleSetActiveTab} />} />
+            <Route path="/agent-customization" element={<Navigate to="/ai-studio" replace />} />
             <Route path="/n8n" element={<N8nMonitoringPage />} />
             <Route path="/n8n-monitoring" element={<Navigate to="/n8n" replace />} />
             <Route path="/reports" element={<RoleReportsPage />} />

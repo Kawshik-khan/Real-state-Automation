@@ -12,18 +12,23 @@ from typing import Any, Optional
 from app.services.llm import llm_service
 
 GROUNDEDNESS_PROMPT = """You are an impartial, highly rigorous evaluator grading factual groundedness in RAG systems for real estate.
-Given a user query, retrieved context chunks, and the AI agent's generated answer, determine if every factual claim in the answer is strictly supported by the retrieved context.
+Given a user query, retrieved context chunks, and the AI agent's generated answer, determine if the factual claims in the answer are supported by the retrieved context.
 
-Scoring:
-- 1.0: Every factual claim is directly supported by the context.
-- 0.5 - 0.9: Mostly grounded with minor stylistic extrapolations, but no contradictory or false facts.
-- 0.0 - 0.4: Hallucinations detected (invented unit sizes, fabricated prices, wrong locations, non-existent amenities).
+Evaluation Rules:
+1. Core Factual Consistency: Check that verified project amenities, locations, prices, bedroom counts, and dates match the retrieved context.
+2. Minor Stylistic Polish: Natural conversational phrasing, helpful formatting, polite transitions, or general descriptive terms (e.g. "exclusive for residents", "panoramic views", "on-site security") do NOT count as hallucinations as long as the core amenities and facts align with the knowledge base.
+3. Hallucinations: Mark hallucination_detected as true ONLY if the agent fabricates non-existent amenities (e.g. helipad, private marina, private airfield), states incorrect prices/locations, or invents contradictory specifications.
+
+Scoring Guidelines:
+- 0.9 - 1.0: Accurate, fully grounded response directly answering with facts from context.
+- 0.7 - 0.89: Well-grounded with minor conversational phrasing, zero false claims.
+- 0.0 - 0.49: Severe hallucination (fabricated pricing, fake amenities, wrong project).
 
 Respond with strict JSON:
 {
   "groundedness_score": float between 0.0 and 1.0,
   "hallucination_detected": boolean,
-  "unsupported_claims": ["list of claims not in context"],
+  "unsupported_claims": ["list of factual claims contradicting or completely missing from context"],
   "reasoning": "brief explanation of score"
 }"""
 

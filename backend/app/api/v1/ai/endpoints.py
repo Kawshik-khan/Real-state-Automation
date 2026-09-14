@@ -4,10 +4,11 @@ n8n calls POST /api/chat for every incoming message.
 MVP specification: {"reply":"...", "actions":["send_images","send_brochure"]}
 Backward compatible: Full format with confidence, intent, metadata
 """
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 
 from app.agents.graph import ai_graph
 from app.agents.state import AIState
+from app.core.rate_limiter import AI_CHAT_LIMIT, limiter
 from app.dependencies import require_automation_secret as _auth
 from app.schemas.chat import Action, ChatRequest, ChatResponse
 from app.utils.chat_response_builder import ChatResponseBuilder
@@ -16,7 +17,9 @@ router = APIRouter()
 
 @router.post("/chat", summary="Main chat endpoint -- full AI pipeline (LangGraph)")
 @router.post("/ask", summary="Main chat endpoint alias -- full AI pipeline (LangGraph)")
+@limiter.limit(AI_CHAT_LIMIT)
 async def ai_chat(
+    request: Request,
     body: ChatRequest, 
     auth: dict = Depends(_auth),
     format_version: str = Header("full", alias="X-Format-Version")  # "full" or "structured"
@@ -26,41 +29,72 @@ async def ai_chat(
     n8n calls this endpoint when it receives a message from any channel.
     Supports both full format (backward compatible) and structured format (MVP spec).
     """
-    # Build initial state
-    initial_state = AIState(
-        message=body.message,
-        conversation_id=body.conversation_id,
-        channel=body.channel,
-        user_id=body.user_id,
+    # 1. Semantic Vector Cache Lookup: Intercept repeated real estate queries
+    from app.core.semantic_cache import semantic_cache
+
+    cached_entry = await semantic_cache.lookup(
+        query=body.message,
         tenant_id=body.tenant_id,
         language=body.language or "en",
     )
 
-    # Run the graph -- LangGraph returns state dict
-    raw: dict = await ai_graph.ainvoke(initial_state)
+    is_cache_hit = False
+    if cached_entry:
+        extracted_data, sim_score = cached_entry
+        is_cache_hit = True
+    else:
+        # Build initial state
+        initial_state = AIState(
+            message=body.message,
+            conversation_id=body.conversation_id,
+            channel=body.channel,
+            user_id=body.user_id,
+            tenant_id=body.tenant_id,
+            language=body.language or "en",
+        )
 
-    # Extract LangGraph output for both formats
-    extracted_data = ChatResponseBuilder.extract_workflow_data(raw)
+        # Run the graph -- LangGraph returns state dict
+        raw: dict = await ai_graph.ainvoke(initial_state)
+
+        # Extract LangGraph output for both formats
+        extracted_data = ChatResponseBuilder.extract_workflow_data(raw)
+
+        # Store in semantic cache if not an escalation
+        if not extracted_data.get("requires_escalation"):
+            import asyncio
+            asyncio.create_task(
+                semantic_cache.store(
+                    query=body.message,
+                    response_data=extracted_data,
+                    tenant_id=body.tenant_id,
+                    language=body.language or "en",
+                    intent=str(extracted_data.get("agent_used", "property_inquiry")),
+                )
+            )
     
     # Broadcast live SSE message events & update conversations store
     try:
         from app.api.v1.conversations.endpoints import add_message_to_conversation
         from app.schemas.chat import MemoryEntry
         from app.services.memory import conversation_memory
+        from app.services.llm_guardrails import llm_guardrails
         requires_esc = bool(extracted_data.get("requires_escalation", False))
         reply_text = extracted_data.get("agent_reply", "")
         confidence = extracted_data.get("confidence", 0.90)
         intent = str(extracted_data.get("agent_used", "property_inquiry"))
 
+        # Redact sensitive PII before persistence in chat history & memory stores
+        persisted_user_msg, _ = llm_guardrails.redact_pii(body.message)
+
         # Save user message to memory store & DB
         await conversation_memory.add(
             body.conversation_id,
-            MemoryEntry(role="user", content=body.message)
+            MemoryEntry(role="user", content=persisted_user_msg)
         )
         await add_message_to_conversation(
             conv_id=body.conversation_id,
             sender="user",
-            text=body.message,
+            text=persisted_user_msg,
             channel=body.channel,
         )
 
@@ -100,10 +134,17 @@ async def ai_chat(
     if format_version == "structured":
         # MVP structured format: {"reply": "...", "actions": ["send_images", ...]}
         response_data = ChatResponseBuilder.build_structured(extracted_data)
+        if is_cache_hit:
+            response_data["cached"] = True
+            response_data["cache_similarity"] = round(sim_score, 4)
         return ChatResponseBuilder.create_json_response(response_data, format_version)
     else:
         # Full format for backward compatibility
-        return await _build_full_chat_response(extracted_data, body, auth)
+        res = await _build_full_chat_response(extracted_data, body, auth)
+        if is_cache_hit and isinstance(res, dict):
+            res["cached"] = True
+            res["cache_similarity"] = round(sim_score, 4)
+        return res
 
 
 async def _build_full_chat_response(extracted_data: dict, body: ChatRequest, auth: dict):

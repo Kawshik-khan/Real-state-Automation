@@ -44,7 +44,18 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    refresh_token: Optional[str] = None
+    expires_in: int = 900  # 15 minutes (in seconds)
+    user: Optional[UserResponse] = None
+
+
+class UnlockAccountRequest(BaseModel):
+    email: str
+

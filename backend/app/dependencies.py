@@ -52,10 +52,22 @@ async def get_current_user(
     x_automation_secret: Optional[str] = Header(None, alias="X-Automation-Secret"),
 ) -> dict:
     """Extract and decode current authenticated user from Bearer JWT token or automation secret."""
+    # 1. Check automation shared secret first (foolproof for developer console & background benchmarks)
+    if x_automation_secret and x_automation_secret == settings.automation_shared_secret:
+        return {
+            "sub": "sys-admin-000",
+            "email": "admin@glgassets.com",
+            "role": UserRole.ADMIN.value,
+            "tenant_id": getattr(settings, "default_tenant_id", "default-tenant"),
+        }
+
     token = None
     if authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-    elif x_automation_secret:
+        raw_token = authorization[7:].strip()
+        if raw_token not in ("null", "undefined", ""):
+            token = raw_token
+
+    if not token and x_automation_secret:
         token = x_automation_secret
 
     if not token:
@@ -64,11 +76,7 @@ async def get_current_user(
             detail="Authorization token required",
         )
 
-    payload = decode_access_token(token)
-    if payload:
-        return payload
-
-    # If valid secret passed, return system admin context
+    # 2. Check if bearer token itself is the automation shared secret
     if token == settings.automation_shared_secret:
         return {
             "sub": "sys-admin-000",
@@ -76,6 +84,11 @@ async def get_current_user(
             "role": UserRole.ADMIN.value,
             "tenant_id": getattr(settings, "default_tenant_id", "default-tenant"),
         }
+
+    # 3. Decode JWT access token
+    payload = decode_access_token(token)
+    if payload:
+        return payload
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

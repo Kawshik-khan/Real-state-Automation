@@ -106,13 +106,19 @@ class PolicyRepository:
     def match_policy(self, query: str) -> Optional[Dict[str, Any]]:
         """Match query text to an approved policy."""
         q = query.lower()
-        if any(kw in q for kw in ["document", "kagoj", "paper", "nid", "tin", "tax return", "passport", "lagbe", "requirements"]):
+        # Check payment terms first (prevents "down payment requirements" from matching documents)
+        if any(kw in q for kw in ["payment", "installment", "kisti", "down payment", "booking amount", "financing", "loan"]):
+            return self._policies.get("standard_payment_plan")
+
+        if any(kw in q for kw in ["document", "kagoj", "paper", "nid", "tin", "tax return", "passport", "lagbe"]):
             if "rent" in q or "bhara" in q:
                 return self._policies.get("required_documents_rental")
             return self._policies.get("required_documents_purchase")
 
-        if any(kw in q for kw in ["payment", "installment", "kisti", "down payment", "booking amount", "financing", "loan"]):
-            return self._policies.get("standard_payment_plan")
+        if "requirements" in q:
+            if "rent" in q or "bhara" in q:
+                return self._policies.get("required_documents_rental")
+            return self._policies.get("required_documents_purchase")
 
         if any(kw in q for kw in ["rent vs buy", "kena bhalo na bhara"]):
             return self._policies.get("rent_vs_buy")

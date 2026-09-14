@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GLG Assets End-to-End User Flow Architecture",
+    "subtitle": "Bi-Directional Omnichannel Ingress/Egress, LangGraph Orchestration, Hybrid RAG & Human-in-the-Loop CRM",
+    "output": "glg-user-flow-architecture.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "user-journey",
+        "label": "Bi-Directional User Journey",
+        "focus": [
+          "end_user",
+          "touchpoints",
+          "api_gateway",
+          "response_composer"
+        ],
+        "note": "Client journey: inquiry submission, edge ingestion, AI multi-agent reasoning, and streaming card return."
+      },
+      {
+        "id": "agent-orchestration",
+        "label": "LangGraph Cognitive Routing",
+        "focus": [
+          "supervisor",
+          "property_agent",
+          "legal_agent",
+          "groq_llm"
+        ],
+        "note": "Supervisor intent routing, sub-agent execution, ultra-fast Groq LLaMA 3.3 70B inference, and proposal compilation."
+      },
+      {
+        "id": "hybrid-rag-vault",
+        "label": "Hybrid RAG & Grounded Vault",
+        "focus": [
+          "property_agent",
+          "hybrid_rag",
+          "supabase_db",
+          "groq_llm"
+        ],
+        "note": "Dense 1536-d HNSW semantic retrieval with sparse BM25 (RRF k=60) against verified Supabase listings."
+      },
+      {
+        "id": "crm-human-takeover",
+        "label": "CRM Sync & Human Escalation",
+        "focus": [
+          "supervisor",
+          "n8n_crm",
+          "sales_copilot",
+          "api_gateway"
+        ],
+        "note": "Bi-directional sales workflow: propensity scoring (>=80), n8n CRM event dispatch, and live human takeover."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "end_user",
+      "type": "external",
+      "label": "Client / Buyer",
+      "sublabel": "Web, WhatsApp & Social",
+      "pos": [
+        50,
+        220
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Inquirer"
+    },
+    {
+      "id": "touchpoints",
+      "type": "frontend",
+      "label": "Omnichannel Hub",
+      "sublabel": "React 19 & WhatsApp API",
+      "pos": [
+        250,
+        220
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Ingress / UI"
+    },
+    {
+      "id": "response_composer",
+      "type": "messagebus",
+      "label": "Response Composer",
+      "sublabel": "Rich Cards & PDF Egress",
+      "pos": [
+        250,
+        350
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Return Egress"
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "FastAPI Gateway",
+      "sublabel": "WS, SSE & HMAC Auth",
+      "pos": [
+        450,
+        220
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Port 8000"
+    },
+    {
+      "id": "sales_copilot",
+      "type": "frontend",
+      "label": "Sales Co-pilot",
+      "sublabel": "Live Takeover & CRM",
+      "pos": [
+        450,
+        350
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Human-in-the-Loop"
+    },
+    {
+      "id": "supervisor",
+      "type": "backend",
+      "label": "LangGraph Supervisor",
+      "sublabel": "Dynamic Intent Router",
+      "pos": [
+        650,
+        220
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "State Machine"
+    },
+    {
+      "id": "n8n_crm",
+      "type": "cloud",
+      "label": "n8n CRM Engine",
+      "sublabel": "Cal.com & Lead Sync",
+      "pos": [
+        650,
+        350
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Event Hub"
+    },
+    {
+      "id": "property_agent",
+      "type": "backend",
+      "label": "Property Advisor",
+      "sublabel": "Matching & Pricing",
+      "pos": [
+        850,
+        100
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "legal_agent",
+      "type": "backend",
+      "label": "Legal & Tour Agent",
+      "sublabel": "RAJUK FAQ & Cal.com",
+      "pos": [
+        850,
+        220
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "groq_llm",
+      "type": "cloud",
+      "label": "Groq LLaMA 3.3 70B",
+      "sublabel": ">120 tok/s LoRA Adaptor",
+      "pos": [
+        1070,
+        100
+      ],
+      "size": [
+        145,
+        58
+      ],
+      "tag": "Fast Inference"
+    },
+    {
+      "id": "hybrid_rag",
+      "type": "backend",
+      "label": "Hybrid RAG Engine",
+      "sublabel": "pgvector HNSW + BM25",
+      "pos": [
+        1070,
+        220
+      ],
+      "size": [
+        145,
+        58
+      ],
+      "tag": "k=60 Fusion"
+    },
+    {
+      "id": "supabase_db",
+      "type": "database",
+      "label": "Supabase Vault",
+      "sublabel": "Postgres & Media Buckets",
+      "pos": [
+        1070,
+        350
+      ],
+      "size": [
+        145,
+        58
+      ],
+      "tag": "Verified Data"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Client Engagement Perimeter",
+      "wraps": [
+        "end_user",
+        "touchpoints",
+        "response_composer"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "FastAPI Gateway & Copilot Hub",
+      "wraps": [
+        "api_gateway",
+        "sales_copilot"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "LangGraph Multi-Agent Core",
+      "wraps": [
+        "supervisor",
+        "property_agent",
+        "legal_agent"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Enterprise Knowledge & Persistence",
+      "wraps": [
+        "groq_llm",
+        "hybrid_rag",
+        "supabase_db"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-inquiry",
+      "from": "end_user",
+      "to": "touchpoints",
+      "label": "inquiry",
+      "variant": "emphasis"
+    },
+    {
+      "id": "touchpoints-egress",
+      "from": "touchpoints",
+      "to": "end_user",
+      "label": "rich cards",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "labelDy": 24
+    },
+    {
+      "id": "touchpoints-ingress",
+      "from": "touchpoints",
+      "to": "api_gateway",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gateway-to-touchpoints",
+      "from": "api_gateway",
+      "to": "touchpoints",
+      "label": "SSE stream",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "top",
+      "labelDy": -20
+    },
+    {
+      "id": "gateway-to-supervisor",
+      "from": "api_gateway",
+      "to": "supervisor",
+      "label": "session",
+      "variant": "default"
+    },
+    {
+      "id": "supervisor-to-gateway",
+      "from": "supervisor",
+      "to": "api_gateway",
+      "label": "state",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "labelDy": 20
+    },
+    {
+      "id": "supervisor-to-property",
+      "from": "supervisor",
+      "to": "property_agent",
+      "label": "intent",
+      "variant": "default",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "property-to-supervisor",
+      "from": "property_agent",
+      "to": "supervisor",
+      "label": "units",
+      "variant": "default",
+      "fromSide": "left",
+      "toSide": "top"
+    },
+    {
+      "id": "supervisor-to-legal",
+      "from": "supervisor",
+      "to": "legal_agent",
+      "label": "legal",
+      "variant": "default"
+    },
+    {
+      "id": "property-to-llm",
+      "from": "property_agent",
+      "to": "groq_llm",
+      "label": "prompt",
+      "variant": "default"
+    },
+    {
+      "id": "legal-to-rag",
+      "from": "legal_agent",
+      "to": "hybrid_rag",
+      "label": "FAQ query",
+      "variant": "default"
+    },
+    {
+      "id": "hybrid-to-db",
+      "from": "hybrid_rag",
+      "to": "supabase_db",
+      "label": "HNSW match",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 25
+    },
+    {
+      "id": "llm-to-db",
+      "from": "groq_llm",
+      "to": "supabase_db",
+      "label": "grounding",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "right",
+      "labelDy": 50
+    },
+    {
+      "id": "api-to-composer",
+      "from": "api_gateway",
+      "to": "response_composer",
+      "label": "payload",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "top"
+    },
+    {
+      "id": "composer-to-touchpoints",
+      "from": "response_composer",
+      "to": "touchpoints",
+      "label": "push cards",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "supervisor-to-crm",
+      "from": "supervisor",
+      "to": "n8n_crm",
+      "label": "hot lead",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 50
+    },
+    {
+      "id": "crm-to-copilot",
+      "from": "n8n_crm",
+      "to": "sales_copilot",
+      "label": "CRM alert",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "copilot-takeover",
+      "from": "sales_copilot",
+      "to": "api_gateway",
+      "label": "takeover",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Bi-Directional Omnichannel Flow",
+      "items": [
+        "Inquiries stream from React 19, WhatsApp Cloud API, and Meta Messenger into FastAPI Edge",
+        "Full-duplex response return path delivers markdown streams, interactive quick-replies, and floorplan PDFs"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "LangGraph Reasoning & Hybrid RAG",
+      "items": [
+        "Supervisor dynamically routes intents between Property Advisor and Legal FAQ sub-agents",
+        "Hybrid RAG combines dense 1536-d HNSW embeddings and sparse BM25 (RRF k=60) against Supabase"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Human-in-the-Loop & CRM Sync",
+      "items": [
+        "Autonomous 0-100 propensity scoring escalates high-value buyers to sales executives",
+        "n8n orchestrates Cal.com site visit booking and two-way Google Sheets CRM synchronization"
+      ]
+    }
+  ]
+}

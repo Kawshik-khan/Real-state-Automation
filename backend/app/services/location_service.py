@@ -42,12 +42,13 @@ class DynamicLocationService:
             return
 
         try:
-            from app.database import async_session_factory
-            from app.models.models import ProjectRecord
+            from app.database import async_session_factory, is_db_reachable
+            if is_db_reachable():
+                from app.models.models import ProjectRecord
 
-            async with async_session_factory() as session:
-                result = await session.execute(select(ProjectRecord.location, ProjectRecord.name))
-                rows = result.all()
+                async with async_session_factory() as session:
+                    result = await session.execute(select(ProjectRecord.location, ProjectRecord.name))
+                    rows = result.all()
                 if rows:
                     locations_set = set(DEFAULT_LOCATIONS)
                     projects_set = set()

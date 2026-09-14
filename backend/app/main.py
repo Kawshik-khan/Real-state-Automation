@@ -15,15 +15,16 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.rate_limiter import limiter, custom_rate_limit_exceeded_handler
 
 from app.api.v1.ai.endpoints import ai_chat
 from app.api.v1.ai.endpoints import router as ai_router
+from app.api.v1.ai_control_plane import router as ai_control_plane_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth.endpoints import router as auth_router
 from app.api.v1.automation import router as automation_router
@@ -96,8 +97,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"[shutdown] {settings.app_name} — Shutting down gracefully")
 
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
-
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
@@ -107,7 +106,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -118,6 +117,57 @@ app.add_middleware(
 )
 
 setup_live_logging()
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Enforce OWASP Security Headers and Dynamic Content Security Policy (CSP)."""
+    response = await call_next(request)
+
+    # 1. Anti-Clickjacking: Disallow embedding in external frames
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # 2. Prevent MIME-type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # 3. Cross-Site Scripting Filter for legacy browsers
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    # 4. Strict Referrer Policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # 5. Restrict sensitive hardware/device permissions
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+
+    # 6. HTTP Strict Transport Security (HSTS) on HTTPS connections
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+    # 7. Content Security Policy (CSP)
+    path = request.url.path
+    if path in ("/docs", "/redoc", "/openapi.json"):
+        # Swagger UI and ReDoc require jsdelivr CDN assets and inline script/style
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "connect-src 'self' http: https: ws: wss:;"
+        )
+    else:
+        # Standard API and Web application routes
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "connect-src 'self' ws: wss: http: https:; "
+            "img-src 'self' data: https: blob:; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "script-src 'self' 'unsafe-inline';"
+        )
+
+    return response
 
 
 @app.middleware("http")
@@ -250,9 +300,14 @@ async def api_moderation_handler(body: dict, auth: dict = Depends(_auth)):
     return await check_moderation(body, auth)
 
 @app.get("/api/projects", tags=["MVP API"])
-async def api_projects_handler(db: AsyncSession = Depends(get_session), auth: dict = Depends(_auth)):
+async def api_projects_handler(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_session),
+    auth: dict = Depends(_auth),
+):
     """GET /api/projects — List real-estate projects."""
-    return await list_projects(db=db, auth=auth)
+    return await list_projects(request=request, response=response, db=db, auth=auth)
 
 @app.post("/api/projects", tags=["MVP API"])
 async def api_project_create_handler(body: dict, db: AsyncSession = Depends(get_session), auth: dict = Depends(_auth)):
@@ -277,6 +332,8 @@ app.include_router(auth_router,          prefix="/api/v1",              tags=["a
 app.include_router(developer_router,     prefix="/api/v1/developer",    tags=["developer"])
 app.include_router(email_router,         prefix="/api/v1/email",        tags=["email"])
 app.include_router(ai_router,           prefix="/api/v1/ai",           tags=["ai"])
+app.include_router(ai_control_plane_router, prefix="/api/v1/ai-control", tags=["ai_control_plane"])
+app.include_router(ai_control_plane_router, prefix="/api/ai", tags=["ai_control_plane_api"])
 app.include_router(notifications_router,prefix="/api/v1/notifications",tags=["notifications"])
 app.include_router(conversations_router,prefix="/api/v1/conversations",  tags=["conversations"])
 app.include_router(automation_router,   prefix="/api/v1/automation",   tags=["automation"])

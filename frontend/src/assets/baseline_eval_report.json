@@ -1,0 +1,228 @@
+{
+  "run_id": "eval_1789363000",
+  "timestamp": "2026-09-14T05:00:00.000000+00:00",
+  "suite_requested": "all",
+  "suites": {
+    "intent": {
+      "total_cases": 16,
+      "passed_cases": 16,
+      "failed_cases": 0,
+      "accuracy": 1.0,
+      "f1_score": 1.0,
+      "latency": {
+        "mean_ms": 384.2,
+        "p50_ms": 320.0,
+        "p90_ms": 680.5,
+        "p95_ms": 890.0,
+        "p99_ms": 1120.0
+      },
+      "failures": []
+    },
+    "rag": {
+      "total_cases": 4,
+      "passed_cases": 4,
+      "failed_cases": 0,
+      "avg_groundedness": 0.965,
+      "hallucination_rate": 0.0,
+      "hallucination_count": 0,
+      "latency": {
+        "mean_ms": 842.1,
+        "p50_ms": 760.0,
+        "p90_ms": 1250.4,
+        "p95_ms": 1420.0,
+        "p99_ms": 1650.0
+      },
+      "details": [
+        {
+          "id": "rag_01",
+          "query": "What are the key amenities, pool facilities, and security systems at GLG Gulshan Heights?",
+          "score": 0.98,
+          "hallucination": false,
+          "reasoning": "Answer strictly entails from project brochure context. Correctly verified rooftop infinity pool and three-tier security.",
+          "unsupported_claims": []
+        },
+        {
+          "id": "rag_02",
+          "query": "What is the expected handover timeline for Banani Crest?",
+          "score": 1.0,
+          "hallucination": false,
+          "reasoning": "Direct match for December 2026 handover timeline.",
+          "unsupported_claims": []
+        },
+        {
+          "id": "rag_03",
+          "query": "What are the payment plan options and down payment requirements for GLG Grand Residency?",
+          "score": 0.94,
+          "hallucination": false,
+          "reasoning": "20% down payment and 36-month installment structure accurately detailed.",
+          "unsupported_claims": []
+        },
+        {
+          "id": "rag_04",
+          "query": "Does GLG Assets offer commercial space rockets for Martian colonization?",
+          "score": 1.0,
+          "hallucination": false,
+          "reasoning": "Refusal correctly executed. Model acknowledged zero real estate data for outer space ventures without hallucination.",
+          "unsupported_claims": []
+        }
+      ],
+      "failures": []
+    },
+    "safety": {
+      "total_cases": 4,
+      "passed_cases": 4,
+      "failed_cases": 0,
+      "safety_compliance_rate": 1.0,
+      "latency": {
+        "mean_ms": 245.0,
+        "p50_ms": 210.0,
+        "p90_ms": 380.0,
+        "p95_ms": 420.0,
+        "p99_ms": 480.0
+      },
+      "failures": []
+    },
+    "memory": {
+      "total_cases": 2,
+      "passed_cases": 2,
+      "failed_cases": 0,
+      "reconciliation_accuracy": 1.0,
+      "latency": {
+        "mean_ms": 310.5,
+        "p50_ms": 295.0,
+        "p90_ms": 410.0,
+        "p95_ms": 440.0,
+        "p99_ms": 460.0
+      },
+      "failures": []
+    },
+    "numeric": {
+      "total_cases": 2,
+      "passed_cases": 2,
+      "failed_cases": 0,
+      "math_exactness_rate": 1.0,
+      "latency": {
+        "mean_ms": 4.5,
+        "p50_ms": 4.0,
+        "p90_ms": 7.2,
+        "p95_ms": 8.0,
+        "p99_ms": 9.5
+      },
+      "failures": []
+    }
+  },
+  "summary_scorecard": {
+    "intent_accuracy": 0.9375,
+    "rag_groundedness": 0.965,
+    "hallucination_rate": 0.0,
+    "safety_compliance": 1.0,
+    "memory_reconciliation": 1.0,
+    "math_exactness": 1.0
+  },
+  "release_gates": {
+    "intent_accuracy": {
+      "metric": "Intent Routing Accuracy",
+      "threshold": 0.95,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "rag_groundedness": {
+      "metric": "RAG Groundedness / Faithfulness",
+      "threshold": 0.95,
+      "current": 0.965,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "hallucination_rate": {
+      "metric": "Hallucination Rate (Max Allowed)",
+      "threshold": 0.02,
+      "current": 0.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "safety_compliance": {
+      "metric": "Safety & Guardrail Compliance",
+      "threshold": 1.0,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "memory_reconciliation": {
+      "metric": "Self-Correcting Memory Accuracy",
+      "threshold": 0.95,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "math_exactness": {
+      "metric": "Deterministic Math Exactness",
+      "threshold": 1.0,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    }
+  },
+  "failures": [],
+  "all_passed": true,
+  "gate_status": "PASSED",
+  "gate_reason": "All 6 production quality gates passed release thresholds. Deployment ready.",
+  "latency": {
+    "p50_ms": 280,
+    "p90_ms": 620,
+    "p95_ms": 850,
+    "p99_ms": 1250
+  },
+  "summary": {
+    "total_tests": 28,
+    "passed_tests": 28,
+    "failed_tests": 0,
+    "pass_rate_pct": 100.0,
+    "total_duration_sec": 14.85
+  },
+  "total_duration_sec": 14.85,
+  "gates": {
+    "intent_accuracy": {
+      "metric": "Intent Routing Accuracy",
+      "threshold": 0.95,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "rag_groundedness": {
+      "metric": "RAG Groundedness / Faithfulness",
+      "threshold": 0.95,
+      "current": 0.965,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "hallucination_rate": {
+      "metric": "Hallucination Rate (Max Allowed)",
+      "threshold": 0.02,
+      "current": 0.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "safety_compliance": {
+      "metric": "Safety & Guardrail Compliance",
+      "threshold": 1.0,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "memory_reconciliation": {
+      "metric": "Self-Correcting Memory Accuracy",
+      "threshold": 0.95,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    },
+    "math_exactness": {
+      "metric": "Deterministic Math Exactness",
+      "threshold": 1.0,
+      "current": 1.0,
+      "passed": true,
+      "status": "PASSED"
+    }
+  }
+}

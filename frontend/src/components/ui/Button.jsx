@@ -45,6 +45,18 @@ export default function Button({
     }
   };
 
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (React.isValidElement(icon)) {
+      return icon;
+    }
+    if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && 'render' in icon)) {
+      const IconComponent = icon;
+      return <IconComponent size={14} />;
+    }
+    return icon;
+  };
+
   return (
     <button
       type={type}
@@ -59,7 +71,7 @@ export default function Button({
         ...style
       }}
     >
-      {icon && <span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>}
+      {icon && <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: children ? '6px' : '0' }}>{renderIcon()}</span>}
       {children}
     </button>
   );

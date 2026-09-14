@@ -1,0 +1,922 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GLG Assets Enterprise Agentic Multi-Agent System Architecture",
+    "subtitle": "Production AI-OS: Omnichannel Ingress/Egress, LangGraph Multi-Agent, Hybrid RAG, n8n & Supabase pgvector",
+    "output": "glg-assets-architecture.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "full-topology",
+        "label": "Complete Enterprise Architecture",
+        "focus": [
+          "web_portal",
+          "meta_whatsapp",
+          "meta_social",
+          "email_inbound",
+          "security_auth",
+          "api_gateway",
+          "ingress_queue",
+          "moderation_node",
+          "belief_memory",
+          "supervisor",
+          "lead_scorer",
+          "property_agent",
+          "faq_agent",
+          "email_agent",
+          "social_bridge",
+          "groq_llm",
+          "lora_registry",
+          "gpt4o_llm",
+          "grounding_guard",
+          "response_builder",
+          "hybrid_rrf",
+          "reranker",
+          "n8n_workflows",
+          "crm_calendar",
+          "supabase_postgres",
+          "pgvector_hnsw",
+          "pinecone_serverless",
+          "storage_buckets"
+        ],
+        "note": "Closed-loop distributed architecture from omnichannel ingress/egress to LangGraph and database persistence."
+      },
+      {
+        "id": "agent-orchestration",
+        "label": "LangGraph Closed-Loop Pipeline",
+        "focus": [
+          "api_gateway",
+          "moderation_node",
+          "belief_memory",
+          "supervisor",
+          "lead_scorer",
+          "property_agent",
+          "faq_agent",
+          "email_agent",
+          "social_bridge",
+          "groq_llm",
+          "grounding_guard",
+          "response_builder"
+        ],
+        "note": "LangGraph DAG: moderation, belief reflection, supervisor routing, sub-agents, grounding check, and response builder return."
+      },
+      {
+        "id": "hybrid-rag-and-data",
+        "label": "Hybrid RAG & Enterprise Vector Vault",
+        "focus": [
+          "property_agent",
+          "faq_agent",
+          "hybrid_rrf",
+          "reranker",
+          "groq_llm",
+          "supabase_postgres",
+          "pgvector_hnsw",
+          "pinecone_serverless",
+          "storage_buckets"
+        ],
+        "note": "Dense 1536-d HNSW search, sparse FTS, Reciprocal Rank Fusion (k=60), and cross-encoder re-ranking returning context to Groq."
+      },
+      {
+        "id": "omnichannel-and-n8n",
+        "label": "Omnichannel Ingress/Egress & n8n Hub",
+        "focus": [
+          "web_portal",
+          "meta_whatsapp",
+          "meta_social",
+          "email_inbound",
+          "api_gateway",
+          "security_auth",
+          "lead_scorer",
+          "n8n_workflows",
+          "crm_calendar"
+        ],
+        "note": "Bi-directional omnichannel messaging: webhooks ingested by n8n, dispatched to LangGraph, and replies sent back to WhatsApp, Meta, and CRM."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web_portal",
+      "type": "frontend",
+      "label": "React 19 Portal",
+      "sublabel": "Executive & AI Studio",
+      "pos": [
+        40,
+        140
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "Port 5173"
+    },
+    {
+      "id": "meta_whatsapp",
+      "type": "external",
+      "label": "WhatsApp Cloud API",
+      "sublabel": "Click-to-WhatsApp Ingress",
+      "pos": [
+        40,
+        260
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "Meta Webhook"
+    },
+    {
+      "id": "meta_social",
+      "type": "external",
+      "label": "Meta & Telegram Gateway",
+      "sublabel": "FB/IG Direct & Bot API",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "Graph API"
+    },
+    {
+      "id": "email_inbound",
+      "type": "external",
+      "label": "Gmail OAuth2 / IMAP",
+      "sublabel": "Inbound Inquiries & Deeds",
+      "pos": [
+        40,
+        500
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "IMAP Ingress"
+    },
+    {
+      "id": "security_auth",
+      "type": "security",
+      "label": "HMAC & RBAC Auth",
+      "sublabel": "SHA-256 & Tenant Scope",
+      "pos": [
+        260,
+        200
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "5-Tier RBAC"
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "FastAPI Core Gateway",
+      "sublabel": "Async REST, WS & SSE",
+      "pos": [
+        260,
+        320
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "Port 8000"
+    },
+    {
+      "id": "ingress_queue",
+      "type": "messagebus",
+      "label": "Async Ingress Queue",
+      "sublabel": "Rate Limiter & Buffer",
+      "pos": [
+        260,
+        440
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "Token Bucket"
+    },
+    {
+      "id": "moderation_node",
+      "type": "security",
+      "label": "Moderation & PII Guard",
+      "sublabel": "Prompt Injection Filter",
+      "pos": [
+        480,
+        160
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Safety Gate"
+    },
+    {
+      "id": "belief_memory",
+      "type": "backend",
+      "label": "Belief Reflection Engine",
+      "sublabel": "Preference Overrides",
+      "pos": [
+        480,
+        270
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Dynamic Belief"
+    },
+    {
+      "id": "supervisor",
+      "type": "backend",
+      "label": "LangGraph Supervisor",
+      "sublabel": "8-Way Intent Router",
+      "pos": [
+        480,
+        380
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "DAG State Machine"
+    },
+    {
+      "id": "lead_scorer",
+      "type": "backend",
+      "label": "0-100 Lead Propensity",
+      "sublabel": "Hot Lead Escalation",
+      "pos": [
+        480,
+        490
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Score >= 80"
+    },
+    {
+      "id": "property_agent",
+      "type": "backend",
+      "label": "Property Advisor Agent",
+      "sublabel": "Inventory & Proximity",
+      "pos": [
+        700,
+        160
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "faq_agent",
+      "type": "backend",
+      "label": "FAQ & Legal Agent",
+      "sublabel": "REHAB & Land Policies",
+      "pos": [
+        700,
+        270
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "email_agent",
+      "type": "backend",
+      "label": "Email & Brochure Agent",
+      "sublabel": "Proposal Dispatcher",
+      "pos": [
+        700,
+        380
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "social_bridge",
+      "type": "backend",
+      "label": "Social Comment-to-DM",
+      "sublabel": "Ad Comment Followup",
+      "pos": [
+        700,
+        490
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Sub-Agent"
+    },
+    {
+      "id": "groq_llm",
+      "type": "cloud",
+      "label": "Groq LLaMA 3.3 70B",
+      "sublabel": ">120 tok/s Sub-Second",
+      "pos": [
+        930,
+        140
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Primary LLM"
+    },
+    {
+      "id": "lora_registry",
+      "type": "cloud",
+      "label": "LoRA Fine-Tune Registry",
+      "sublabel": "Dhaka Real Estate v1",
+      "pos": [
+        930,
+        240
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Adapters"
+    },
+    {
+      "id": "gpt4o_llm",
+      "type": "cloud",
+      "label": "OpenAI GPT-4o & Embed",
+      "sublabel": "text-embed-3-sm 1536d",
+      "pos": [
+        930,
+        340
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Reasoning & Vector"
+    },
+    {
+      "id": "grounding_guard",
+      "type": "security",
+      "label": "Grounding Validator",
+      "sublabel": "Anti-Hallucination Gate",
+      "pos": [
+        1160,
+        160
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Fact Checker"
+    },
+    {
+      "id": "response_builder",
+      "type": "backend",
+      "label": "Response Builder Node",
+      "sublabel": "State & Channel Egress",
+      "pos": [
+        1160,
+        270
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Egress Packager"
+    },
+    {
+      "id": "hybrid_rrf",
+      "type": "backend",
+      "label": "Hybrid RRF Retrieval",
+      "sublabel": "Dense + Sparse FTS (k=60)",
+      "pos": [
+        930,
+        450
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "RRF Engine"
+    },
+    {
+      "id": "reranker",
+      "type": "backend",
+      "label": "Cross-Encoder Re-Ranker",
+      "sublabel": "Top-3 Semantic Filter",
+      "pos": [
+        930,
+        560
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Reranker"
+    },
+    {
+      "id": "n8n_workflows",
+      "type": "cloud",
+      "label": "n8n Cloud Hub",
+      "sublabel": "Workflows WF-001 - 006",
+      "pos": [
+        1160,
+        400
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Workflow Engine"
+    },
+    {
+      "id": "crm_calendar",
+      "type": "external",
+      "label": "CRM & Calendar Sync",
+      "sublabel": "Google Sheets & Site Tour",
+      "pos": [
+        1160,
+        520
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "CRM / Calendar"
+    },
+    {
+      "id": "supabase_postgres",
+      "type": "database",
+      "label": "Supabase PostgreSQL",
+      "sublabel": "Projects, Leads, RLS",
+      "pos": [
+        1390,
+        160
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Postgres 15+"
+    },
+    {
+      "id": "pgvector_hnsw",
+      "type": "database",
+      "label": "pgvector HNSW Store",
+      "sublabel": "1536-d Vector Index",
+      "pos": [
+        1390,
+        270
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "HNSW Sub-15ms"
+    },
+    {
+      "id": "pinecone_serverless",
+      "type": "database",
+      "label": "Pinecone Serverless",
+      "sublabel": "Secondary Vector Fallback",
+      "pos": [
+        1390,
+        380
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Fallback HA"
+    },
+    {
+      "id": "storage_buckets",
+      "type": "cloud",
+      "label": "Supabase Storage",
+      "sublabel": "Brochures, Floorplans, OCR",
+      "pos": [
+        1390,
+        490
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "S3 Buckets"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "LangGraph Multi-Agent Orchestration Perimeter",
+      "wraps": [
+        "moderation_node",
+        "belief_memory",
+        "supervisor",
+        "lead_scorer",
+        "property_agent",
+        "faq_agent",
+        "email_agent",
+        "social_bridge",
+        "grounding_guard",
+        "response_builder"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Enterprise Vector Vault & Persistence",
+      "wraps": [
+        "supabase_postgres",
+        "pgvector_hnsw",
+        "pinecone_serverless",
+        "storage_buckets"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "web_portal",
+      "to": "api_gateway",
+      "variant": "emphasis"
+    },
+    {
+      "from": "meta_whatsapp",
+      "to": "security_auth"
+    },
+    {
+      "from": "meta_social",
+      "to": "security_auth"
+    },
+    {
+      "from": "email_inbound",
+      "to": "security_auth"
+    },
+    {
+      "from": "security_auth",
+      "to": "api_gateway"
+    },
+    {
+      "from": "api_gateway",
+      "to": "ingress_queue"
+    },
+    {
+      "from": "meta_whatsapp",
+      "to": "n8n_workflows",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [
+        [
+          15,
+          291
+        ],
+        [
+          15,
+          680
+        ],
+        [
+          1125,
+          680
+        ],
+        [
+          1125,
+          431
+        ]
+      ]
+    },
+    {
+      "from": "n8n_workflows",
+      "to": "api_gateway",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          1355,
+          431
+        ],
+        [
+          1355,
+          70
+        ],
+        [
+          225,
+          70
+        ],
+        [
+          225,
+          351
+        ]
+      ]
+    },
+    {
+      "from": "n8n_workflows",
+      "to": "crm_calendar"
+    },
+    {
+      "from": "ingress_queue",
+      "to": "moderation_node"
+    },
+    {
+      "from": "moderation_node",
+      "to": "belief_memory"
+    },
+    {
+      "from": "belief_memory",
+      "to": "supervisor",
+      "variant": "emphasis"
+    },
+    {
+      "from": "supervisor",
+      "to": "lead_scorer"
+    },
+    {
+      "from": "supervisor",
+      "to": "property_agent"
+    },
+    {
+      "from": "supervisor",
+      "to": "faq_agent"
+    },
+    {
+      "from": "supervisor",
+      "to": "email_agent"
+    },
+    {
+      "from": "supervisor",
+      "to": "social_bridge"
+    },
+    {
+      "from": "property_agent",
+      "to": "groq_llm"
+    },
+    {
+      "from": "groq_llm",
+      "to": "lora_registry",
+      "variant": "dashed"
+    },
+    {
+      "from": "faq_agent",
+      "to": "gpt4o_llm"
+    },
+    {
+      "from": "property_agent",
+      "to": "hybrid_rrf",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          895,
+          191
+        ],
+        [
+          895,
+          481
+        ]
+      ]
+    },
+    {
+      "from": "faq_agent",
+      "to": "hybrid_rrf"
+    },
+    {
+      "from": "hybrid_rrf",
+      "to": "reranker"
+    },
+    {
+      "from": "reranker",
+      "to": "pgvector_hnsw"
+    },
+    {
+      "from": "pgvector_hnsw",
+      "to": "pinecone_serverless",
+      "variant": "dashed"
+    },
+    {
+      "from": "property_agent",
+      "to": "supabase_postgres",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          780,
+          70
+        ],
+        [
+          1470,
+          70
+        ]
+      ]
+    },
+    {
+      "from": "property_agent",
+      "to": "grounding_guard",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          780,
+          110
+        ],
+        [
+          1240,
+          110
+        ]
+      ]
+    },
+    {
+      "from": "faq_agent",
+      "to": "grounding_guard",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          895,
+          301
+        ],
+        [
+          895,
+          415
+        ],
+        [
+          1125,
+          415
+        ],
+        [
+          1125,
+          191
+        ]
+      ]
+    },
+    {
+      "from": "email_agent",
+      "to": "grounding_guard",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          895,
+          411
+        ],
+        [
+          895,
+          415
+        ],
+        [
+          1125,
+          415
+        ],
+        [
+          1125,
+          191
+        ]
+      ]
+    },
+    {
+      "from": "social_bridge",
+      "to": "grounding_guard",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          895,
+          521
+        ],
+        [
+          895,
+          415
+        ],
+        [
+          1125,
+          415
+        ],
+        [
+          1125,
+          191
+        ]
+      ]
+    },
+    {
+      "from": "grounding_guard",
+      "to": "response_builder",
+      "variant": "emphasis"
+    },
+    {
+      "from": "grounding_guard",
+      "to": "storage_buckets",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "dashed"
+    },
+    {
+      "from": "response_builder",
+      "to": "api_gateway",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [
+        [
+          1125,
+          301
+        ],
+        [
+          1125,
+          660
+        ],
+        [
+          225,
+          660
+        ],
+        [
+          225,
+          351
+        ]
+      ],
+      "variant": "emphasis"
+    },
+    {
+      "from": "api_gateway",
+      "to": "web_portal",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [
+        [
+          225,
+          351
+        ],
+        [
+          225,
+          171
+        ],
+        [
+          15,
+          171
+        ]
+      ],
+      "variant": "emphasis"
+    },
+    {
+      "from": "lead_scorer",
+      "to": "n8n_workflows",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          560,
+          640
+        ],
+        [
+          1125,
+          640
+        ],
+        [
+          1125,
+          431
+        ]
+      ],
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Omnichannel Ingress / Egress & Gateway",
+      "items": [
+        "React 19 Executive & AI Studio interfaces with live SSE streams and audio/voice chat",
+        "Meta WhatsApp Cloud API, Instagram/FB Direct & Telegram Bot gateways with HMAC verification",
+        "FastAPI Gateway managing bi-directional websocket streams and return response routing"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "LangGraph Closed-Loop Multi-Agent DAG",
+      "items": [
+        "Dynamic belief reflection reconciling customer preference updates and intent classification",
+        "Domain sub-agents (Property, FAQ/Legal, Email, Social) converging into Grounding Validator",
+        "Anti-hallucination verification gate ensuring 100% factual accuracy before egress dispatch",
+        "0-100 Lead Propensity engine triggering hot-lead (>=80) escalation to sales agents & n8n"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Hybrid RAG, n8n Automation & Storage Vault",
+      "items": [
+        "Bi-directional n8n cloud automation: ingests webhooks, triggers LangGraph, and syncs CRM",
+        "Dual-engine hybrid RRF (k=60): dense pgvector HNSW + sparse PostgreSQL full-text search",
+        "Cross-encoder semantic re-ranking with Groq LLaMA 3.3 70B & LoRA fine-tuning adapters",
+        "Supabase PostgreSQL 15+ tenant isolation via strict Row-Level Security (RLS) policies"
+      ]
+    }
+  ]
+}

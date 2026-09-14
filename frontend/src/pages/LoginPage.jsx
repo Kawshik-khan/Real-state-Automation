@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Zap, Lock, Mail, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, Mail, ArrowRight, Clock } from 'lucide-react';
 import HexagonBackground from '../components/layout/HexagonBackground';
 
 export default function LoginPage() {
@@ -9,6 +9,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inactivityNotice, setInactivityNotice] = useState(false);
+
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem('session_logout_reason');
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (reason === 'inactivity' || params?.get('reason') === 'inactivity') {
+        setInactivityNotice(true);
+      }
+    } catch {
+      // Ignore sessionStorage issues
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,6 +29,11 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(email, password);
+      try {
+        sessionStorage.removeItem('session_logout_reason');
+      } catch {
+        // Ignore
+      }
     } catch (err) {
       setError(err.message || 'Login failed. Please verify email and password.');
     } finally {
@@ -79,6 +97,25 @@ export default function LoginPage() {
             Enter your credentials to access your workspace
           </p>
         </div>
+
+        {/* Inactivity Notice Banner */}
+        {inactivityNotice && !error && (
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: '12px',
+            background: 'rgba(232, 101, 74, 0.12)',
+            border: '1px solid rgba(232, 101, 74, 0.35)',
+            color: 'var(--accent-coral)',
+            fontSize: '0.85rem',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Clock size={18} color="var(--accent-coral)" />
+            <span>Your session expired due to 15 minutes of inactivity. Please sign in again.</span>
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (
