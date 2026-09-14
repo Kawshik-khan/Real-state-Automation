@@ -76,8 +76,8 @@ async def ai_chat(
     try:
         from app.api.v1.conversations.endpoints import add_message_to_conversation
         from app.schemas.chat import MemoryEntry
-        from app.services.memory import conversation_memory
         from app.services.llm_guardrails import llm_guardrails
+        from app.services.memory import conversation_memory
         requires_esc = bool(extracted_data.get("requires_escalation", False))
         reply_text = extracted_data.get("agent_reply", "")
         confidence = extracted_data.get("confidence", 0.90)

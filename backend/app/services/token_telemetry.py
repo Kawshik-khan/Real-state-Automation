@@ -6,7 +6,7 @@ live cost calculation in USD ($) and BDT (৳), and rate limit utilization.
 
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Current exchange rate USD to BDT
 USD_TO_BDT_RATE = 122.50

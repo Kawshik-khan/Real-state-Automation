@@ -567,7 +567,7 @@ class EvaluationEngine:
         for i, item in enumerate(dataset):
             t0 = time.time()
             try:
-                from app.services.belief_memory import belief_memory_service, UserBeliefState
+                from app.services.belief_memory import UserBeliefState, belief_memory_service
 
                 # Turn 1: Initial user query and premise
                 b1, _ = await belief_memory_service.reconcile_beliefs(

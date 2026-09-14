@@ -20,8 +20,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.rate_limiter import limiter, custom_rate_limit_exceeded_handler
-
 from app.api.v1.ai.endpoints import ai_chat
 from app.api.v1.ai.endpoints import router as ai_router
 from app.api.v1.ai_control_plane import router as ai_control_plane_router
@@ -49,6 +47,7 @@ from app.api.v1.search.endpoints import search_knowledge
 from app.api.v1.social import router as social_router
 from app.api.v1.ws import ws_router
 from app.config import settings
+from app.core.rate_limiter import custom_rate_limit_exceeded_handler, limiter
 from app.database import get_session
 from app.dependencies import require_automation_secret as _auth
 from app.dependencies import require_roles

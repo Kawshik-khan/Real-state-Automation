@@ -11,7 +11,7 @@ import asyncio
 import hashlib
 import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.redis_client import resilient_store

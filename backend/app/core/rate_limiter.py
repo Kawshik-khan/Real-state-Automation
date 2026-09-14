@@ -7,13 +7,15 @@ Provides tiered limits based on caller identity:
 """
 
 import re
-from typing import Optional, Tuple
+from typing import Tuple
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+from app.core.redis_client import resilient_store
 from app.core.security import decode_access_token
 
 # Tiered Limit Definitions
@@ -87,7 +89,6 @@ limiter = Limiter(
     default_limits=[DEFAULT_LIMIT],
 )
 
-from app.core.redis_client import resilient_store
 
 async def check_sliding_window_rate_limit(
     identity: str, window_seconds: int = 60, max_limit: int = 100

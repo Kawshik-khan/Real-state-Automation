@@ -6,13 +6,12 @@ with resilient fallback to local JSON cache and in-memory runtime hot-reloading.
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from app.database import async_session_factory, is_db_reachable
 from app.models.models import AgentConfigurationRecord

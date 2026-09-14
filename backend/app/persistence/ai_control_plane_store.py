@@ -7,15 +7,13 @@ Bangladesh real-estate domain seeds.
 
 import asyncio
 import copy
-import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import func, or_, select, update
 
 from app.database import async_session_factory, is_db_reachable
 from app.models.ai_control_plane import (
@@ -23,30 +21,22 @@ from app.models.ai_control_plane import (
     AIAgentVersionRecord,
     AIApprovalRequestRecord,
     AIAuditLogRecord,
+    AIBenchmarkRecord,
     AIBudgetRecord,
     AIDatasetExampleRecord,
     AIDatasetRecord,
     AIEvaluationRunRecord,
+    AIExperimentRecord,
+    AIFineTuneJobRecord,
     AIGuardrailEventRecord,
     AIGuardrailPolicyRecord,
     AIIncidentRecord,
     AIModelRecord,
-    AIMemoryPolicyRecord,
-    AIPolicyRecord,
-    AIPromptTemplateRecord,
-    AIPromptVersionRecord,
     AIProviderRecord,
-    AIRAGConfigRecord,
     AIReleaseRecord,
     AIRoutingRuleRecord,
     AIToolRecord,
     AITraceRecord,
-    AIWorkflowRecord,
-    AIFineTuneJobRecord,
-    AIExperimentRecord,
-    AIBenchmarkRecord,
-    AIMemoryItemRecord,
-    AIConfigurationSnapshotRecord,
 )
 
 logger = logging.getLogger(__name__)

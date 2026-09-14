@@ -17,16 +17,13 @@ Unifies all 27 enterprise AI platform capabilities:
 """
 
 import asyncio
-import json
 import logging
-import math
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from app.config import settings
 from app.persistence.ai_control_plane_store import ai_control_plane_store
 from app.repositories.property_repository import PropertyRepository
 from app.services.ai_control_plane.event_broadcaster import ai_event_broadcaster
@@ -520,7 +517,6 @@ class AIControlPlaneService:
             errors.append("Workflow has no nodes.")
             return {"valid": False, "errors": errors}
 
-        node_ids = {n.get("id") for n in nodes}
         has_trigger = any(n.get("type") in ("TRIGGER", "START") for n in nodes)
         has_end = any(n.get("type") == "END" for n in nodes)
 
@@ -558,7 +554,6 @@ class AIControlPlaneService:
             area = p["location"]["area"]
             price = p["pricing"]["display_en"]
             facts = p["facts"]
-            desc = p.get("description", "")
             amenities_str = ", ".join(facts.get("amenities", []))
 
             # Check matching keywords
@@ -865,7 +860,6 @@ class AIControlPlaneService:
 
         # Run real evaluation pass over dataset examples
         for ex in examples:
-            t0 = time.perf_counter()
             inp = ex.get("input_message", "")
             exp_facts = ex.get("expected_facts", [])
 
@@ -1146,10 +1140,10 @@ class AIControlPlaneService:
             q = test_queries[idx % len(test_queries)]
             w0 = time.perf_counter()
             try:
-                res = await self.run_playground_execution(agent_slug=agent_slug, user_message=q, rag_enabled=True)
+                await self.run_playground_execution(agent_slug=agent_slug, user_message=q, rag_enabled=True)
                 lat = round((time.perf_counter() - w0) * 1000, 1)
                 latencies.append(lat)
-            except Exception as e:
+            except Exception:
                 errors += 1
                 latencies.append(500.0)
 

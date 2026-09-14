@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Request
@@ -468,9 +468,9 @@ async def get_developer_cache_stats(
     current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
 ) -> Dict[str, Any]:
     """Retrieve live statistics for Two-Tier data cache, Semantic vector cache, and account lockouts."""
-    from app.core.two_tier_cache import two_tier_cache
-    from app.core.semantic_cache import semantic_cache
     from app.core.account_lockout import account_lockout
+    from app.core.semantic_cache import semantic_cache
+    from app.core.two_tier_cache import two_tier_cache
 
     return {
         "success": True,
@@ -486,8 +486,8 @@ async def flush_developer_caches(
     current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
 ) -> Dict[str, Any]:
     """Flush L1/L2 and semantic caches on demand."""
-    from app.core.two_tier_cache import two_tier_cache
     from app.core.semantic_cache import semantic_cache
+    from app.core.two_tier_cache import two_tier_cache
 
     two_tier_cleared = await two_tier_cache.invalidate("*")
     semantic_cleared = await semantic_cache.invalidate_all()

@@ -21,7 +21,8 @@ Exposes endpoints for all 27 enterprise capabilities:
 - Immutable configuration audit logs & Server-Sent Events (SSE) stream
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
@@ -37,7 +38,6 @@ from app.schemas.ai_control_plane import (
     BenchmarkRunRequest,
     BudgetUpdateRequest,
     CircuitBreakerTripRequest,
-    DatasetCreateRequest,
     DatasetExampleCreateRequest,
     EvaluationRunRequest,
     ExperimentActionRequest,
