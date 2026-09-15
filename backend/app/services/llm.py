@@ -46,8 +46,8 @@ class LLMService:
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
                 elif "20b" in kwargs["model"]:
-                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.6-27b...")
-                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.8-27b...")
+                    kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
                 if attempt == 3:
                     print(f"[LLMService Error] Rate limit exceeded after 4 attempts: {rle}")
@@ -68,8 +68,8 @@ class LLMService:
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
                 elif "20b" in kwargs["model"]:
-                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.6-27b...")
-                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.8-27b...")
+                    kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
                 if attempt == 3:
                     raise ex
@@ -114,8 +114,8 @@ class LLMService:
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
                 elif "20b" in kwargs["model"]:
-                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.6-27b in structured_chat...")
-                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.8-27b in structured_chat...")
+                    kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
                 if attempt == 3:
                     print(f"[LLMService Error] structured_chat rate limit exceeded: {rle}")
@@ -136,8 +136,8 @@ class LLMService:
                     kwargs["model"] = "openai/gpt-oss-20b"
                     continue
                 elif "20b" in kwargs["model"]:
-                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.6-27b in structured_chat...")
-                    kwargs["model"] = "qwen/qwen3.6-27b"
+                    print("[LLMService Error] Falling back from 20b to qwen/qwen3.8-27b in structured_chat...")
+                    kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
                 if attempt == 3:
                     return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}

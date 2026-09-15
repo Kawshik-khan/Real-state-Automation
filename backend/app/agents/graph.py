@@ -160,12 +160,15 @@ async def supervisor_node(state: AIState) -> dict:
     # Require explicit property indicators (or recognized project/locations), not generic single words like "price"
     real_estate_explicit_terms = [
         "flat", "apartment", "plot", "duplex", "penthouse", "bhk", "building",
-        "floor plan", "sqft", "square feet", "handover", "booking"
+        "floor plan", "sqft", "square feet", "handover", "booking",
+        "project", "projects", "প্রজেক্ট", "প্রকল্প", "আবাসন"
     ]
     location_terms = ["banani", "gulshan", "uttara", "dhanmondi", "baridhara", "mirpur"]
     property_phrases = [
         "ki ache", "konta ache", "kothay ache", "flat ache", "ongoing project",
-        "dam koto", "price koto", "koto dam", "flat price", "apartment price"
+        "dam koto", "price koto", "koto dam", "flat price", "apartment price",
+        "running ache", "running project", "project dekhaw", "project er details",
+        "details daw", "kisu project", "ki ki project", "চলমান প্রজেক্ট"
     ]
     has_explicit_re = any(term in msg_lower for term in real_estate_explicit_terms)
     has_loc = any(loc in msg_lower for loc in location_terms)
