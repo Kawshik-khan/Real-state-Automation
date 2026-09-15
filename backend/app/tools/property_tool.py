@@ -1,10 +1,10 @@
 """Property Search Tool — SQL property filtering + RAG integration + Media Actions."""
 
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
 
 from app.repositories.property_repository import property_repository
 from app.tools.governance import GovernedTool, ToolAuthorityTier, tool_governance
+from pydantic import BaseModel, Field, field_validator
 
 # Backward-compatibility alias pointing to canonical repository data
 PROJECTS_DATABASE = property_repository.to_legacy_dict_format()

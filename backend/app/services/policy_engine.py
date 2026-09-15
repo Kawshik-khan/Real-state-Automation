@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
-from app.services.llm_guardrails import llm_guardrails, GuardrailResult
-from app.services.grounding_validator import grounding_validator, GroundingResult, GroundingViolation
+from app.services.grounding_validator import GroundingResult, grounding_validator
+from app.services.llm_guardrails import GuardrailResult, llm_guardrails
 
 logger = logging.getLogger(__name__)
 

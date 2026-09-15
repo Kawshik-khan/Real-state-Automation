@@ -371,7 +371,7 @@ async def greeting_handler_node(state: AIState) -> dict:
 
 async def booking_handler_node(state: AIState) -> dict:
     from app.repositories.contact_repository import contact_repository
-    from app.tools.booking_tool import booking_tool, SiteVisitProposalInput
+    from app.tools.booking_tool import SiteVisitProposalInput, booking_tool
     from app.utils.language import is_english_query
 
     is_english = is_english_query(state.message) if state.message else False
