@@ -20,24 +20,24 @@ def entry_node(state: AIState) -> dict:
 
 async def moderation_node(state: AIState) -> dict:
     from app.services.llm import llm_service
-    from app.services.llm_guardrails import llm_guardrails
+    from app.services.policy_engine import policy_engine
 
     if not state.message or not state.message.strip():
         return {"moderation": ModerationResult(action="allow"), "moderated": True}
 
-    # 1. Deterministic Pre-Guard (Prompt Injection, Jailbreak Defense & PII Redaction)
-    guard_res = llm_guardrails.pre_guard(state.message)
-    if guard_res.action == "block":
+    # 1. Deterministic Policy Engine (Pillar 1 Pre-Guard: Jailbreak Defense & PII Redaction)
+    policy_res = policy_engine.evaluate_inbound_message(state.message)
+    if not policy_res.is_allowed or policy_res.action == "block":
         return {
             "moderation": ModerationResult(
                 action="block",
-                reason=guard_res.reason or "Message blocked by AI safety guardrail.",
+                reason=policy_res.reasons[0] if policy_res.reasons else "Message blocked by deterministic security policy.",
             ),
             "moderated": True,
-            "message": guard_res.sanitized_text,
+            "message": policy_res.sanitized_text or state.message,
         }
 
-    clean_message = guard_res.sanitized_text if guard_res.action == "sanitize" else state.message
+    clean_message = policy_res.sanitized_text if policy_res.action == "sanitize" else state.message
 
     # 2. LLM-based Moderation
     try:
@@ -371,29 +371,49 @@ async def greeting_handler_node(state: AIState) -> dict:
 
 async def booking_handler_node(state: AIState) -> dict:
     from app.repositories.contact_repository import contact_repository
+    from app.tools.booking_tool import booking_tool, SiteVisitProposalInput
     from app.utils.language import is_english_query
 
     is_english = is_english_query(state.message) if state.message else False
     contact_card = contact_repository.format_contact_card(is_english=is_english)
+
+    # Pillar 3: Governed Booking Tool with Tier 3 HITL approval gate
+    client_name = getattr(state, "sender_name", None) or "Valued Client"
+    client_contact = getattr(state, "sender_id", None) or "WhatsApp Client"
+    project_target = (state.intent.entities or {}).get("project") or "GLG Luxury Project"
+
+    proposal_input = SiteVisitProposalInput(
+        client_name=client_name,
+        phone_or_email=client_contact,
+        project_name=project_target,
+        preferred_date="To be coordinated",
+        preferred_time_slot="Flexible",
+        notes=state.message[:200] if state.message else None,
+    )
+    hitl_proposal = await booking_tool.propose_site_visit(proposal_input)
+
     if is_english:
         reply = (
-            f"Thank you for your interest! 🎉\n\n"
-            f"I'll connect you with our senior sales advisory team who will follow up with personalized assistance and schedule your private site visit.\n\n"
+            f"Thank you for your interest in scheduling a private viewing! 🎉\n\n"
+            f"Your request (Status: *PENDING SALES CONFIRMATION*) has been submitted to our senior relationship desk in Banani. "
+            f"A dedicated property consultant will contact you shortly to confirm the scheduled viewing slot.\n\n"
             f"{contact_card}"
         )
     else:
         reply = (
-            f"আমাদের প্রজেক্টে আগ্রহ প্রকাশের জন্য ধন্যবাদ! 🎉\n\n"
-            f"আপনাকে ব্যক্তিগতভাবে সহযোগিতা ও সাইট পরিদর্শনের সময় নির্ধারণে আমাদের সেলস টিম দ্রুত যোগাযোগ করবে।\n\n"
+            f"আমাদের প্রজেক্টে সাইট পরিদর্শনের আগ্রহ প্রকাশের জন্য ধন্যবাদ! 🎉\n\n"
+            f"আপনার পরিদর্শন অনুরোধটি (স্ট্যাটাস: *সেলস কনফার্মেশনের অপেক্ষায়*) আমাদের বনানী প্রধান কার্যালয়ের সিনিয়র রিলেশনশিপ ডেস্কে জমা দেওয়া হয়েছে। "
+            f"আমাদের প্রতিনিধি খুব দ্রুত আপনার সাথে যোগাযোগ করে চূড়ান্ত সময়সূচী নিশ্চিত করবেন।\n\n"
             f"{contact_card}"
         )
+
     return {
         "agent_reply": reply,
-        "agent_actions": [Action(type="escalate", payload={"reason": state.intent.intent, "priority": "high"})],
+        "agent_actions": [Action(type="escalate", payload={"reason": "site_visit_proposal_hitl", "priority": "high", "proposal": hitl_proposal})],
         "agent_used": "booking_handler",
         "agent_done": True,
         "requires_escalation": True,
-        "escalation_reason": state.intent.escalation_reason or "Booking/lead request",
+        "escalation_reason": state.intent.escalation_reason or "HITL Site Visit Proposal Submitted",
     }
 
 
@@ -440,23 +460,27 @@ async def fallback_handler_node(state: AIState) -> dict:
 
 async def safety_check_node(state: AIState) -> dict:
     from app.services.llm import llm_service
+    from app.services.policy_engine import policy_engine
+    from app.utils.language import is_english_query
 
     if not state.agent_reply.strip():
         return {"safety_check_passed": True, "safety_checked": True}
 
-    from app.services.grounding_validator import grounding_validator
-    from app.utils.language import is_english_query
-
     is_en = is_english_query(state.message) if state.message else False
-    val_res = grounding_validator.validate(reply_text=state.agent_reply, is_english=is_en)
-    sanitized_reply = state.agent_reply
-    if not val_res.is_grounded and val_res.sanitized_reply:
-        sanitized_reply = val_res.sanitized_reply
 
-    # Apply Post-Guard output secret leak protection
-    from app.services.llm_guardrails import llm_guardrails
-    sanitized_reply, _ = llm_guardrails.post_guard(sanitized_reply)
+    # 1. Deterministic Policy Engine Outbound Evaluation (Pillar 1: Grounding & Leak Protection)
+    policy_res = policy_engine.evaluate_outbound_response(state.agent_reply, is_english=is_en)
+    sanitized_reply = policy_res.sanitized_text or state.agent_reply
 
+    if not policy_res.is_allowed and policy_res.action == "block":
+        return {
+            "agent_reply": sanitized_reply,
+            "requires_escalation": True,
+            "safety_check_passed": False,
+            "safety_checked": True,
+        }
+
+    # 2. LLM-based Safety Content Check
     prompt = f"""You are a safety checker. Review this message for harmful or inappropriate content.
 Reply should be allowed for a real-estate customer communication channel.
 

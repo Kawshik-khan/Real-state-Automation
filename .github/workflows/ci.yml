@@ -82,6 +82,9 @@ jobs:
       - name: Run pytest
         run: pytest backend/tests/ -v --tb=short -x
 
+      - name: Run AI Governance & Evals CI Quality Gate
+        run: python scripts/run_ci_evals.py
+
   # ── Stage 3: Frontend Build ──
   frontend-build:
     name: Frontend Production Build (Vite)

@@ -33,6 +33,15 @@ PROMPT_INJECTION_PATTERNS = [
     re.compile(
         r"(?i)\b(repeat\s+everything\s+above|what\s+are\s+your\s+instructions\s+verbatim)\b",
     ),
+    re.compile(
+        r"(?i)\b(system|developer|internal|hidden)\s+(prompt|instructions?|rules?)\s+(override|leak|reveal|dump|bypass|show)\b",
+    ),
+    re.compile(
+        r"(?i)\b(output|print|give|show|reveal)\s+(the\s+)?(database\s+connection|api\s*keys?|secret\s*keys?|passwords?)\b",
+    ),
+    re.compile(
+        r"(?i)\b(stupid|useless|piece\s+of\s+garbage|trash\s+company|fuck|scam\s*company)\b",
+    ),
 
     # Bangla & Banglish Overrides
     re.compile(
@@ -55,7 +64,7 @@ CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
 BANGLADESH_NID_17_PATTERN = re.compile(r"\b\d{17}\b")
 BANGLADESH_NID_13_PATTERN = re.compile(r"\b\d{13}\b")
 BANGLADESH_NID_10_PATTERN = re.compile(r"\b\d{10}\b")
-NID_CONTEXT_PATTERN = re.compile(r"(?i)(?:nid|national\s*id|smart\s*card|identity)\s*[:#=\s]*([0-9]{10,17})")
+NID_CONTEXT_PATTERN = re.compile(r"(?i)(?:nid|national\s*id|smart\s*card|identity)\s*(?:holo|number|no|is|code)?\s*[:#=\s]*([0-9]{10,17})")
 BANK_ACCOUNT_PATTERN = re.compile(r"(?i)\b(?:ac|a\/c|account|acc|bank|routing)\s*#?\s*[:.-]?\s*([0-9]{8,18})\b")
 
 # ── Secret Leak Detection Patterns (Post-Guard) ──

@@ -10,12 +10,18 @@ from app.prompts.core import SYSTEM_CORE_POLICY
 from app.prompts.email import EMAIL_AGENT_SYSTEM_PROMPT
 from app.prompts.fallback import FALLBACK_PROMPT
 from app.prompts.faq import FAQ_AGENT_PROMPT
+from app.prompts.lean_core import (
+    LEAN_EMAIL_PROMPT,
+    LEAN_FAQ_PROMPT,
+    LEAN_PROPERTY_PROMPT,
+    LEAN_SYSTEM_CORE,
+)
 from app.prompts.property import PROPERTY_AGENT_PROMPT
 from app.prompts.social import SOCIAL_BRIDGE_PROMPT, SOCIAL_CONTENT_PROMPT
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "2026.09.11"
+PROMPT_VERSION = "2026.09.15-GOVERNANCE"
 
 PROMPT_REGISTRY: Dict[str, str] = {
     "core": SYSTEM_CORE_POLICY,
@@ -25,6 +31,11 @@ PROMPT_REGISTRY: Dict[str, str] = {
     "social_content": SOCIAL_CONTENT_PROMPT,
     "social_bridge": SOCIAL_BRIDGE_PROMPT,
     "fallback": FALLBACK_PROMPT,
+    # Lean Micro-Prompts (Pillar 2 Architecture)
+    "lean_core": LEAN_SYSTEM_CORE,
+    "lean_property": LEAN_PROPERTY_PROMPT,
+    "lean_faq": LEAN_FAQ_PROMPT,
+    "lean_email": LEAN_EMAIL_PROMPT,
 }
 
 

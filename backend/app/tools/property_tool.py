@@ -1,11 +1,37 @@
 """Property Search Tool — SQL property filtering + RAG integration + Media Actions."""
 
 from typing import Optional
+from pydantic import BaseModel, Field, field_validator
 
 from app.repositories.property_repository import property_repository
+from app.tools.governance import GovernedTool, ToolAuthorityTier, tool_governance
 
 # Backward-compatibility alias pointing to canonical repository data
 PROJECTS_DATABASE = property_repository.to_legacy_dict_format()
+
+ALLOWED_OPERATING_LOCATIONS = {
+    "dhaka", "gulshan", "gulshan 1", "gulshan 2", "banani", "baridhara",
+    "dhanmondi", "uttara", "mirpur", "bashundhara"
+}
+
+
+class PropertySearchInput(BaseModel):
+    """Pydantic v2 input contract for Property Search Tool (Tool Governance)."""
+    query: str = Field(..., max_length=300, description="Customer search query string")
+    location: Optional[str] = Field(None, description="Dhaka neighborhood")
+    max_budget: Optional[int] = Field(None, ge=1000000, le=1000000000, description="Max budget in BDT (10L - 100Cr)")
+    bedrooms: Optional[int] = Field(None, ge=1, le=10, description="Number of bedrooms")
+
+    @field_validator("location")
+    def normalize_and_validate_location(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        clean_loc = v.strip().lower()
+        # Verify location does not contain foreign cities
+        foreign_prohibited = {"mumbai", "bandra", "delhi", "bangalore", "dubai", "london"}
+        if any(fp in clean_loc for fp in foreign_prohibited):
+            raise ValueError(f"Location '{v}' is outside Bangladesh operating core.")
+        return clean_loc
 
 
 class PropertySearchTool:
@@ -119,3 +145,23 @@ class PropertySearchTool:
 
 
 property_search_tool = PropertySearchTool()
+
+
+async def _governed_property_search_handler(validated_args: PropertySearchInput, context: dict) -> dict:
+    return await property_search_tool.search(
+        query=validated_args.query,
+        location=validated_args.location,
+        max_budget=validated_args.max_budget,
+        bedrooms=validated_args.bedrooms,
+    )
+
+
+tool_governance.register(
+    GovernedTool(
+        name="property_search",
+        description="Search canonical luxury real estate inventory in Dhaka.",
+        tier=ToolAuthorityTier.TIER_1_READ_ONLY,
+        input_schema=PropertySearchInput,
+        handler=_governed_property_search_handler,
+    )
+)
