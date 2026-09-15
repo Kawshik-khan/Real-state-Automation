@@ -394,8 +394,8 @@ async def booking_handler_node(state: AIState) -> dict:
 
     if is_english:
         reply = (
-            f"Thank you for your interest in scheduling a private viewing! 🎉\n\n"
-            f"Your request (Status: *PENDING SALES CONFIRMATION*) has been submitted to our senior relationship desk in Banani. "
+            f"Thank you for your interest! 🎉\n\n"
+            f"Your request for scheduling a private viewing (Status: *PENDING SALES CONFIRMATION*) has been submitted to our senior relationship desk in Banani. "
             f"A dedicated property consultant will contact you shortly to confirm the scheduled viewing slot.\n\n"
             f"{contact_card}"
         )
