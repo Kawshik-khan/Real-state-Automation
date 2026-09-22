@@ -378,13 +378,24 @@ ON CONFLICT (project_id) DO UPDATE SET
     description = EXCLUDED.description,
     features = EXCLUDED.features;
 
--- Initial Knowledge Base Document Registration
+-- Initial Knowledge Base Document Registration (Synced with existing 1,634 chunks)
 INSERT INTO knowledge_documents (doc_id, filename, file_type, ocr_status, chunk_count)
 VALUES
-    ('doc_101', 'GLG_Gulshan_Heights_Property_Details.pdf', 'pdf', 'completed', 14),
-    ('doc_102', 'GLG_Pricing_and_Payment_Plans_2026.pdf', 'pdf', 'completed', 10),
-    ('doc_103', 'GLG_Legal_and_Compliance_Guide.pdf', 'pdf', 'completed', 8)
-ON CONFLICT (doc_id) DO NOTHING;
+    ('doc_faq_2026', 'GLG_Assets_FAQ_2026.pdf', 'pdf', 'completed', 96),
+    ('doc_governance', 'GLG_Company_Governance_and_Policies.pdf', 'pdf', 'completed', 33),
+    ('doc_gulshan_heights', 'GLG_Gulshan_Heights_Property_Details.pdf', 'pdf', 'completed', 33),
+    ('doc_legal', 'GLG_Legal_and_Compliance_Guide.pdf', 'pdf', 'completed', 33),
+    ('doc_pricing_2026', 'GLG_Pricing_and_Payment_Plans_2026.pdf', 'pdf', 'completed', 33),
+    ('doc_system_design', 'GLG_Assets_System_Design_and_Report.pdf', 'pdf', 'completed', 726),
+    ('proj_proj_banani_crest', 'Projects_Catalog.json', 'json', 'completed', 12),
+    ('proj_proj_gulshan_luxe', 'Projects_Catalog.json', 'json', 'completed', 11),
+    ('proj_proj_gulshan_palace', 'Projects_Catalog.json', 'json', 'completed', 11),
+    ('proj_proj_mumbai_luxe', 'Projects_Catalog.json', 'json', 'completed', 12)
+ON CONFLICT (doc_id) DO UPDATE SET
+    filename = EXCLUDED.filename,
+    file_type = EXCLUDED.file_type,
+    ocr_status = EXCLUDED.ocr_status,
+    chunk_count = EXCLUDED.chunk_count;
 
 -- Initial Media Assets
 INSERT INTO media (media_id, project_id, media_type, url)
@@ -583,6 +594,338 @@ CREATE POLICY tenant_isolation_fine_tuning_jobs ON public.fine_tuning_jobs
 FOR ALL USING (tenant_id = 'glg-assets-main') WITH CHECK (tenant_id = 'glg-assets-main');
 
 -- ----------------------------------------------------------------------------
+-- 11. AI CONTROL PLANE, AGENT STUDIO & GOVERNANCE TABLES
+-- ----------------------------------------------------------------------------
+
+-- Table 14: ai_agents (Autonomous Agent Profiles)
+CREATE TABLE IF NOT EXISTS public.ai_agents (
+    id VARCHAR(64) PRIMARY KEY,
+    slug VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    role VARCHAR(64) DEFAULT 'assistant',
+    objective TEXT,
+    owner VARCHAR(128) DEFAULT 'dev-team@glgassets.com',
+    status VARCHAR(32) DEFAULT 'PRODUCTION',
+    environment VARCHAR(32) DEFAULT 'production',
+    primary_model VARCHAR(128) DEFAULT 'llama-3.3-70b-versatile',
+    fallback_model VARCHAR(128) DEFAULT 'llama-3.1-8b-instant',
+    current_prompt_version VARCHAR(32) DEFAULT 'v1.0',
+    temperature FLOAT DEFAULT 0.2,
+    top_p FLOAT DEFAULT 0.9,
+    max_tokens INT DEFAULT 1024,
+    presence_penalty FLOAT DEFAULT 0.0,
+    frequency_penalty FLOAT DEFAULT 0.0,
+    persona_preset VARCHAR(64) DEFAULT 'Consultative Luxury',
+    enabled_tools JSONB DEFAULT '[]'::jsonb,
+    rag_config JSONB DEFAULT '{}'::jsonb,
+    memory_config JSONB DEFAULT '{}'::jsonb,
+    guardrail_policy_ids JSONB DEFAULT '[]'::jsonb,
+    output_schema JSONB,
+    human_approval_policy VARCHAR(64) DEFAULT 'NONE',
+    max_execution_steps INT DEFAULT 5,
+    timeout_seconds INT DEFAULT 30,
+    retry_policy JSONB DEFAULT '{}'::jsonb,
+    tenant_id VARCHAR(128) DEFAULT 'glg-assets-main',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 15: ai_agent_versions
+CREATE TABLE IF NOT EXISTS public.ai_agent_versions (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_id VARCHAR(64) REFERENCES public.ai_agents(id) ON DELETE CASCADE,
+    version_tag VARCHAR(32) NOT NULL,
+    snapshot JSONB NOT NULL,
+    changelog TEXT,
+    created_by VARCHAR(128) DEFAULT 'developer@glgassets.com',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 16: ai_providers
+CREATE TABLE IF NOT EXISTS public.ai_providers (
+    id VARCHAR(64) PRIMARY KEY,
+    provider_key VARCHAR(64) UNIQUE NOT NULL,
+    display_name VARCHAR(128) NOT NULL,
+    base_url VARCHAR(256),
+    is_active BOOLEAN DEFAULT TRUE,
+    health_status VARCHAR(32) DEFAULT 'HEALTHY',
+    last_ping_ms FLOAT,
+    last_checked_at TIMESTAMPTZ,
+    capabilities JSONB DEFAULT '[]'::jsonb,
+    rate_limit_rpm INT DEFAULT 60,
+    rate_limit_tpm INT DEFAULT 100000,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 17: ai_models
+CREATE TABLE IF NOT EXISTS public.ai_models (
+    id VARCHAR(64) PRIMARY KEY,
+    model_id VARCHAR(128) UNIQUE NOT NULL,
+    provider_id VARCHAR(64) REFERENCES public.ai_providers(id) ON DELETE CASCADE,
+    display_name VARCHAR(128) NOT NULL,
+    model_type VARCHAR(32) DEFAULT 'BASE',
+    context_window INT DEFAULT 131072,
+    max_output_tokens INT DEFAULT 8192,
+    input_cost_per_m FLOAT DEFAULT 0.59,
+    output_cost_per_m FLOAT DEFAULT 0.79,
+    cached_cost_per_m FLOAT DEFAULT 0.30,
+    supports_structured_output BOOLEAN DEFAULT TRUE,
+    supports_tools BOOLEAN DEFAULT TRUE,
+    supports_streaming BOOLEAN DEFAULT TRUE,
+    status VARCHAR(32) DEFAULT 'PRODUCTION',
+    benchmark_scores JSONB DEFAULT '{}'::jsonb,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 18: ai_prompt_templates
+CREATE TABLE IF NOT EXISTS public.ai_prompt_templates (
+    id VARCHAR(64) PRIMARY KEY,
+    slug VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    target_agent_id VARCHAR(64) NOT NULL,
+    system_prompt TEXT NOT NULL,
+    developer_instructions TEXT,
+    tool_instructions TEXT,
+    output_constraints TEXT,
+    active_version VARCHAR(32) DEFAULT 'v1.0',
+    created_by VARCHAR(128) DEFAULT 'developer@glgassets.com',
+    tenant_id VARCHAR(128) DEFAULT 'glg-assets-main',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 19: ai_prompt_versions
+CREATE TABLE IF NOT EXISTS public.ai_prompt_versions (
+    id VARCHAR(64) PRIMARY KEY,
+    template_id VARCHAR(64) REFERENCES public.ai_prompt_templates(id) ON DELETE CASCADE,
+    version_tag VARCHAR(32) NOT NULL,
+    system_prompt TEXT NOT NULL,
+    developer_instructions TEXT,
+    tool_instructions TEXT,
+    output_constraints TEXT,
+    declared_variables JSONB DEFAULT '[]'::jsonb,
+    token_estimate INT DEFAULT 0,
+    character_count INT DEFAULT 0,
+    is_published BOOLEAN DEFAULT FALSE,
+    published_at TIMESTAMPTZ,
+    created_by VARCHAR(128) DEFAULT 'developer@glgassets.com',
+    changelog TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 20: ai_tools
+CREATE TABLE IF NOT EXISTS public.ai_tools (
+    id VARCHAR(64) PRIMARY KEY,
+    tool_key VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(64) DEFAULT 'data_retrieval',
+    parameters_schema JSONB DEFAULT '{}'::jsonb,
+    output_schema JSONB,
+    requires_approval BOOLEAN DEFAULT FALSE,
+    risk_level VARCHAR(32) DEFAULT 'LOW',
+    timeout_ms INT DEFAULT 5000,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    assigned_agents JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 21: ai_datasets
+CREATE TABLE IF NOT EXISTS public.ai_datasets (
+    id VARCHAR(64) PRIMARY KEY,
+    slug VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    dataset_type VARCHAR(32) DEFAULT 'evaluation',
+    target_agent VARCHAR(64) DEFAULT 'property_agent',
+    version VARCHAR(32) DEFAULT 'v1.0',
+    total_examples INT DEFAULT 0,
+    quality_score FLOAT DEFAULT 96.5,
+    train_count INT DEFAULT 0,
+    val_count INT DEFAULT 0,
+    test_count INT DEFAULT 0,
+    is_locked BOOLEAN DEFAULT FALSE,
+    created_by VARCHAR(128) DEFAULT 'developer@glgassets.com',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 22: ai_evaluations
+CREATE TABLE IF NOT EXISTS public.ai_evaluations (
+    id VARCHAR(64) PRIMARY KEY,
+    suite_name VARCHAR(128) NOT NULL,
+    dataset_id VARCHAR(64) NOT NULL,
+    agent_id VARCHAR(64) NOT NULL,
+    model_tested VARCHAR(128) NOT NULL,
+    prompt_version VARCHAR(32) DEFAULT 'v1.0',
+    total_cases INT DEFAULT 0,
+    passed_cases INT DEFAULT 0,
+    failed_cases INT DEFAULT 0,
+    accuracy_pct FLOAT DEFAULT 0.0,
+    groundedness_pct FLOAT DEFAULT 0.0,
+    hallucination_pct FLOAT DEFAULT 0.0,
+    tool_accuracy_pct FLOAT DEFAULT 0.0,
+    schema_correctness_pct FLOAT DEFAULT 0.0,
+    avg_latency_ms FLOAT DEFAULT 0.0,
+    status VARCHAR(32) DEFAULT 'COMPLETED',
+    gate_verdict VARCHAR(16) DEFAULT 'PASS',
+    report_data JSONB DEFAULT '{}'::jsonb,
+    created_by VARCHAR(128) DEFAULT 'developer@glgassets.com',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 23: ai_guardrail_policies
+CREATE TABLE IF NOT EXISTS public.ai_guardrail_policies (
+    id VARCHAR(64) PRIMARY KEY,
+    category VARCHAR(32) NOT NULL,
+    rule_name VARCHAR(128) NOT NULL,
+    description TEXT NOT NULL,
+    action VARCHAR(32) DEFAULT 'BLOCK',
+    severity VARCHAR(32) DEFAULT 'HIGH',
+    rule_parameters JSONB DEFAULT '{}'::jsonb,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    total_triggers INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 24: ai_governance_logs
+CREATE TABLE IF NOT EXISTS public.ai_governance_logs (
+    id VARCHAR(64) PRIMARY KEY,
+    timestamp TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    event_type VARCHAR(64) NOT NULL,
+    agent_id VARCHAR(64) NOT NULL,
+    severity VARCHAR(32) DEFAULT 'INFO',
+    actor VARCHAR(128) DEFAULT 'system',
+    action_taken VARCHAR(64) NOT NULL,
+    details JSONB DEFAULT '{}'::jsonb,
+    tenant_id VARCHAR(128) DEFAULT 'glg-assets-main'
+);
+
+-- Enable RLS on AI tables
+ALTER TABLE public.ai_agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_agent_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_providers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_models ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_prompt_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_prompt_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_tools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_datasets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_evaluations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_guardrail_policies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_governance_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated read ai_agents" ON public.ai_agents FOR SELECT USING (true);
+CREATE POLICY "Allow service insert ai_agents" ON public.ai_agents FOR ALL USING (true);
+
+CREATE POLICY "Allow authenticated read ai_models" ON public.ai_models FOR SELECT USING (true);
+CREATE POLICY "Allow service insert ai_models" ON public.ai_models FOR ALL USING (true);
+
+CREATE POLICY "Allow authenticated read ai_prompt_templates" ON public.ai_prompt_templates FOR SELECT USING (true);
+CREATE POLICY "Allow service insert ai_prompt_templates" ON public.ai_prompt_templates FOR ALL USING (true);
+
+CREATE POLICY "Allow authenticated read ai_tools" ON public.ai_tools FOR SELECT USING (true);
+CREATE POLICY "Allow service insert ai_tools" ON public.ai_tools FOR ALL USING (true);
+
+-- ----------------------------------------------------------------------------
+-- 12. WORKFLOW TABLES (LEADS & INVENTORY UNITS)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.leads (
+    lead_id VARCHAR(36) PRIMARY KEY,
+    tenant_id VARCHAR(36) NOT NULL DEFAULT 'glg-assets-main',
+    customer_id VARCHAR(36),
+    name VARCHAR(200) NOT NULL,
+    contact VARCHAR(200) NOT NULL,
+    source VARCHAR(80) NOT NULL DEFAULT 'website',
+    status VARCHAR(20) NOT NULL DEFAULT 'new',
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+CREATE INDEX IF NOT EXISTS idx_leads_tenant_id ON public.leads(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads(status);
+
+CREATE TABLE IF NOT EXISTS public.inventory_units (
+    unit_id VARCHAR(36) PRIMARY KEY,
+    tenant_id VARCHAR(36) NOT NULL DEFAULT 'glg-assets-main',
+    project_id VARCHAR(128) REFERENCES public.projects(project_id) ON DELETE CASCADE,
+    bedrooms INT NOT NULL,
+    price VARCHAR(40) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'available',
+    version INT NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_units_project_id ON public.inventory_units(project_id);
+
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_units ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated read leads" ON public.leads FOR SELECT USING (true);
+CREATE POLICY "Allow service insert leads" ON public.leads FOR ALL USING (true);
+CREATE POLICY "Allow authenticated read inventory_units" ON public.inventory_units FOR SELECT USING (true);
+CREATE POLICY "Allow service insert inventory_units" ON public.inventory_units FOR ALL USING (true);
+
+-- ----------------------------------------------------------------------------
+-- 13. CANONICAL SEED DATA (AI CONTROL PLANE & AGENTS)
+-- ----------------------------------------------------------------------------
+
+-- Seed AI Providers
+INSERT INTO public.ai_providers (id, provider_key, display_name, base_url, is_active, health_status, last_ping_ms, capabilities, rate_limit_rpm, rate_limit_tpm)
+VALUES
+('prov-groq', 'groq', 'Groq LPU Inference Engine', 'https://api.groq.com/openai/v1', true, 'HEALTHY', 142.5, '["chat", "streaming", "tools", "structured_output"]'::jsonb, 60, 120000),
+('prov-openai', 'openai', 'OpenAI Enterprise Gateway', 'https://api.openai.com/v1', true, 'HEALTHY', 210.0, '["chat", "streaming", "tools", "embeddings", "structured_output"]'::jsonb, 120, 250000)
+ON CONFLICT (id) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    base_url = EXCLUDED.base_url,
+    is_active = EXCLUDED.is_active;
+
+-- Seed AI Models
+INSERT INTO public.ai_models (id, model_id, provider_id, display_name, model_type, context_window, max_output_tokens, input_cost_per_m, output_cost_per_m, supports_structured_output, supports_tools, supports_streaming, status, is_enabled)
+VALUES
+('model-llama-33-70b', 'llama-3.3-70b-versatile', 'prov-groq', 'Llama 3.3 70B Versatile (Groq)', 'BASE', 131072, 8192, 0.59, 0.79, true, true, true, 'PRODUCTION', true),
+('model-llama-31-8b', 'llama-3.1-8b-instant', 'prov-groq', 'Llama 3.1 8B Instant (Groq Fast Fallback)', 'BASE', 131072, 8192, 0.05, 0.08, true, true, true, 'PRODUCTION', true),
+('model-gpt-4o', 'gpt-4o', 'prov-openai', 'GPT-4o Omnichannel Flagship (OpenAI)', 'BASE', 128000, 4096, 2.50, 10.00, true, true, true, 'PRODUCTION', true),
+('model-emb-3-large', 'text-embedding-3-large', 'prov-openai', 'OpenAI Text Embedding 3 Large (1024/1536d)', 'EMBEDDING', 8191, 0, 0.13, 0.0, false, false, false, 'PRODUCTION', true)
+ON CONFLICT (id) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    is_enabled = EXCLUDED.is_enabled;
+
+-- Seed Autonomous AI Agents
+INSERT INTO public.ai_agents (id, slug, name, description, role, objective, owner, status, environment, primary_model, fallback_model, current_prompt_version, temperature, top_p, max_tokens, persona_preset, enabled_tools, rag_config, memory_config, guardrail_policy_ids, human_approval_policy, max_execution_steps, timeout_seconds)
+VALUES
+('agent-prop-001', 'property_agent', 'Property Consultant Agent', 'Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.', 'Property Advisor', 'Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.', 'sales-tech@glgassets.com', 'PRODUCTION', 'production', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'v2.1', 0.2, 0.9, 1024, 'Consultative Luxury', '["property_search", "availability_check", "crm_lead_sync", "schedule_tour"]'::jsonb, '{"top_k": 5, "chunk_size": 512, "hybrid_alpha": 0.65, "enabled_sources": ["property_db", "brochures", "pricing_matrix"], "grounding_enforced": true, "similarity_threshold": 0.68}'::jsonb, '{"scope": "CONVERSATION", "max_entries": 20, "retention_ttl_hours": 168, "relevance_threshold": 0.65}'::jsonb, '["gr-fact-001", "gr-pii-001", "gr-inj-001"]'::jsonb, 'HIGH_RISK_ONLY', 6, 30),
+('agent-faq-002', 'faq_agent', 'FAQ & Customer Advisory Agent', 'Official policy advisor addressing NID/TIN verification, installment schedules, legal disclosures, and developer credentials.', 'Policy Specialist', 'Answer customer questions factually using approved company policies and financing partnerships.', 'legal-compliance@glgassets.com', 'PRODUCTION', 'production', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'v1.4', 0.15, 0.85, 1024, 'Analytical Advisor', '["knowledge_search", "policy_lookup"]'::jsonb, '{"top_k": 4, "chunk_size": 512, "hybrid_alpha": 0.7, "enabled_sources": ["faq_policies", "legal_disclosures"], "grounding_enforced": true, "similarity_threshold": 0.7}'::jsonb, '{"scope": "CONVERSATION", "max_entries": 10, "retention_ttl_hours": 72, "relevance_threshold": 0.7}'::jsonb, '["gr-pii-001", "gr-inj-001"]'::jsonb, 'NONE', 4, 25),
+('agent-sup-003', 'supervisor', 'Supervisor Intent Orchestrator', 'Deterministic classifier routing incoming multi-lingual inquiries (Bangla, Banglish, English) to the optimal domain agent with confidence telemetry.', 'Router & Orchestrator', 'Detect user intent, extract location/budget entities, and dispatch to appropriate sub-agents.', 'core-ai@glgassets.com', 'PRODUCTION', 'production', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'v2.0', 0.1, 0.85, 512, 'Deterministic Router', '["crm_lead_sync"]'::jsonb, '{"top_k": 3, "chunk_size": 256, "hybrid_alpha": 0.5, "enabled_sources": ["faq_policies"], "grounding_enforced": false, "similarity_threshold": 0.6}'::jsonb, '{"scope": "SHORT_TERM", "max_entries": 6, "retention_ttl_hours": 24, "relevance_threshold": 0.6}'::jsonb, '["gr-inj-001"]'::jsonb, 'NONE', 3, 15),
+('agent-email-004', 'email_agent', 'Lead & Email Concierge Agent', 'Executive correspondent drafting formal proposals, VIP site visit itineraries, and structured payment plan breakdowns for investors.', 'Executive Concierge', 'Compose polished investor communications and confirm scheduled appointments.', 'investor-relations@glgassets.com', 'PRODUCTION', 'production', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'v1.2', 0.3, 0.9, 1200, 'High-Urgency Closer', '["email_dispatch", "schedule_tour", "crm_lead_sync"]'::jsonb, '{"top_k": 4, "chunk_size": 512, "hybrid_alpha": 0.6, "enabled_sources": ["property_db", "pricing_matrix"], "grounding_enforced": true, "similarity_threshold": 0.65}'::jsonb, '{"scope": "CUSTOMER", "max_entries": 15, "retention_ttl_hours": 336, "relevance_threshold": 0.65}'::jsonb, '["gr-fact-001", "gr-pii-001"]'::jsonb, 'HIGH_RISK_ONLY', 5, 35),
+('agent-social-005', 'social_bridge', 'Social Media Omnichannel Bridge', 'Engaging conversational bridge managing WhatsApp, Facebook Messenger, and Instagram Direct conversations with warm hospitality.', 'Social Concierge', 'Convert social engagements into qualified buyer leads via welcoming Bangla/Banglish/English interaction.', 'growth-marketing@glgassets.com', 'PRODUCTION', 'production', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'v1.5', 0.35, 0.95, 850, 'Warm Conversational', '["whatsapp_send", "property_search", "crm_lead_sync"]'::jsonb, '{"top_k": 3, "chunk_size": 384, "hybrid_alpha": 0.55, "enabled_sources": ["property_db", "brochures"], "grounding_enforced": true, "similarity_threshold": 0.6}'::jsonb, '{"scope": "CONVERSATION", "max_entries": 8, "retention_ttl_hours": 48, "relevance_threshold": 0.6}'::jsonb, '["gr-fact-001", "gr-pii-001", "gr-inj-001"]'::jsonb, 'NONE', 4, 20)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    primary_model = EXCLUDED.primary_model,
+    fallback_model = EXCLUDED.fallback_model,
+    rag_config = EXCLUDED.rag_config;
+
+-- Seed Guardrail Policies
+INSERT INTO public.ai_guardrail_policies (id, category, rule_name, description, action, severity, is_enabled)
+VALUES
+('gr-fact-001', 'FACTUAL_GROUNDING', 'Anti-Hallucination Factual Grounding', 'Requires all unit specifications, prices, and amenities to match verified knowledge base chunks with >= 0.70 grounding confidence score.', 'REWRITE', 'CRITICAL', true),
+('gr-pii-001', 'PRIVACY', 'PII Masking & Privacy Shield', 'Redacts Bangladeshi National ID (NID), Tax Identification Numbers (TIN), personal bank account numbers, and credit card numbers prior to model inference.', 'REDACT', 'HIGH', true),
+('gr-inj-001', 'SECURITY', 'Prompt Injection & Jailbreak Defense', 'Detects and blocks adversarial jailbreak attempts, system prompt exfiltration, and unauthorized role overrides.', 'BLOCK', 'CRITICAL', true)
+ON CONFLICT (id) DO UPDATE SET
+    rule_name = EXCLUDED.rule_name,
+    is_enabled = EXCLUDED.is_enabled;
+
+-- Seed Agent Configurations (Studio UI Sync)
+INSERT INTO public.agent_configurations (id, agent_key, name, description, provider, model, fallback_model, temperature, top_p, max_tokens, system_prompt)
+VALUES
+('cfg-prop-001', 'property_agent', 'Property Consultant Agent', 'Luxury real-estate specialist for Gulshan, Banani, and Baridhara developments.', 'groq', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 0.2, 0.9, 1024, 'You are the Elite Real Estate Consultant for GLG Assets LTD, Dhaka premiere luxury developer. Always answer professionally, cite specific developments (GLG Gulshan Heights, Baridhara Luxury Suites, GLG Sky Tower, Banani Crest Towers, Dhanmondi Lake Oasis), provide exact BDT pricing when available, and invite clients to book VIP site tours.'),
+('cfg-faq-002', 'faq_agent', 'FAQ & Policy Advisor', 'Official policy advisor on booking procedures, payment plans, and handover timelines.', 'groq', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 0.15, 0.85, 1024, 'You are the Compliance & Customer Advisory Specialist for GLG Assets LTD. Answer inquiries regarding payment schedules, legal documentation, RAJUK approvals, and warranty coverage accurately based on official policy documentation.'),
+('cfg-sup-003', 'supervisor', 'Supervisor Intent Orchestrator', 'Routes user queries to the appropriate specialized agent.', 'groq', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 0.1, 0.85, 512, 'You are the Master Orchestration Supervisor for GLG Assets Social AI OS. Analyze customer language (English, Bangla, Banglish), identify intent (property inquiry, price negotiation, site visit booking, complaints, general greeting), and route accordingly.')
+ON CONFLICT (agent_key) DO UPDATE SET
+    name = EXCLUDED.name,
+    model = EXCLUDED.model,
+    system_prompt = EXCLUDED.system_prompt;
+
+-- ----------------------------------------------------------------------------
 -- SUCCESS VERIFICATION QUERY
 -- ----------------------------------------------------------------------------
 SELECT 
@@ -590,5 +933,7 @@ SELECT
     (SELECT COUNT(*) FROM projects) AS total_projects,
     (SELECT COUNT(*) FROM ad_campaigns) AS total_campaigns,
     (SELECT COUNT(*) FROM calendar_milestones) AS total_milestones,
-    (SELECT COUNT(*) FROM knowledge_documents) AS total_documents;
+    (SELECT COUNT(*) FROM knowledge_documents) AS total_documents,
+    (SELECT COUNT(*) FROM ai_agents) AS total_ai_agents,
+    (SELECT COUNT(*) FROM ai_models) AS total_ai_models;
 
