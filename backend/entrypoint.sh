@@ -9,8 +9,16 @@ echo "  GLG Assets Social AI OS — Container Entrypoint"
 echo "====================================================="
 
 # Step 1: Run Alembic Database Migrations
-echo "[entrypoint] Running Alembic database migrations..."
-if [ -f "alembic.ini" ] || [ -f "../alembic.ini" ]; then
+echo "[entrypoint] Checking database migration configuration..."
+if [ -z "${DATABASE_URL}" ] || echo "${DATABASE_URL}" | grep -qE "localhost|127\.0\.0\.1"; then
+    if [ -z "${DATABASE_URL}" ]; then
+        echo "[entrypoint] Notice: DATABASE_URL is not set. Skipping Alembic database migrations."
+    else
+        echo "[entrypoint] Notice: DATABASE_URL points to localhost in a container. Skipping Alembic database migrations."
+    fi
+    echo "[entrypoint] (Set DATABASE_URL to your Supabase or managed PostgreSQL URL to enable automatic migrations)"
+elif [ -f "alembic.ini" ] || [ -f "../alembic.ini" ]; then
+    echo "[entrypoint] Running Alembic database migrations against configured database..."
     alembic upgrade head || echo "[entrypoint] Alembic migration warning: continuing container startup"
 else
     echo "[entrypoint] No alembic.ini found, skipping migrations."
