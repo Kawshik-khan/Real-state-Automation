@@ -1,12 +1,25 @@
 import os
 import re
+import sys
 from logging.config import fileConfig
+
+# Guarantee project root is in sys.path so 'app' is always importable by Alembic CLI
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+CWD = os.path.abspath(os.getcwd())
+if CWD not in sys.path:
+    sys.path.insert(0, CWD)
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# Import shared Base — root-level app/persistence/models.py is canonical
-from app.persistence.models import Base
+# Import shared Base — load all core domain models into metadata
+from app.models.models import Base
+try:
+    import app.models.ai_control_plane  # ensure AI Control Plane tables are registered in metadata
+except ImportError:
+    pass
 
 
 config = context.config
@@ -14,7 +27,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Normalise DATABASE_URL for Alembic (sync driver vs asyncpg)
-_raw_url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+_raw_url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or ""
 _sync_url = re.sub(r"\+asyncpg", "", _raw_url)
 config.set_main_option("sqlalchemy.url", _sync_url)
 

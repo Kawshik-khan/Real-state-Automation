@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Building2, 
   MapPin, 
-  DollarSign, 
   Bed, 
   FileText, 
   Image as ImageIcon, 
@@ -10,10 +8,8 @@ import {
   Map as MapIcon,
   LayoutGrid,
   Navigation,
-  Compass,
   CheckCircle2,
-  SlidersHorizontal,
-  X
+  SlidersHorizontal
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -21,6 +17,8 @@ import { getProjects } from '../services/api';
 import { AddPropertyModal } from '../components/dashboard/AddPropertyModal';
 import { useToast } from '../components/ui/Toast';
 import Pagination from '../components/ui/Pagination';
+import Modal from '../components/ui/Modal';
+import Button from '../components/ui/Button';
 
 // Custom Leaflet marker icons with clean light theme styling
 const createCustomIcon = (priceText) => {
@@ -519,54 +517,77 @@ export default function PropertiesPage({ searchQuery = '' }) {
 
       {/* Floor Plans Modal */}
       {floorPlanModalProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="relative w-full max-w-2xl bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-white">Floor Plans &amp; Specifications</h3>
-                <p className="text-xs text-neutral-400">{floorPlanModalProject.name} • {floorPlanModalProject.bedrooms}</p>
-              </div>
-              <button 
-                onClick={() => setFloorPlanModalProject(null)}
-                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-white/10"
-              >
-                <X size={20} />
-              </button>
+        <Modal
+          isOpen={!!floorPlanModalProject}
+          onClose={() => setFloorPlanModalProject(null)}
+          title="Floor Plans & Specifications"
+          subtitle={`${floorPlanModalProject.name} • ${floorPlanModalProject.bedrooms}`}
+          icon={<ImageIcon size={20} color="var(--primary-coral)" />}
+          maxWidth="680px"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              borderRadius: '14px',
+              overflow: 'hidden',
+              border: '1px solid var(--border-glass)',
+              background: 'var(--bg-main)',
+              height: '240px'
+            }}>
+              <img 
+                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80" 
+                alt="Architectural Blueprint Layout" 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
-            <div className="space-y-4">
-              <div className="rounded-xl overflow-hidden border border-white/10 bg-neutral-950 p-2">
-                <img 
-                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80" 
-                  alt="Architectural Blueprint Layout" 
-                  className="w-full h-64 object-cover rounded-lg"
-                />
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '12px',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border-glass)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Super Built-up</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '4px' }}>2,850 Sq.Ft</div>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                  <div className="text-xs text-neutral-400">Total Super Built-up</div>
-                  <div className="text-sm font-bold text-white mt-1">2,850 Sq.Ft</div>
-                </div>
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                  <div className="text-xs text-neutral-400">Carpet Area</div>
-                  <div className="text-sm font-bold text-emerald-400 mt-1">2,280 Sq.Ft</div>
-                </div>
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                  <div className="text-xs text-neutral-400">Balconies</div>
-                  <div className="text-sm font-bold text-amber-400 mt-1">3 Verandas</div>
-                </div>
+              <div style={{
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border-glass)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carpet Area</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary-emerald)', marginTop: '4px' }}>2,280 Sq.Ft</div>
               </div>
-              <button 
-                onClick={() => {
-                  showToast('High-resolution CAD blueprint saved to downloads.', 'success');
-                  setFloorPlanModalProject(null);
-                }}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-black font-semibold text-sm hover:from-amber-300 hover:to-amber-400 transition-all"
-              >
-                Download High-Res CAD Blueprints (PDF)
-              </button>
+              <div style={{
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border-glass)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Balconies</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-amber)', marginTop: '4px' }}>3 Verandas</div>
+              </div>
             </div>
+
+            <Button
+              variant="coral"
+              onClick={() => {
+                showToast('High-resolution CAD blueprint saved to downloads.', 'success');
+                setFloorPlanModalProject(null);
+              }}
+              style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+              icon={<FileText size={16} />}
+            >
+              Download High-Res CAD Blueprints (PDF)
+            </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Add Property Development Modal */}

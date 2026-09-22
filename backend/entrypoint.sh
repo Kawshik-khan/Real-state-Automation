@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# Guarantee PYTHONPATH includes /app so all CLI tools (alembic, uvicorn, python) can import app
+export PYTHONPATH="/app:${PYTHONPATH:-}"
+
 echo "====================================================="
 echo "  GLG Assets Social AI OS — Container Entrypoint"
 echo "====================================================="

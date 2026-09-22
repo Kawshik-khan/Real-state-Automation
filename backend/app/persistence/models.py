@@ -1,5 +1,6 @@
 """Re-export lean models for backward compatibility."""
 from app.models.models import (
+    Base,
     LogRecord,
     UserRecord,
 )
@@ -7,3 +8,11 @@ from app.models.models import (
 # Compatibility aliases
 CustomerRecord = UserRecord
 AuditRecord = LogRecord
+
+__all__ = [
+    "Base",
+    "CustomerRecord",
+    "AuditRecord",
+    "LogRecord",
+    "UserRecord",
+]
