@@ -3,10 +3,11 @@
 import asyncio
 import json
 
-from app.services.event_broadcaster import broadcaster
-from app.services.telegram import telegram_service
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
+from app.services.event_broadcaster import broadcaster
+from app.services.telegram import telegram_service
 
 router = APIRouter()
 
@@ -162,9 +163,10 @@ async def add_message_to_conversation(
 async def _persist_message_to_db(conv_id: str, sender: str, text: str, channel: str = "website", name: str = None, phone: str = None):
     """Persists conversation and message into Supabase/PostgreSQL."""
     try:
+        from sqlalchemy import select
+
         from app.database import async_session_factory
         from app.models.models import ConversationRecord, MessageRecord, UserRecord
-        from sqlalchemy import select
         async with async_session_factory() as session:
             user_id = f"usr_{conv_id}"
             user_stmt = select(UserRecord).where(UserRecord.user_id == user_id)
@@ -220,9 +222,10 @@ async def list_conversations(
 ):
     """Returns active customer conversations from database or cache."""
     try:
+        from sqlalchemy import and_, desc, select
+
         from app.database import async_session_factory
         from app.models.models import ConversationRecord, MessageRecord, UserRecord
-        from sqlalchemy import and_, desc, select
 
         async with async_session_factory() as session:
             stmt = select(ConversationRecord, UserRecord).join(
@@ -405,9 +408,10 @@ async def toggle_takeover(conv_id: str):
             
             # Persist to database
             try:
+                from sqlalchemy import update
+
                 from app.database import async_session_factory
                 from app.models.models import ConversationRecord
-                from sqlalchemy import update
 
                 async with async_session_factory() as session:
                     stmt = update(ConversationRecord).where(
