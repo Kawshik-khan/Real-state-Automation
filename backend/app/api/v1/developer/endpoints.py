@@ -183,12 +183,12 @@ async def benchmark_rag_query(
     """Runs a real-time vector search latency and similarity diagnostic test."""
     t0 = time.perf_counter()
     # Simulated embedding latency
-    time.sleep(0.01)
+    await asyncio.sleep(0.01)
     embed_ms = round((time.perf_counter() - t0) * 1000 + 12.4, 2)
     
     t1 = time.perf_counter()
     # Simulated vector search latency
-    time.sleep(0.015)
+    await asyncio.sleep(0.015)
     search_ms = round((time.perf_counter() - t1) * 1000 + 18.2, 2)
     
     chunks = []
