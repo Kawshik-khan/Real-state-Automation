@@ -3,8 +3,9 @@
 import logging
 from typing import Any, Dict
 
-from app.schemas.chat_response import FullChatResponse, StructuredChatResponse
 from fastapi.responses import JSONResponse
+
+from app.schemas.chat_response import FullChatResponse, StructuredChatResponse
 
 logger = logging.getLogger(__name__)
 class ChatResponseBuilder:

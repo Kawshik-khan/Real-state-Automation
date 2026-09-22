@@ -5,6 +5,8 @@ Handles incoming email webhooks, thread listing, AI draft review, and 1-click ap
 
 from typing import Optional
 
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+
 from app.agents.email_agent import email_agent
 from app.config import settings
 from app.models.email import (
@@ -15,7 +17,6 @@ from app.models.email import (
 from app.services.attachment_parser import attachment_parser
 from app.services.email_service import email_service
 from app.services.idempotency import idempotency_service
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 router = APIRouter()
 
