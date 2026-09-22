@@ -12,8 +12,8 @@
       "environment": "production",
       "primary_model": "llama-3.3-70b-versatile",
       "fallback_model": "llama-3.1-8b-instant",
-      "current_prompt_version": "v2.3",
-      "temperature": 0.25,
+      "current_prompt_version": "v2.1",
+      "temperature": 0.2,
       "top_p": 0.9,
       "max_tokens": 1024,
       "persona_preset": "Consultative Luxury",
@@ -48,8 +48,7 @@
       ],
       "human_approval_policy": "HIGH_RISK_ONLY",
       "max_execution_steps": 6,
-      "timeout_seconds": 30,
-      "updated_at": "2026-09-14T08:45:54.416755+00:00"
+      "timeout_seconds": 30
     },
     {
       "id": "agent-faq-002",
@@ -309,6 +308,22 @@
       ],
       "rate_limit_rpm": 300,
       "rate_limit_tpm": 500000
+    },
+    {
+      "id": "prov-openrouter",
+      "provider_key": "openrouter",
+      "display_name": "OpenRouter Global Aggregator",
+      "base_url": "https://openrouter.ai/api/v1",
+      "is_active": true,
+      "health_status": "HEALTHY",
+      "last_ping_ms": 210.0,
+      "capabilities": [
+        "chat",
+        "streaming",
+        "tools"
+      ],
+      "rate_limit_rpm": 120,
+      "rate_limit_tpm": 200000
     }
   ],
   "models": [
@@ -375,6 +390,28 @@
         "groundedness": 98.9,
         "latency_p50": 620,
         "tool_accuracy": 98.5
+      },
+      "is_enabled": true
+    },
+    {
+      "id": "mod-gpt4o-mini",
+      "model_id": "gpt-4o-mini",
+      "provider_id": "prov-openai",
+      "display_name": "OpenAI GPT-4o Mini",
+      "model_type": "BASE",
+      "context_window": 128000,
+      "max_output_tokens": 4096,
+      "input_cost_per_m": 0.15,
+      "output_cost_per_m": 0.6,
+      "cached_cost_per_m": 0.075,
+      "supports_structured_output": true,
+      "supports_tools": true,
+      "supports_streaming": true,
+      "status": "PRODUCTION",
+      "benchmark_scores": {
+        "groundedness": 96.5,
+        "latency_p50": 240,
+        "tool_accuracy": 96.0
       },
       "is_enabled": true
     },
@@ -454,25 +491,22 @@
       "is_enabled": true,
       "assigned_agents": [
         "property_agent",
+        "supervisor",
         "social_bridge"
       ]
     },
     {
       "id": "tool-avail-check",
       "tool_key": "availability_check",
-      "name": "Unit Availability & Floor Status",
-      "description": "Retrieve live inventory status (Available, Reserved, Sold Out) for specific property towers and unit numbers.",
+      "name": "Live Unit Availability Check",
+      "description": "Check real-time unit status (Available, Reserved, Sold) and floor availability across GLG projects.",
       "category": "data_retrieval",
       "parameters_schema": {
         "type": "object",
         "properties": {
           "project_name": {
             "type": "string",
-            "description": "Project title (e.g. GLG Sky Tower)"
-          },
-          "unit_type": {
-            "type": "string",
-            "description": "Unit specification or floor tier"
+            "description": "GLG Sky Tower, GLG Crown Jewel, etc."
           }
         },
         "required": [
@@ -484,44 +518,8 @@
       "timeout_ms": 2500,
       "is_enabled": true,
       "assigned_agents": [
-        "property_agent"
-      ]
-    },
-    {
-      "id": "tool-crm-sync",
-      "tool_key": "crm_lead_sync",
-      "name": "CRM Lead Sync & Scoring",
-      "description": "Upsert verified prospect identity, detected budget, and purchase timeline into sales pipeline.",
-      "category": "crm",
-      "parameters_schema": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "project_interest": {
-            "type": "string"
-          },
-          "intent_score": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "phone"
-        ]
-      },
-      "requires_approval": false,
-      "risk_level": "MEDIUM",
-      "timeout_ms": 4000,
-      "is_enabled": true,
-      "assigned_agents": [
         "property_agent",
-        "email_agent",
-        "social_bridge",
-        "supervisor"
+        "faq_agent"
       ]
     },
     {
@@ -555,6 +553,155 @@
       "assigned_agents": [
         "property_agent",
         "email_agent"
+      ]
+    },
+    {
+      "id": "tool-crm-sync",
+      "tool_key": "crm_lead_sync",
+      "name": "CRM Lead Qualification Sync",
+      "description": "Sync customer budget, timeframe, and micro-market preferences to the central CRM lead card.",
+      "category": "crm",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "customer_name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "budget_bdt": {
+            "type": "number"
+          },
+          "target_location": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "requires_approval": false,
+      "risk_level": "LOW",
+      "timeout_ms": 3000,
+      "is_enabled": true,
+      "assigned_agents": [
+        "supervisor",
+        "property_agent",
+        "email_agent",
+        "social_bridge"
+      ]
+    },
+    {
+      "id": "tool-knowledge-search",
+      "tool_key": "knowledge_search",
+      "name": "Company Policy & Spec Lookup",
+      "description": "Search official specifications, backup generator capacities, lift brands, and legal titles.",
+      "category": "data_retrieval",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "requires_approval": false,
+      "risk_level": "LOW",
+      "timeout_ms": 2500,
+      "is_enabled": true,
+      "assigned_agents": [
+        "faq_agent"
+      ]
+    },
+    {
+      "id": "tool-policy-lookup",
+      "tool_key": "policy_lookup",
+      "name": "Legal & Installment Guidelines",
+      "description": "Retrieve official Rajuk approval details, land mutation records, and standard payment installment terms.",
+      "category": "data_retrieval",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ]
+      },
+      "requires_approval": false,
+      "risk_level": "LOW",
+      "timeout_ms": 2500,
+      "is_enabled": true,
+      "assigned_agents": [
+        "faq_agent"
+      ]
+    },
+    {
+      "id": "tool-email-dispatch",
+      "tool_key": "email_dispatch",
+      "name": "Executive Email Proposal Dispatch",
+      "description": "Send formal investment summaries and luxury brochure links via authenticated SMTP.",
+      "category": "communication",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "recipient_email": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body_html": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient_email",
+          "subject",
+          "body_html"
+        ]
+      },
+      "requires_approval": true,
+      "risk_level": "HIGH",
+      "timeout_ms": 6000,
+      "is_enabled": true,
+      "assigned_agents": [
+        "email_agent"
+      ]
+    },
+    {
+      "id": "tool-whatsapp-send",
+      "tool_key": "whatsapp_send",
+      "name": "WhatsApp Business Interactive Message",
+      "description": "Dispatch rich media messages, brochure PDFs, and quick-reply buttons via WhatsApp Cloud API.",
+      "category": "communication",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "recipient_phone": {
+            "type": "string"
+          },
+          "message_text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient_phone",
+          "message_text"
+        ]
+      },
+      "requires_approval": false,
+      "risk_level": "MEDIUM",
+      "timeout_ms": 4000,
+      "is_enabled": true,
+      "assigned_agents": [
+        "social_bridge"
       ]
     }
   ],
@@ -623,7 +770,7 @@
         "preserve_last_digits": 4
       },
       "is_enabled": true,
-      "total_triggers": 44
+      "total_triggers": 42
     },
     {
       "id": "gr-inj-001",
@@ -637,52 +784,138 @@
         "strictness": 0.92
       },
       "is_enabled": true,
-      "total_triggers": 29
+      "total_triggers": 27
+    }
+  ],
+  "datasets": [
+    {
+      "id": "ds-eval-001",
+      "slug": "dhaka_luxury_eval_v2",
+      "name": "Dhaka Luxury Residences Golden Benchmark",
+      "dataset_type": "evaluation",
+      "target_agent": "property_agent",
+      "version": "v2.0",
+      "total_examples": 5,
+      "quality_score": 98.4,
+      "train_count": 0,
+      "val_count": 1,
+      "test_count": 4,
+      "is_locked": true,
+      "created_by": "developer@glgassets.com"
+    },
+    {
+      "id": "ds-eval-002",
+      "slug": "bangla_banglish_intent_v1",
+      "name": "Bangla & Banglish Intent Classification Corpus",
+      "dataset_type": "evaluation",
+      "target_agent": "supervisor",
+      "version": "v1.5",
+      "total_examples": 5,
+      "quality_score": 97.8,
+      "train_count": 0,
+      "val_count": 1,
+      "test_count": 4,
+      "is_locked": true,
+      "created_by": "developer@glgassets.com"
+    }
+  ],
+  "dataset_examples": [
+    {
+      "id": "ex-001",
+      "dataset_id": "ds-eval-001",
+      "split": "test",
+      "input_message": "Gulshan 2 e 3 BHK luxury flat er price koto ar handover kobe?",
+      "expected_intent": "property_search",
+      "expected_output": "GLG Gulshan Heights features 3 BHK apartments priced at 95 Lakhs BDT (৳9,500,000) with handover scheduled for December 2026.",
+      "expected_tools": [
+        "property_search"
+      ],
+      "expected_facts": [
+        "95 Lakhs BDT",
+        "December 2026",
+        "Gulshan 2"
+      ],
+      "metadata_tags": {
+        "area": "Gulshan 2",
+        "language": "banglish"
+      }
+    },
+    {
+      "id": "ex-002",
+      "dataset_id": "ds-eval-001",
+      "split": "test",
+      "input_message": "Banani te kono available project ache infinity pool soho?",
+      "expected_intent": "property_search",
+      "expected_output": "GLG Banani Crest on prime Banani Road includes a Rooftop Infinity Pool, 3 BHK suites priced at 1.2 Crore BDT with December 2026 handover.",
+      "expected_tools": [
+        "property_search"
+      ],
+      "expected_facts": [
+        "GLG Banani Crest",
+        "Infinity Pool",
+        "1.2 Crore BDT"
+      ],
+      "metadata_tags": {
+        "area": "Banani",
+        "amenity": "pool"
+      }
+    },
+    {
+      "id": "ex-003",
+      "dataset_id": "ds-eval-001",
+      "split": "test",
+      "input_message": "Baridhara diplomatic zone er 4 BHK project details bolun.",
+      "expected_intent": "property_search",
+      "expected_output": "GLG Luxe Heights in Baridhara Diplomatic Zone offers ultra-exclusive 4 BHK residences overlooking the lake, priced at 1.8 Crore BDT.",
+      "expected_tools": [
+        "property_search"
+      ],
+      "expected_facts": [
+        "GLG Luxe Heights",
+        "Baridhara Diplomatic Zone",
+        "1.8 Crore BDT"
+      ],
+      "metadata_tags": {
+        "area": "Baridhara"
+      }
+    },
+    {
+      "id": "ex-004",
+      "dataset_id": "ds-eval-002",
+      "split": "test",
+      "input_message": "Ami flat kinte chai, Gulshan e budget 1.5 crore.",
+      "expected_intent": "property_inquiry",
+      "expected_output": "Supervisor routes to property_agent with extracted budget 1.5 Crore BDT and location Gulshan.",
+      "expected_tools": [
+        "crm_lead_sync"
+      ],
+      "expected_facts": [
+        "Gulshan",
+        "1.5 Crore"
+      ],
+      "metadata_tags": {
+        "language": "banglish"
+      }
+    },
+    {
+      "id": "ex-005",
+      "dataset_id": "ds-eval-002",
+      "split": "test",
+      "input_message": "Installment payment schedule ki bhabe kaj kore?",
+      "expected_intent": "faq_policy",
+      "expected_output": "Supervisor routes to faq_agent for installment schedule policies.",
+      "expected_tools": [
+        "knowledge_search"
+      ],
+      "expected_facts": [
+        "payment schedule"
+      ],
+      "metadata_tags": {
+        "intent": "policy"
+      }
     }
   ],
   "evaluations": [
-    {
-      "suite_name": "Property Consultant Agent Regression & Grounding Suite",
-      "dataset_id": "ds-eval-001",
-      "agent_id": "property_agent",
-      "model_tested": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.3",
-      "total_cases": 40,
-      "passed_cases": 39,
-      "failed_cases": 1,
-      "accuracy_pct": 97.5,
-      "groundedness_pct": 98.6,
-      "hallucination_pct": 0.5,
-      "tool_accuracy_pct": 97.5,
-      "schema_correctness_pct": 100.0,
-      "avg_latency_ms": 320.0,
-      "status": "COMPLETED",
-      "gate_verdict": "PASS",
-      "created_by": "developer@glgassets.com",
-      "id": "eval-64a9da",
-      "created_at": "2026-09-14T08:45:54.490027+00:00"
-    },
-    {
-      "suite_name": "Property Consultant Agent Regression & Grounding Suite",
-      "dataset_id": "ds-eval-001",
-      "agent_id": "property_agent",
-      "model_tested": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.2",
-      "total_cases": 40,
-      "passed_cases": 39,
-      "failed_cases": 1,
-      "accuracy_pct": 97.5,
-      "groundedness_pct": 98.6,
-      "hallucination_pct": 0.5,
-      "tool_accuracy_pct": 97.5,
-      "schema_correctness_pct": 100.0,
-      "avg_latency_ms": 320.0,
-      "status": "COMPLETED",
-      "gate_verdict": "PASS",
-      "created_by": "developer@glgassets.com",
-      "id": "eval-d11c17",
-      "created_at": "2026-09-14T08:21:57.662878+00:00"
-    },
     {
       "id": "eval-001",
       "suite_name": "Banani & Gulshan Property Inquiries Baseline",
@@ -702,117 +935,9 @@
       "status": "COMPLETED",
       "gate_verdict": "PASS",
       "created_by": "developer@glgassets.com"
-    },
-    {
-      "id": "eval-002",
-      "suite_name": "Multilingual Intent & Entity Extraction Suite",
-      "dataset_id": "ds-eval-002",
-      "agent_id": "supervisor",
-      "model_tested": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.0",
-      "total_cases": 40,
-      "passed_cases": 39,
-      "failed_cases": 1,
-      "accuracy_pct": 97.5,
-      "groundedness_pct": 99.0,
-      "hallucination_pct": 0.0,
-      "tool_accuracy_pct": 98.0,
-      "schema_correctness_pct": 100.0,
-      "avg_latency_ms": 185.0,
-      "status": "COMPLETED",
-      "gate_verdict": "PASS",
-      "created_by": "developer@glgassets.com"
-    }
-  ],
-  "datasets": [
-    {
-      "id": "ds-eval-001",
-      "slug": "dhaka_luxury_eval_v2",
-      "name": "Dhaka Luxury Residences Golden Benchmark",
-      "dataset_type": "evaluation",
-      "target_agent": "property_agent",
-      "version": "v2.0",
-      "total_examples": 50,
-      "quality_score": 98.4,
-      "train_count": 0,
-      "val_count": 10,
-      "test_count": 40,
-      "is_locked": true,
-      "created_by": "developer@glgassets.com"
-    },
-    {
-      "id": "ds-eval-002",
-      "slug": "bangla_banglish_intent_v1",
-      "name": "Bangla & Banglish Intent Classification Corpus",
-      "dataset_type": "evaluation",
-      "target_agent": "supervisor",
-      "version": "v1.5",
-      "total_examples": 40,
-      "quality_score": 97.8,
-      "train_count": 0,
-      "val_count": 10,
-      "test_count": 30,
-      "is_locked": true,
-      "created_by": "developer@glgassets.com"
     }
   ],
   "releases": [
-    {
-      "id": "rel-245289",
-      "created_at": "2026-09-14T08:45:54.498069+00:00",
-      "deployed_by": "developer@glgassets.com",
-      "release_tag": "v3.9.0-test",
-      "title": "Automated Test Candidate Release",
-      "description": "",
-      "environment": "ROLLED_BACK",
-      "manifest": {
-        "agents": {
-          "property_agent": "v2.3",
-          "faq_agent": "v1.4",
-          "supervisor": "v2.0",
-          "email_agent": "v1.2",
-          "social_bridge": "v1.5"
-        },
-        "primary_model": "llama-3.3-70b-versatile",
-        "guardrails_active": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "timestamp": "2026-09-14T08:45:54.498047+00:00"
-      },
-      "evaluation_gate_passed": true,
-      "evaluation_score": 98.0,
-      "deployed_at": "2026-09-14T08:45:54.506121+00:00"
-    },
-    {
-      "id": "rel-a93c35",
-      "created_at": "2026-09-14T08:21:57.670695+00:00",
-      "deployed_by": "developer@glgassets.com",
-      "release_tag": "v3.9.0-test",
-      "title": "Automated Test Candidate Release",
-      "description": "",
-      "environment": "ROLLED_BACK",
-      "manifest": {
-        "agents": {
-          "property_agent": "v2.2",
-          "faq_agent": "v1.4",
-          "supervisor": "v2.0",
-          "email_agent": "v1.2",
-          "social_bridge": "v1.5"
-        },
-        "primary_model": "llama-3.3-70b-versatile",
-        "guardrails_active": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "timestamp": "2026-09-14T08:21:57.670667+00:00"
-      },
-      "evaluation_gate_passed": true,
-      "evaluation_score": 98.0,
-      "deployed_at": "2026-09-14T08:21:57.677642+00:00"
-    },
     {
       "id": "rel-3-8-0",
       "release_tag": "v3.8.0",
@@ -842,9 +967,29 @@
       "evaluation_gate_passed": true,
       "evaluation_score": 98.5,
       "deployed_by": "developer@glgassets.com",
-      "deployed_at": "2026-09-14T08:45:54.557640+00:00",
+      "deployed_at": "2026-09-12T10:00:00Z",
       "can_rollback": true,
       "previous_release_tag": "v3.7.2"
+    },
+    {
+      "id": "rel-3-7-2",
+      "release_tag": "v3.7.2",
+      "title": "Staging Release — Fallback Cascades",
+      "description": "Automated 8B fallback validation for rate-limit protection.",
+      "environment": "ARCHIVED",
+      "manifest": {
+        "agents": {
+          "property_agent": "v2.0",
+          "supervisor": "v1.9"
+        },
+        "model": "llama-3.3-70b-versatile"
+      },
+      "evaluation_gate_passed": true,
+      "evaluation_score": 97.2,
+      "deployed_by": "developer@glgassets.com",
+      "deployed_at": "2026-09-01T10:00:00Z",
+      "can_rollback": false,
+      "previous_release_tag": null
     }
   ],
   "budget": {
@@ -863,6 +1008,43 @@
       "social_bridge": 60.0
     }
   },
+  "approvals": [
+    {
+      "id": "appr-001",
+      "agent_id": "email_agent",
+      "action_type": "SEND_OFFER",
+      "risk_level": "HIGH",
+      "reason": "Exclusive discount proposal for GLG Sky Tower 4BHK exceeding ৳500,000 threshold.",
+      "context_data": {
+        "customer": "Tanvir Ahmed",
+        "project": "GLG Sky Tower",
+        "quoted_price": "৳2.40 Crore"
+      },
+      "generated_content": "Dear Mr. Tanvir, GLG Assets is pleased to extend an executive limited-time token waiver on the 18th floor panoramic suite at GLG Sky Tower.",
+      "status": "PENDING",
+      "reviewer": null,
+      "reviewer_notes": null,
+      "reviewed_at": null,
+      "created_at": "2026-09-14T07:15:00Z"
+    },
+    {
+      "id": "appr-002",
+      "agent_id": "property_agent",
+      "action_type": "SCHEDULE_VIP_TOUR",
+      "risk_level": "MEDIUM",
+      "reason": "Request for private helicopter transfer and site inspection for Baridhara Diplomatic Penthouse.",
+      "context_data": {
+        "customer": "Kamrul Hassan",
+        "project": "GLG Luxe Heights"
+      },
+      "generated_content": "Confirmed tentative VIP site tour slot for Saturday, Sept 20th. Relationship Manager assigned.",
+      "status": "PENDING",
+      "reviewer": null,
+      "reviewer_notes": null,
+      "reviewed_at": null,
+      "created_at": "2026-09-14T09:30:00Z"
+    }
+  ],
   "incidents": [
     {
       "id": "inc-001",
@@ -894,733 +1076,6 @@
   ],
   "audit_logs": [
     {
-      "id": "audit-b7e740fa",
-      "event_type": "RELEASE_ROLLED_BACK",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.8.0",
-      "action": "ROLLBACK",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-3-8-0",
-        "release_tag": "v3.8.0",
-        "title": "Production AI Release — Banani & Gulshan Hybrid RAG v2",
-        "description": "Full release snapshot with Groq LLaMA 3.3 70B inference, pgvector 1536-d semantic retrieval, and dual BDT currency accounting.",
-        "environment": "PRODUCTION",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.1",
-            "supervisor": "v2.0",
-            "faq_agent": "v1.4"
-          },
-          "model": "llama-3.3-70b-versatile",
-          "rag": "hybrid_rrf_k60",
-          "guardrails": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "tools": [
-            "property_search",
-            "availability_check",
-            "crm_lead_sync",
-            "schedule_tour"
-          ]
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.5,
-        "deployed_by": "developer@glgassets.com",
-        "deployed_at": "2026-09-14T08:45:54.557640+00:00",
-        "can_rollback": true,
-        "previous_release_tag": "v3.7.2"
-      },
-      "reason": "Rolled back to release v3.8.0.",
-      "created_at": "2026-09-14T08:45:54.559882+00:00"
-    },
-    {
-      "id": "audit-9452c6a8",
-      "event_type": "RELEASE_DEPLOYED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.9.0-test",
-      "action": "DEPLOY",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-245289",
-        "created_at": "2026-09-14T08:45:54.498069+00:00",
-        "deployed_by": "developer@glgassets.com",
-        "release_tag": "v3.9.0-test",
-        "title": "Automated Test Candidate Release",
-        "description": "",
-        "environment": "ROLLED_BACK",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.3",
-            "faq_agent": "v1.4",
-            "supervisor": "v2.0",
-            "email_agent": "v1.2",
-            "social_bridge": "v1.5"
-          },
-          "primary_model": "llama-3.3-70b-versatile",
-          "guardrails_active": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "timestamp": "2026-09-14T08:45:54.498047+00:00"
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.0,
-        "deployed_at": "2026-09-14T08:45:54.506121+00:00"
-      },
-      "reason": "Release v3.9.0-test promoted to PRODUCTION.",
-      "created_at": "2026-09-14T08:45:54.508511+00:00"
-    },
-    {
-      "id": "audit-1136896a",
-      "event_type": "RELEASE_CREATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.9.0-test",
-      "action": "CREATE",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-245289",
-        "created_at": "2026-09-14T08:45:54.498069+00:00",
-        "deployed_by": "developer@glgassets.com",
-        "release_tag": "v3.9.0-test",
-        "title": "Automated Test Candidate Release",
-        "description": "",
-        "environment": "ROLLED_BACK",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.3",
-            "faq_agent": "v1.4",
-            "supervisor": "v2.0",
-            "email_agent": "v1.2",
-            "social_bridge": "v1.5"
-          },
-          "primary_model": "llama-3.3-70b-versatile",
-          "guardrails_active": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "timestamp": "2026-09-14T08:45:54.498047+00:00"
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.0,
-        "deployed_at": "2026-09-14T08:45:54.506121+00:00"
-      },
-      "reason": "Release v3.9.0-test created for STAGING.",
-      "created_at": "2026-09-14T08:45:54.500524+00:00"
-    },
-    {
-      "id": "audit-fd9defc9",
-      "event_type": "AGENT_PUBLISHED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "PUBLISH",
-      "before_state": null,
-      "after_state": null,
-      "reason": "Published property_agent as immutable v2.3: Updated luxury tone preset for Banani 2026",
-      "created_at": "2026-09-14T08:45:54.420220+00:00"
-    },
-    {
-      "id": "audit-141bed3e",
-      "event_type": "AGENT_UPDATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "UPDATE",
-      "before_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.3",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:45:54.409818+00:00"
-      },
-      "after_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.3",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:45:54.416755+00:00"
-      },
-      "reason": "Agent 'Property Consultant Agent' modified by developer.",
-      "created_at": "2026-09-14T08:45:54.418493+00:00"
-    },
-    {
-      "id": "audit-da02f5d4",
-      "event_type": "AGENT_UPDATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "UPDATE",
-      "before_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.2",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:21:57.582036+00:00"
-      },
-      "after_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.3",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:45:54.409818+00:00"
-      },
-      "reason": "Agent 'Property Consultant Agent' modified by developer.",
-      "created_at": "2026-09-14T08:45:54.411689+00:00"
-    },
-    {
-      "id": "audit-b0347499",
-      "event_type": "RELEASE_ROLLED_BACK",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.8.0",
-      "action": "ROLLBACK",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-3-8-0",
-        "release_tag": "v3.8.0",
-        "title": "Production AI Release — Banani & Gulshan Hybrid RAG v2",
-        "description": "Full release snapshot with Groq LLaMA 3.3 70B inference, pgvector 1536-d semantic retrieval, and dual BDT currency accounting.",
-        "environment": "PRODUCTION",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.1",
-            "supervisor": "v2.0",
-            "faq_agent": "v1.4"
-          },
-          "model": "llama-3.3-70b-versatile",
-          "rag": "hybrid_rrf_k60",
-          "guardrails": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "tools": [
-            "property_search",
-            "availability_check",
-            "crm_lead_sync",
-            "schedule_tour"
-          ]
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.5,
-        "deployed_by": "developer@glgassets.com",
-        "deployed_at": "2026-09-14T08:21:57.685362+00:00",
-        "can_rollback": true,
-        "previous_release_tag": "v3.7.2"
-      },
-      "reason": "Rolled back to release v3.8.0.",
-      "created_at": "2026-09-14T08:21:57.686973+00:00"
-    },
-    {
-      "id": "audit-5814515d",
-      "event_type": "RELEASE_DEPLOYED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.9.0-test",
-      "action": "DEPLOY",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-a93c35",
-        "created_at": "2026-09-14T08:21:57.670695+00:00",
-        "deployed_by": "developer@glgassets.com",
-        "release_tag": "v3.9.0-test",
-        "title": "Automated Test Candidate Release",
-        "description": "",
-        "environment": "ROLLED_BACK",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.2",
-            "faq_agent": "v1.4",
-            "supervisor": "v2.0",
-            "email_agent": "v1.2",
-            "social_bridge": "v1.5"
-          },
-          "primary_model": "llama-3.3-70b-versatile",
-          "guardrails_active": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "timestamp": "2026-09-14T08:21:57.670667+00:00"
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.0,
-        "deployed_at": "2026-09-14T08:21:57.677642+00:00"
-      },
-      "reason": "Release v3.9.0-test promoted to PRODUCTION.",
-      "created_at": "2026-09-14T08:21:57.679476+00:00"
-    },
-    {
-      "id": "audit-9434a0a9",
-      "event_type": "RELEASE_CREATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_release",
-      "entity_id": "v3.9.0-test",
-      "action": "CREATE",
-      "before_state": null,
-      "after_state": {
-        "id": "rel-a93c35",
-        "created_at": "2026-09-14T08:21:57.670695+00:00",
-        "deployed_by": "developer@glgassets.com",
-        "release_tag": "v3.9.0-test",
-        "title": "Automated Test Candidate Release",
-        "description": "",
-        "environment": "ROLLED_BACK",
-        "manifest": {
-          "agents": {
-            "property_agent": "v2.2",
-            "faq_agent": "v1.4",
-            "supervisor": "v2.0",
-            "email_agent": "v1.2",
-            "social_bridge": "v1.5"
-          },
-          "primary_model": "llama-3.3-70b-versatile",
-          "guardrails_active": [
-            "gr-fact-001",
-            "gr-pii-001",
-            "gr-inj-001"
-          ],
-          "timestamp": "2026-09-14T08:21:57.670667+00:00"
-        },
-        "evaluation_gate_passed": true,
-        "evaluation_score": 98.0,
-        "deployed_at": "2026-09-14T08:21:57.677642+00:00"
-      },
-      "reason": "Release v3.9.0-test created for STAGING.",
-      "created_at": "2026-09-14T08:21:57.672304+00:00"
-    },
-    {
-      "id": "audit-04baa0ae",
-      "event_type": "AGENT_PUBLISHED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "PUBLISH",
-      "before_state": null,
-      "after_state": null,
-      "reason": "Published property_agent as immutable v2.2: Updated luxury tone preset for Banani 2026",
-      "created_at": "2026-09-14T08:21:57.584428+00:00"
-    },
-    {
-      "id": "audit-0eb9cce5",
-      "event_type": "AGENT_UPDATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "UPDATE",
-      "before_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.2",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:21:57.576683+00:00"
-      },
-      "after_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.2",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:21:57.582036+00:00"
-      },
-      "reason": "Agent 'Property Consultant Agent' modified by developer.",
-      "created_at": "2026-09-14T08:21:57.583199+00:00"
-    },
-    {
-      "id": "audit-1641562b",
-      "event_type": "AGENT_UPDATED",
-      "actor_email": "developer@glgassets.com",
-      "actor_role": "developer",
-      "entity_type": "ai_agent",
-      "entity_id": "property_agent",
-      "action": "UPDATE",
-      "before_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.1",
-        "temperature": 0.2,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30
-      },
-      "after_state": {
-        "id": "agent-prop-001",
-        "slug": "property_agent",
-        "name": "Property Consultant Agent",
-        "description": "Consultative real estate advisor specialized in Gulshan, Banani, and Baridhara luxury residences, verified unit layouts, and BDT pricing.",
-        "role": "Property Advisor",
-        "objective": "Guide high-net-worth investors through luxury floor plans, verified prices, and private site visits.",
-        "owner": "sales-tech@glgassets.com",
-        "status": "PRODUCTION",
-        "environment": "production",
-        "primary_model": "llama-3.3-70b-versatile",
-        "fallback_model": "llama-3.1-8b-instant",
-        "current_prompt_version": "v2.2",
-        "temperature": 0.25,
-        "top_p": 0.9,
-        "max_tokens": 1024,
-        "persona_preset": "Consultative Luxury",
-        "enabled_tools": [
-          "property_search",
-          "availability_check",
-          "crm_lead_sync",
-          "schedule_tour"
-        ],
-        "rag_config": {
-          "chunk_size": 512,
-          "top_k": 5,
-          "similarity_threshold": 0.68,
-          "hybrid_alpha": 0.65,
-          "grounding_enforced": true,
-          "enabled_sources": [
-            "property_db",
-            "brochures",
-            "pricing_matrix"
-          ]
-        },
-        "memory_config": {
-          "scope": "CONVERSATION",
-          "retention_ttl_hours": 168,
-          "max_entries": 20,
-          "relevance_threshold": 0.65
-        },
-        "guardrail_policy_ids": [
-          "gr-fact-001",
-          "gr-pii-001",
-          "gr-inj-001"
-        ],
-        "human_approval_policy": "HIGH_RISK_ONLY",
-        "max_execution_steps": 6,
-        "timeout_seconds": 30,
-        "updated_at": "2026-09-14T08:21:57.576683+00:00"
-      },
-      "reason": "Agent 'Property Consultant Agent' modified by developer.",
-      "created_at": "2026-09-14T08:21:57.577875+00:00"
-    },
-    {
       "id": "audit-001",
       "event_type": "AGENT_CONFIG_UPDATED",
       "actor_email": "developer@glgassets.com",
@@ -1645,286 +1100,311 @@
   ],
   "traces": [
     {
-      "trace_id": "trc-f8462cbd6bbe",
-      "run_id": "run-c0188d33",
+      "id": "trc-init-001",
+      "trace_id": "trc-98fa321a",
+      "run_id": "run-a101",
       "agent_id": "property_agent",
-      "user_query": "What are the available 3 BHK penthouses and handover timeline for GLG Sky Tower in Banani?",
-      "agent_response": "**GLG Sky Tower – 3 BHK Penthouse Offering (Banani)**  \n\n| Unit type | Typical size | Starting price* |\n|-----------|--------------|-----------------|\n| 3 BHK Penthouse (ultra‑luxury) | 2,450 – 2,800 sq ft. | ৳2.45 Crore BDT (and up) |\n\n\\*Prices are quoted from the base price of a 3 BHK suite; actual penthouse pricing may be higher depending on floor level, view, and finishes.  \n\n**Handover timeline**  \n- **Scheduled handover:** **December 2026** (all 3 BHK units, including penthouses, are slated for delivery at that time).\n\n**Payment plan (for any 3 BHK unit, including penthouses)**  \n\n| Milestone | Percentage of total price | Timing |\n|-----------|---------------------------|--------|\n| Booking / down‑payment | **20 %** | At reservation |\n| Construction‑linked installments | **60 %** | Quarterly over 36 months (as construction milestones are met) |\n| Final payment & registration | **20 %** | Upon handover (December 2026) |\n\n---\n\n### What to do next?\n- **Unit‑specific availability:** The exact floor numbers and the number of penthouses currently on offer are managed by the sales team. For the most up‑to‑date inventory (e.g., which penthouse floors are still open), please contact GLG Sky Tower’s sales office directly or visit their official showroom.\n- **Site visit & layout review:** You can schedule a private tour to see the verified unit layouts, finishes, and view options for the 3 BHK penthouses.\n- **Financing assistance:** If you need help structuring the quarterly installments or exploring mortgage options, let us know—we can connect you with trusted financial partners.\n\nFeel free to ask if you’d like more details on the floor plans, amenities, or the next steps to secure a penthouse!",
+      "channel": "WhatsApp",
+      "environment": "production",
+      "user_query": "Gulshan 2 e 3 BHK apartment er price koto?",
+      "agent_response": "GLG Gulshan Heights features 3 BHK residences starting at 95 Lakhs BDT with handover in December 2026.",
       "model_used": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.3",
+      "prompt_version": "v2.1",
       "status": "SUCCESS",
-      "total_tokens": 497,
-      "prompt_tokens": 132,
-      "completion_tokens": 365,
-      "cached_tokens": 46,
-      "latency_ms": 2874.8,
-      "cost_usd": 0.00038,
-      "cost_bdt": 0.0466,
+      "total_tokens": 412,
+      "prompt_tokens": 284,
+      "completion_tokens": 128,
+      "cached_tokens": 64,
+      "latency_ms": 342.0,
+      "cost_usd": 0.00028,
+      "cost_bdt": 0.0343,
       "spans": [
         {
           "span_id": "span-1",
           "name": "Ingress & Authentication",
-          "parent_id": null,
           "latency_ms": 2.4,
           "status": "OK"
         },
         {
           "span_id": "span-2",
-          "name": "Pre-Guard Injection Filter",
-          "parent_id": "span-1",
-          "latency_ms": 0.0,
+          "name": "Pre-Guard PII Check",
+          "latency_ms": 14.0,
           "status": "OK"
         },
         {
           "span_id": "span-3",
-          "name": "Supervisor Intent Classifier",
-          "parent_id": "span-1",
-          "latency_ms": 48.0,
-          "status": "OK",
-          "attributes": {
-            "detected_intent": "property_inquiry",
-            "confidence": 0.98
-          }
+          "name": "RAG Hybrid Retrieval",
+          "latency_ms": 42.0,
+          "status": "OK"
         },
         {
           "span_id": "span-4",
-          "name": "Hybrid RAG Retrieval",
-          "parent_id": "span-3",
-          "latency_ms": 0.0,
-          "status": "OK",
-          "attributes": {
-            "chunks_retrieved": 2
-          }
+          "name": "Tool Execution: property_search",
+          "latency_ms": 68.0,
+          "status": "OK"
         },
         {
           "span_id": "span-5",
-          "name": "LLM Inference (llama-3.3-70b-versatile)",
-          "parent_id": "span-3",
-          "latency_ms": 2874.4,
-          "status": "OK",
-          "attributes": {
-            "model": "llama-3.3-70b-versatile",
-            "fallback_engaged": false,
-            "tokens": {
-              "prompt_tokens": 132,
-              "completion_tokens": 365,
-              "cached_tokens": 46,
-              "total_tokens": 497
-            }
-          }
+          "name": "LLM Inference: Groq LLaMA 70B",
+          "latency_ms": 215.0,
+          "status": "OK"
+        }
+      ],
+      "guardrail_actions": [],
+      "tool_calls": [
+        {
+          "tool": "property_search",
+          "location": "Gulshan 2"
         }
       ],
       "rag_retrievals": [
         {
-          "chunk_id": "chk-sky-001",
-          "document_name": "GLG_Sky_Tower_Banani_Brochure_2026.pdf",
-          "page": 3,
-          "score": 0.94,
-          "content": "GLG Sky Tower is an ultra-luxury residential landmark located on Road 11, Banani, Dhaka. 3 BHK suites range from 2,450 to 2,800 sq.ft., priced from ৳2.45 Crore BDT. Handover scheduled for December 2026.",
-          "source_type": "brochure",
-          "grounding_priority": 1
-        },
-        {
-          "chunk_id": "chk-sky-002",
-          "document_name": "GLG_Pricing_and_Payment_Plans_2026.pdf",
-          "page": 7,
-          "score": 0.88,
-          "content": "Payment plan for GLG Sky Tower involves a 20% down payment upon booking, 60% construction-linked quarterly installments across 36 months, and 20% upon final handover registration.",
-          "source_type": "pricing_policy",
-          "grounding_priority": 2
+          "document": "GLG_Gulshan_Heights_Brochure.pdf",
+          "score": 0.94
         }
       ],
-      "guardrail_actions": [],
-      "id": "trc-48a8584f",
-      "timestamp": "2026-09-14T08:56:03.293563+00:00"
+      "timestamp": "2026-09-14T08:00:00Z"
+    }
+  ],
+  "fine_tune_jobs": [
+    {
+      "id": "ft-job-001",
+      "job_name": "glg-bangla-realestate-lora-v1",
+      "base_model": "llama-3.3-70b-versatile",
+      "dataset_id": "ds-eval-002",
+      "lora_rank": 16,
+      "epochs": 3,
+      "learning_rate": 0.0002,
+      "status": "COMPLETED",
+      "progress_pct": 100.0,
+      "current_epoch": 3,
+      "train_loss": 0.412,
+      "eval_loss": 0.385,
+      "output_model_id": "glg-bangla-realestate-lora-v1",
+      "metrics": {
+        "perplexity": 1.47,
+        "accuracy": 97.4,
+        "bleu": 42.6
+      },
+      "training_duration_sec": 3840,
+      "cost_usd": 14.8,
+      "cost_bdt": 1813.0,
+      "created_by": "developer@glgassets.com",
+      "started_at": "2026-09-10T04:00:00Z",
+      "completed_at": "2026-09-10T05:04:00Z",
+      "created_at": "2026-09-10T03:55:00Z"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "exp-001",
+      "name": "Consultative Luxury vs Direct Pitch Prompt",
+      "description": "A/B test comparing conversational consultative tone against high-urgency luxury pitch on WhatsApp.",
+      "agent_id": "property_agent",
+      "test_type": "PROMPT",
+      "status": "RUNNING",
+      "traffic_split_a_pct": 50,
+      "traffic_split_b_pct": 50,
+      "variant_a_config": {
+        "prompt_version": "v2.1",
+        "persona": "Consultative Luxury",
+        "model": "llama-3.3-70b-versatile"
+      },
+      "variant_b_config": {
+        "prompt_version": "v2.2-urgency",
+        "persona": "Direct Executive Closer",
+        "model": "llama-3.3-70b-versatile"
+      },
+      "metrics_a": {
+        "conversion_rate": 28.4,
+        "task_success_pct": 96.2,
+        "latency_ms": 340.0,
+        "cost_per_req_usd": 0.00028,
+        "total_runs": 128
+      },
+      "metrics_b": {
+        "conversion_rate": 31.8,
+        "task_success_pct": 97.1,
+        "latency_ms": 335.0,
+        "cost_per_req_usd": 0.00027,
+        "total_runs": 126
+      },
+      "winner_variant": "VARIANT_B",
+      "confidence_pct": 92.4,
+      "total_evaluations": 254,
+      "created_by": "developer@glgassets.com",
+      "created_at": "2026-09-11T12:00:00Z"
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "bmk-001",
+      "name": "Groq LLaMA 3.3 70B vs OpenAI GPT-4o Flagship",
+      "category": "MODEL_HEAD_TO_HEAD",
+      "entity_a_label": "Groq LLaMA 3.3 70B Versatile",
+      "entity_b_label": "OpenAI GPT-4o Flagship",
+      "entity_a_config": {
+        "model": "llama-3.3-70b-versatile",
+        "provider": "groq"
+      },
+      "entity_b_config": {
+        "model": "gpt-4o",
+        "provider": "openai"
+      },
+      "metrics_comparison": {
+        "quality": {
+          "a": 96.8,
+          "b": 98.2
+        },
+        "latency_p50_ms": {
+          "a": 280.0,
+          "b": 640.0
+        },
+        "cost_per_m_usd": {
+          "a": 0.59,
+          "b": 2.5
+        },
+        "reliability_pct": {
+          "a": 99.4,
+          "b": 99.8
+        },
+        "tool_accuracy_pct": {
+          "a": 97.5,
+          "b": 98.9
+        },
+        "grounding_pct": {
+          "a": 98.4,
+          "b": 99.1
+        },
+        "safety_score_pct": {
+          "a": 99.6,
+          "b": 99.7
+        },
+        "completion_rate_pct": {
+          "a": 99.1,
+          "b": 99.5
+        }
+      },
+      "scorecard": {
+        "winner": "llama-3.3-70b-versatile",
+        "verdict": "Groq LLaMA 3.3 70B recommended for production: 2.3x faster latency and 76% lower cost with comparable 96.8% quality.",
+        "radar_dimensions": [
+          "Quality",
+          "Latency",
+          "Cost Efficiency",
+          "Reliability",
+          "Tool Accuracy",
+          "Grounding",
+          "Safety",
+          "Task Completion"
+        ]
+      },
+      "winner": "llama-3.3-70b-versatile",
+      "executed_by": "developer@glgassets.com",
+      "created_at": "2026-09-13T09:00:00Z"
+    }
+  ],
+  "memories": [
+    {
+      "id": "mem-001",
+      "agent_id": "property_agent",
+      "customer_id": "cust-tanvir-01",
+      "conversation_id": "conv-wsp-4412",
+      "scope": "CUSTOMER",
+      "memory_key": "preferred_neighborhood",
+      "memory_value": "Banani Road 11 or Gulshan 2 (minimum 3 bedrooms with 2 dedicated parking bays)",
+      "relevance_score": 0.95,
+      "is_sensitive": false,
+      "created_at": "2026-09-12T14:30:00Z"
     },
     {
-      "trace_id": "trc-64c23203190e",
-      "run_id": "run-3fda7e02",
+      "id": "mem-002",
       "agent_id": "property_agent",
-      "user_query": "What is the handover date and amenities for GLG Sky Tower in Banani?",
-      "agent_response": "{\"reply\": \"AI service not configured\", \"intent\": \"fallback\", \"confidence\": 0.5}",
-      "model_used": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.3",
-      "status": "SUCCESS",
-      "total_tokens": 140,
-      "prompt_tokens": 128,
-      "completion_tokens": 12,
-      "cached_tokens": 44,
-      "latency_ms": 0.3,
-      "cost_usd": 9.8e-05,
-      "cost_bdt": 0.012,
-      "spans": [
-        {
-          "span_id": "span-1",
-          "name": "Ingress & Authentication",
-          "parent_id": null,
-          "latency_ms": 2.4,
-          "status": "OK"
-        },
-        {
-          "span_id": "span-2",
-          "name": "Pre-Guard Injection Filter",
-          "parent_id": "span-1",
-          "latency_ms": 0.0,
-          "status": "OK"
-        },
-        {
-          "span_id": "span-3",
-          "name": "Supervisor Intent Classifier",
-          "parent_id": "span-1",
-          "latency_ms": 48.0,
-          "status": "OK",
-          "attributes": {
-            "detected_intent": "property_inquiry",
-            "confidence": 0.98
-          }
-        },
-        {
-          "span_id": "span-4",
-          "name": "Hybrid RAG Retrieval",
-          "parent_id": "span-3",
-          "latency_ms": 0.0,
-          "status": "OK",
-          "attributes": {
-            "chunks_retrieved": 2
-          }
-        },
-        {
-          "span_id": "span-5",
-          "name": "LLM Inference (llama-3.3-70b-versatile)",
-          "parent_id": "span-3",
-          "latency_ms": 0.0,
-          "status": "OK",
-          "attributes": {
-            "model": "llama-3.3-70b-versatile",
-            "fallback_engaged": false,
-            "tokens": {
-              "prompt_tokens": 128,
-              "completion_tokens": 12,
-              "cached_tokens": 44,
-              "total_tokens": 140
-            }
-          }
-        }
+      "customer_id": "cust-tanvir-01",
+      "conversation_id": "conv-wsp-4412",
+      "scope": "CUSTOMER",
+      "memory_key": "maximum_budget_bdt",
+      "memory_value": "৳2.2 Crore BDT maximum purchase capability",
+      "relevance_score": 0.98,
+      "is_sensitive": true,
+      "created_at": "2026-09-12T14:32:00Z"
+    }
+  ],
+  "snapshots": [
+    {
+      "id": "snap-001",
+      "snapshot_tag": "AI-RELEASE-3.8.0",
+      "title": "Unified Production Snapshot v3.8.0",
+      "description": "Canonical release bundling Property Consultant v2.1, Prompt v2.1, Groq LLaMA 70B, pgvector Hybrid RAG, and Security Guardrails.",
+      "agent_slug": "property_agent",
+      "agent_version": "v2.1",
+      "prompt_version": "v2.1",
+      "model_id": "llama-3.3-70b-versatile",
+      "rag_version": "v2.0",
+      "guardrail_version": "v1.4",
+      "tool_versions": [
+        "property_search:v2.0",
+        "availability_check:v1.2",
+        "schedule_tour:v1.5"
       ],
-      "rag_retrievals": [
-        {
-          "chunk_id": "chk-sky-001",
-          "document_name": "GLG_Sky_Tower_Banani_Brochure_2026.pdf",
-          "page": 3,
-          "score": 0.94,
-          "content": "GLG Sky Tower is an ultra-luxury residential landmark located on Road 11, Banani, Dhaka. 3 BHK suites range from 2,450 to 2,800 sq.ft., priced from ৳2.45 Crore BDT. Handover scheduled for December 2026.",
-          "source_type": "brochure",
-          "grounding_priority": 1
-        },
-        {
-          "chunk_id": "chk-sky-002",
-          "document_name": "GLG_Pricing_and_Payment_Plans_2026.pdf",
-          "page": 7,
-          "score": 0.88,
-          "content": "Payment plan for GLG Sky Tower involves a 20% down payment upon booking, 60% construction-linked quarterly installments across 36 months, and 20% upon final handover registration.",
-          "source_type": "pricing_policy",
-          "grounding_priority": 2
-        }
-      ],
-      "guardrail_actions": [],
-      "id": "trc-114313cd",
-      "timestamp": "2026-09-14T08:45:54.482623+00:00"
+      "memory_version": "v1.8",
+      "workflow_version": "v1.2.0",
+      "full_manifest": {
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "tools": [
+          "property_search",
+          "availability_check",
+          "crm_lead_sync",
+          "schedule_tour"
+        ],
+        "guardrails": [
+          "gr-fact-001",
+          "gr-pii-001",
+          "gr-inj-001"
+        ],
+        "hybrid_alpha": 0.65
+      },
+      "created_by": "developer@glgassets.com",
+      "created_at": "2026-09-12T10:00:00Z"
+    }
+  ],
+  "policies": [
+    {
+      "id": "pol-001",
+      "name": "High-Value Offer Mandatory Human Escalation",
+      "description": "Escalates any proposed pricing concession exceeding ৳500,000 to Human Approval queue.",
+      "priority": 1,
+      "condition_expression": "action == 'SEND_OFFER' and discount_amount_bdt > 500000",
+      "action_directive": "HUMAN_APPROVAL",
+      "scope": "ALL_AGENTS",
+      "is_enabled": true,
+      "environment": "production",
+      "created_at": "2026-09-08T00:00:00Z"
     },
     {
-      "trace_id": "trc-8648efced732",
-      "run_id": "run-f7631bc7",
-      "agent_id": "property_agent",
-      "user_query": "What is the handover date and amenities for GLG Sky Tower in Banani?",
-      "agent_response": "{\"reply\": \"AI service not configured\", \"intent\": \"fallback\", \"confidence\": 0.5}",
-      "model_used": "llama-3.3-70b-versatile",
-      "prompt_version": "v2.2",
-      "status": "SUCCESS",
-      "total_tokens": 140,
-      "prompt_tokens": 128,
-      "completion_tokens": 12,
-      "cached_tokens": 44,
-      "latency_ms": 12.7,
-      "cost_usd": 9.8e-05,
-      "cost_bdt": 0.012,
-      "spans": [
-        {
-          "span_id": "span-1",
-          "name": "Ingress & Authentication",
-          "parent_id": null,
-          "latency_ms": 2.4,
-          "status": "OK"
-        },
-        {
-          "span_id": "span-2",
-          "name": "Pre-Guard Injection Filter",
-          "parent_id": "span-1",
-          "latency_ms": 0.0,
-          "status": "OK"
-        },
-        {
-          "span_id": "span-3",
-          "name": "Supervisor Intent Classifier",
-          "parent_id": "span-1",
-          "latency_ms": 48.0,
-          "status": "OK",
-          "attributes": {
-            "detected_intent": "property_inquiry",
-            "confidence": 0.98
-          }
-        },
-        {
-          "span_id": "span-4",
-          "name": "Hybrid RAG Retrieval",
-          "parent_id": "span-3",
-          "latency_ms": 0.0,
-          "status": "OK",
-          "attributes": {
-            "chunks_retrieved": 2
-          }
-        },
-        {
-          "span_id": "span-5",
-          "name": "LLM Inference (llama-3.3-70b-versatile)",
-          "parent_id": "span-3",
-          "latency_ms": 0.0,
-          "status": "OK",
-          "attributes": {
-            "model": "llama-3.3-70b-versatile",
-            "fallback_engaged": false,
-            "tokens": {
-              "prompt_tokens": 128,
-              "completion_tokens": 12,
-              "cached_tokens": 44,
-              "total_tokens": 140
-            }
-          }
-        }
-      ],
-      "rag_retrievals": [
-        {
-          "chunk_id": "chk-sky-001",
-          "document_name": "GLG_Sky_Tower_Banani_Brochure_2026.pdf",
-          "page": 3,
-          "score": 0.94,
-          "content": "GLG Sky Tower is an ultra-luxury residential landmark located on Road 11, Banani, Dhaka. 3 BHK suites range from 2,450 to 2,800 sq.ft., priced from ৳2.45 Crore BDT. Handover scheduled for December 2026.",
-          "source_type": "brochure",
-          "grounding_priority": 1
-        },
-        {
-          "chunk_id": "chk-sky-002",
-          "document_name": "GLG_Pricing_and_Payment_Plans_2026.pdf",
-          "page": 7,
-          "score": 0.88,
-          "content": "Payment plan for GLG Sky Tower involves a 20% down payment upon booking, 60% construction-linked quarterly installments across 36 months, and 20% upon final handover registration.",
-          "source_type": "pricing_policy",
-          "grounding_priority": 2
-        }
-      ],
-      "guardrail_actions": [],
-      "id": "trc-e0f264eb",
-      "timestamp": "2026-09-14T08:21:57.653945+00:00"
+      "id": "pol-002",
+      "name": "Unverified Database Price Block",
+      "description": "Blocks any generated response with property price differing from canonical database price.",
+      "priority": 2,
+      "condition_expression": "property_price != verified_database_price",
+      "action_directive": "BLOCK",
+      "scope": "property_agent",
+      "is_enabled": true,
+      "environment": "production",
+      "created_at": "2026-09-08T00:00:00Z"
+    },
+    {
+      "id": "pol-003",
+      "name": "Low Confidence Message Human Escalation",
+      "description": "Directs customer communication with model confidence < 0.85 to human agent review.",
+      "priority": 3,
+      "condition_expression": "action == 'SEND_MESSAGE' and confidence < 0.85",
+      "action_directive": "HUMAN_APPROVAL",
+      "scope": "ALL_AGENTS",
+      "is_enabled": true,
+      "environment": "production",
+      "created_at": "2026-09-08T00:00:00Z"
     }
   ]
 }
