@@ -16,9 +16,6 @@ import time
 import warnings
 from contextlib import asynccontextmanager
 
-# Suppress known LangGraph/LangChain internal serializer deprecation warnings
-warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
-
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -59,6 +56,9 @@ from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
 logger = logging.getLogger(__name__)
+
+# Suppress known LangGraph/LangChain internal serializer deprecation warnings
+warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
 
 
 @asynccontextmanager

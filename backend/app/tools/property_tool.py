@@ -2,9 +2,10 @@
 
 from typing import Optional
 
+from pydantic import BaseModel, Field, field_validator
+
 from app.repositories.property_repository import property_repository
 from app.tools.governance import GovernedTool, ToolAuthorityTier, tool_governance
-from pydantic import BaseModel, Field, field_validator
 
 # Backward-compatibility alias pointing to canonical repository data
 PROJECTS_DATABASE = property_repository.to_legacy_dict_format()
@@ -76,9 +77,10 @@ class PropertySearchTool:
         # Fetch dynamic projects from DB if available
         all_projects = property_repository.to_legacy_dict_format()
         try:
+            from sqlalchemy import select
+
             from app.database import async_session_factory, is_db_reachable
             from app.models.models import ProjectRecord
-            from sqlalchemy import select
 
             if is_db_reachable():
                 async with async_session_factory() as session:

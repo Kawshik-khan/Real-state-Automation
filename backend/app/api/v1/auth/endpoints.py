@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+
 from app.core.rate_limiter import AUTH_LOGIN_LIMIT, limiter
 from app.core.security import (
     create_access_token,
@@ -23,7 +25,6 @@ from app.models.user import (
     UserResponse,
     UserRole,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
