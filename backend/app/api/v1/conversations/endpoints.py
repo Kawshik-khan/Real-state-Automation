@@ -2,10 +2,13 @@
 
 import asyncio
 import json
+import os
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.config import settings
 from app.services.event_broadcaster import broadcaster
 from app.services.telegram import telegram_service
 
@@ -195,8 +198,6 @@ async def _persist_message_to_db(conv_id: str, sender: str, text: str, channel: 
 async def _sync_lead_to_n8n_sheets(conv: dict):
     """Asynchronously post lead/message update to n8n Google Sheets Sync webhook."""
     try:
-        import os
-        import httpx
         n8n_base = (
             getattr(settings, "n8n_webhook_base_url", None)
             or os.getenv("N8N_WEBHOOK_BASE_URL")
