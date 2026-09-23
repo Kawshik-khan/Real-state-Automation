@@ -17,7 +17,8 @@ FROM python:3.12-slim
 # Prevent Python from writing bytecode and enable unbuffered output for logging
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    PYTHONWARNINGS="ignore:The default value of ,ignore::DeprecationWarning"
 
 WORKDIR /app
 

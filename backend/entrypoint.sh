@@ -4,6 +4,9 @@ set -e
 # Guarantee PYTHONPATH includes /app so all CLI tools (alembic, uvicorn, python) can import app
 export PYTHONPATH="/app:${PYTHONPATH:-}"
 
+# Suppress known upstream LangChain/LangGraph deprecation warnings before Python interpreter initializes
+export PYTHONWARNINGS="ignore:The default value of ,ignore::DeprecationWarning,${PYTHONWARNINGS:-}"
+
 echo "====================================================="
 echo "  GLG Assets Social AI OS — Container Entrypoint"
 echo "====================================================="

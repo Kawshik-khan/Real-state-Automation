@@ -57,7 +57,10 @@ from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
 # Suppress known LangGraph/LangChain internal serializer deprecation warnings
+warnings.filterwarnings("ignore", message="The default value of ")
 warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
+warnings.filterwarnings("ignore", category=UserWarning, module=r".*langgraph.*")
+warnings.filterwarnings("ignore", category=UserWarning, module=r".*langchain.*")
 
 logger = logging.getLogger(__name__)
 

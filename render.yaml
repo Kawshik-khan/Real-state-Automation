@@ -13,6 +13,8 @@ services:
         value: GLG Assets Automation API
       - key: DEBUG
         value: "false"
+      - key: PYTHONWARNINGS
+        value: "ignore:The default value of ,ignore::DeprecationWarning"
       - key: CORS_ORIGINS
         value: "*"
       - key: DATABASE_URL
