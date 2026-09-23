@@ -1,7 +1,9 @@
 """Conversations API & SSE Event Stream Endpoints."""
 
 import asyncio
+from datetime import datetime, timezone
 import json
+import logging
 import os
 
 import httpx
@@ -12,84 +14,22 @@ from app.config import settings
 from app.services.event_broadcaster import broadcaster
 from app.services.telegram import telegram_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
-# In-memory mock conversation database store
-IN_MEMORY_CONVERSATIONS = [
-    {
-        "id": "wa_8801711122233",
-        "name": "Tanvir Hossain",
-        "phone": "+880 1711-122233",
-        "channel": "whatsapp",
-        "lastMessage": "I want 3 BHK in Gulshan under 1 crore",
-        "time": "2 mins ago",
-        "status": "active",
-        "aiPaused": False,
-        "confidence": 0.92,
-        "intent": "property_search",
-        "messages": [
-            {"sender": "user", "text": "Hi, looking for apartments in Gulshan", "time": "10:14 AM"},
-            {"sender": "ai", "text": "Hello Tanvir! Welcome to GLG Assets. What is your preferred budget?", "time": "10:14 AM"},
-            {"sender": "user", "text": "I want 3 BHK in Gulshan under 1 crore", "time": "10:16 AM"},
-            {"sender": "ai", "text": "Great choice! GLG Gulshan Heights features 3 BHK priced at ৳95 Lakhs.", "time": "10:16 AM"}
-        ]
-    },
-    {
-        "id": "tg_88018998877",
-        "name": "Mahmudur Rahman",
-        "phone": "+880 1899-887766",
-        "channel": "telegram",
-        "lastMessage": "Send me the brochure and price list for Uttara project",
-        "time": "5 mins ago",
-        "status": "active",
-        "aiPaused": False,
-        "confidence": 0.94,
-        "intent": "brochure_request",
-        "messages": [
-            {"sender": "user", "text": "Hi, I am interested in your Uttara project on Telegram", "time": "10:20 AM"},
-            {"sender": "ai", "text": "Hello Mahmudur! Welcome to GLG Assets Telegram Bot. How can I assist you?", "time": "10:20 AM"},
-            {"sender": "user", "text": "Send me the brochure and price list for Uttara project", "time": "10:22 AM"}
-        ]
-    },
-    {
-        "id": "fb_1029384756",
-        "name": "Sarah Khan",
-        "phone": "+880 1822-334455",
-        "channel": "facebook",
-        "lastMessage": "Can I visit the site tomorrow at 3 PM?",
-        "time": "15 mins ago",
-        "status": "escalated",
-        "aiPaused": True,
-        "confidence": 0.68,
-        "intent": "booking",
-        "messages": [
-            {"sender": "user", "text": "Is Banani Crest project open for site visit?", "time": "09:45 AM"},
-            {"sender": "ai", "text": "Yes Sarah! Site visits are available daily 10 AM to 5 PM.", "time": "09:45 AM"},
-            {"sender": "user", "text": "Can I visit the site tomorrow at 3 PM?", "time": "10:01 AM"}
-        ]
-    },
-    {
-        "id": "ig_99887766",
-        "name": "Anisur Rahman",
-        "phone": "+880 1911-556677",
-        "channel": "instagram",
-        "lastMessage": "Is payment schedule flexible over 3 years?",
-        "time": "1 hour ago",
-        "status": "active",
-        "aiPaused": False,
-        "confidence": 0.88,
-        "intent": "faq",
-        "messages": [
-            {"sender": "user", "text": "Is payment schedule flexible over 3 years?", "time": "09:12 AM"}
-        ]
-    }
-]
+# Runtime conversation cache (hydrated from database on first API call)
+IN_MEMORY_CONVERSATIONS = []
 
 
 def get_or_create_conversation(conv_id: str, channel: str = "website", name: str = None, phone: str = None):
     """Retrieve existing or create new conversation in memory."""
     for conv in IN_MEMORY_CONVERSATIONS:
         if conv["id"] == conv_id:
+            if name and conv.get("name") in [None, "Prospective Buyer", f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}"]:
+                conv["name"] = name
+            if phone and conv.get("phone") in [None, "+880 1700-000000"]:
+                conv["phone"] = phone
             return conv
     
     new_conv = {
@@ -103,10 +43,132 @@ def get_or_create_conversation(conv_id: str, channel: str = "website", name: str
         "aiPaused": False,
         "confidence": 0.90,
         "intent": "general_inquiry",
+        "beliefs": {},
         "messages": []
     }
     IN_MEMORY_CONVERSATIONS.insert(0, new_conv)
     return new_conv
+
+
+async def async_get_or_create_conversation(conv_id: str, channel: str = "website", name: str = None, phone: str = None):
+    """Retrieve existing conversation from memory cache or database, or create a new one."""
+    for conv in IN_MEMORY_CONVERSATIONS:
+        if conv["id"] == conv_id:
+            if name and conv.get("name") in [None, "Prospective Buyer", f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}"]:
+                conv["name"] = name
+            if phone and conv.get("phone") in [None, "+880 1700-000000"]:
+                conv["phone"] = phone
+            return conv
+
+    # Hydrate from database if present
+    try:
+        from sqlalchemy import select
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord, UserRecord
+
+        async with async_session_factory() as session:
+            stmt = (
+                select(ConversationRecord, UserRecord)
+                .join(UserRecord, ConversationRecord.user_id == UserRecord.user_id, isouter=True)
+                .where(ConversationRecord.conversation_id == conv_id)
+            )
+            res = await session.execute(stmt)
+            row = res.first()
+            if row:
+                db_c, db_u = row
+                beliefs = db_c.beliefs if isinstance(db_c.beliefs, dict) else {}
+                conv = {
+                    "id": db_c.conversation_id,
+                    "name": (db_u.name if db_u and db_u.name else None) or name or f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}",
+                    "phone": (db_u.phone if db_u and db_u.phone else None) or phone or "+880 1700-000000",
+                    "channel": db_c.channel or channel or "website",
+                    "lastMessage": "Conversation resumed",
+                    "time": db_c.last_message_at.strftime("%I:%M %p") if db_c.last_message_at else "Just now",
+                    "status": db_c.status or "active",
+                    "aiPaused": db_c.ai_paused or False,
+                    "confidence": beliefs.get("confidence", 0.90),
+                    "intent": beliefs.get("intent", "property_inquiry"),
+                    "beliefs": beliefs,
+                    "createdAt": db_c.created_at.isoformat() if db_c.created_at else None,
+                    "messages": []
+                }
+                IN_MEMORY_CONVERSATIONS.insert(0, conv)
+                return conv
+    except Exception as e:
+        logger.error(f"Error fetching conversation {conv_id} from DB: {e}")
+
+    # Fallback to in-memory creation
+    return get_or_create_conversation(conv_id, channel, name, phone)
+
+
+async def _persist_message_to_db(
+    conv_id: str,
+    sender: str | None = None,
+    text: str | None = None,
+    channel: str = "website",
+    name: str | None = None,
+    phone: str | None = None,
+    status: str | None = None,
+    ai_paused: bool | None = None,
+    beliefs: dict | None = None,
+):
+    """Persists conversation and message into Supabase/PostgreSQL. Returns the created MessageRecord or None."""
+    msg_record = None
+    try:
+        from sqlalchemy import select
+
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord, MessageRecord, UserRecord, utc_now
+        async with async_session_factory() as session:
+            user_id = f"usr_{conv_id}"
+            user_stmt = select(UserRecord).where(UserRecord.user_id == user_id)
+            u_res = await session.execute(user_stmt)
+            db_user = u_res.scalar_one_or_none()
+            if not db_user:
+                db_user = UserRecord(user_id=user_id, name=name, phone=phone, channel=channel)
+                session.add(db_user)
+                await session.flush()
+            else:
+                if name and (not db_user.name or db_user.name == "Prospective Buyer"):
+                    db_user.name = name
+                if phone and (not db_user.phone or db_user.phone == "+880 1700-000000"):
+                    db_user.phone = phone
+
+            conv_stmt = select(ConversationRecord).where(ConversationRecord.conversation_id == conv_id)
+            conv_res = await session.execute(conv_stmt)
+            db_conv = conv_res.scalar_one_or_none()
+            now = utc_now()
+            if not db_conv:
+                db_conv = ConversationRecord(
+                    conversation_id=conv_id,
+                    user_id=user_id,
+                    channel=channel,
+                    status=status or "active",
+                    ai_paused=ai_paused if ai_paused is not None else False,
+                    beliefs=beliefs or {},
+                    last_message_at=now,
+                    created_at=now
+                )
+                session.add(db_conv)
+                await session.flush()
+            else:
+                db_conv.last_message_at = now
+                if status is not None:
+                    db_conv.status = status
+                if ai_paused is not None:
+                    db_conv.ai_paused = ai_paused
+                if beliefs is not None:
+                    merged = dict(db_conv.beliefs) if isinstance(db_conv.beliefs, dict) else {}
+                    merged.update(beliefs)
+                    db_conv.beliefs = merged
+
+            if text and sender:
+                msg_record = MessageRecord(conversation_id=conv_id, sender=sender, text=text, created_at=now)
+                session.add(msg_record)
+            await session.commit()
+    except Exception as e:
+        logger.error(f"Error persisting message to db: {e}")
+    return msg_record
 
 
 async def add_message_to_conversation(
@@ -118,8 +180,8 @@ async def add_message_to_conversation(
     intent: str = None,
     requires_escalation: bool = False
 ):
-    """Append message to conversation state and broadcast via SSE."""
-    conv = get_or_create_conversation(conv_id, channel)
+    """Append message to conversation state, persist to database, and broadcast via SSE."""
+    conv = await async_get_or_create_conversation(conv_id, channel)
     
     # Deduplication Guard: Do not append if the exact same message was just added
     if conv["messages"]:
@@ -127,10 +189,8 @@ async def add_message_to_conversation(
         if last_msg.get("sender") == sender and last_msg.get("text", "").strip() == text.strip():
             return conv, last_msg
 
-    msg_obj = {"sender": sender, "text": text, "time": "Just now"}
-    conv["messages"].append(msg_obj)
-    conv["lastMessage"] = text
-    conv["time"] = "Just now"
+    now = datetime.now()
+    now_time = now.strftime("%I:%M %p")
     
     if confidence is not None:
         conv["confidence"] = confidence
@@ -140,6 +200,41 @@ async def add_message_to_conversation(
         conv["status"] = "escalated"
         conv["aiPaused"] = True
 
+    beliefs_update = {}
+    if confidence is not None:
+        beliefs_update["confidence"] = confidence
+    if intent:
+        beliefs_update["intent"] = intent
+
+    # 1. DB-first persistence: Write to database first and await commit
+    persisted_record = await _persist_message_to_db(
+        conv_id=conv_id,
+        sender=sender,
+        text=text,
+        channel=conv.get("channel", channel),
+        name=conv.get("name"),
+        phone=conv.get("phone"),
+        status=conv.get("status"),
+        ai_paused=conv.get("aiPaused"),
+        beliefs=beliefs_update or None,
+    )
+
+    msg_id = getattr(persisted_record, "message_id", None)
+    if persisted_record and hasattr(persisted_record, "created_at") and persisted_record.created_at:
+        now_time = persisted_record.created_at.strftime("%I:%M %p")
+
+    msg_obj = {
+        "id": msg_id,
+        "sender": sender,
+        "text": text,
+        "time": now_time,
+        "createdAt": persisted_record.created_at.isoformat() if persisted_record and hasattr(persisted_record, "created_at") and persisted_record.created_at else now.isoformat()
+    }
+    conv["messages"].append(msg_obj)
+    conv["lastMessage"] = text
+    conv["time"] = now_time
+
+    # 2. Broadcast via SSE
     event_type = "new_lead" if (sender == "user" and len(conv["messages"]) == 1) else "message_received"
     await broadcaster.broadcast(event_type, {
         "conversation_id": conv_id,
@@ -156,43 +251,10 @@ async def add_message_to_conversation(
             "reason": "AI confidence low or escalation requested"
         })
 
-    # Trigger background sync to n8n Google Sheets webhook and database persistence
+    # Trigger background sync to n8n Google Sheets webhook
     asyncio.create_task(_sync_lead_to_n8n_sheets(conv))
-    asyncio.create_task(_persist_message_to_db(conv_id, sender, text, conv["channel"], conv["name"], conv["phone"]))
         
     return conv, msg_obj
-
-
-async def _persist_message_to_db(conv_id: str, sender: str, text: str, channel: str = "website", name: str = None, phone: str = None):
-    """Persists conversation and message into Supabase/PostgreSQL."""
-    try:
-        from sqlalchemy import select
-
-        from app.database import async_session_factory
-        from app.models.models import ConversationRecord, MessageRecord, UserRecord
-        async with async_session_factory() as session:
-            user_id = f"usr_{conv_id}"
-            user_stmt = select(UserRecord).where(UserRecord.user_id == user_id)
-            u_res = await session.execute(user_stmt)
-            db_user = u_res.scalar_one_or_none()
-            if not db_user:
-                db_user = UserRecord(user_id=user_id, name=name, phone=phone, channel=channel)
-                session.add(db_user)
-                await session.flush()
-
-            conv_stmt = select(ConversationRecord).where(ConversationRecord.conversation_id == conv_id)
-            conv_res = await session.execute(conv_stmt)
-            db_conv = conv_res.scalar_one_or_none()
-            if not db_conv:
-                db_conv = ConversationRecord(conversation_id=conv_id, user_id=user_id, channel=channel, status="active")
-                session.add(db_conv)
-                await session.flush()
-
-            new_msg = MessageRecord(conversation_id=conv_id, sender=sender, text=text)
-            session.add(new_msg)
-            await session.commit()
-    except Exception:
-        pass  # Non-blocking async persistence
 
 
 async def _sync_lead_to_n8n_sheets(conv: dict):
@@ -251,36 +313,65 @@ async def list_conversations(
             res = await session.execute(stmt)
             rows = res.all()
 
-            if rows:
-                formatted = []
-                for conv, usr in rows:
-                    msg_stmt = (
-                        select(MessageRecord)
-                        .where(MessageRecord.conversation_id == conv.conversation_id)
-                        .order_by(desc(MessageRecord.created_at))
-                        .limit(1)
-                    )
-                    msg_res = await session.execute(msg_stmt)
-                    last_msg = msg_res.scalar_one_or_none()
+            formatted = []
+            for conv, usr in rows:
+                msg_stmt = (
+                    select(MessageRecord)
+                    .where(MessageRecord.conversation_id == conv.conversation_id)
+                    .order_by(desc(MessageRecord.created_at))
+                    .limit(1)
+                )
+                msg_res = await session.execute(msg_stmt)
+                last_msg = msg_res.scalar_one_or_none()
 
-                    formatted.append({
-                        "id": conv.conversation_id,
-                        "name": usr.name if usr and usr.name else "Prospective Buyer",
-                        "phone": usr.phone if usr and usr.phone else "+880 1700-000000",
-                        "channel": conv.channel,
-                        "status": conv.status,
-                        "aiPaused": conv.ai_paused,
-                        "lastMessage": last_msg.text if last_msg and hasattr(last_msg, 'text') else "Inquiry initiated",
-                        "time": conv.last_message_at.strftime("%I:%M %p") if conv.last_message_at else "Just now",
-                        "unread": 0,
-                        "avatar": (usr.name[0].upper() if (usr and usr.name) else "C"),
-                        "beliefs": conv.beliefs or {},
-                        "createdAt": conv.created_at.isoformat() if conv.created_at else None
-                    })
-                return {"success": True, "conversations": formatted, "count": len(formatted)}
-    except Exception:
-        pass
-    return {"success": True, "conversations": IN_MEMORY_CONVERSATIONS, "count": len(IN_MEMORY_CONVERSATIONS)}
+                last_msg_time = conv.last_message_at or (last_msg.created_at if last_msg else None)
+                time_display = last_msg_time.strftime("%I:%M %p") if last_msg_time else "Just now"
+
+                beliefs = conv.beliefs if isinstance(conv.beliefs, dict) else {}
+                formatted.append({
+                    "id": conv.conversation_id,
+                    "name": usr.name if usr and usr.name else "Prospective Buyer",
+                    "phone": usr.phone if usr and usr.phone else "+880 1700-000000",
+                    "channel": conv.channel,
+                    "status": conv.status,
+                    "aiPaused": conv.ai_paused,
+                    "lastMessage": last_msg.text if last_msg and hasattr(last_msg, 'text') else "Inquiry initiated",
+                    "time": time_display,
+                    "unread": 0,
+                    "avatar": (usr.name[0].upper() if (usr and usr.name) else "C"),
+                    "beliefs": beliefs,
+                    "createdAt": conv.created_at.isoformat() if conv.created_at else None,
+                    "confidence": beliefs.get("confidence", 0.90),
+                    "intent": beliefs.get("intent", "property_inquiry"),
+                    "messages": []
+                })
+
+            # Hydrate in-memory cache with DB data
+            for f_conv in formatted:
+                existing = next((c for c in IN_MEMORY_CONVERSATIONS if c["id"] == f_conv["id"]), None)
+                if not existing:
+                    IN_MEMORY_CONVERSATIONS.append(dict(f_conv))
+                else:
+                    existing["name"] = f_conv["name"]
+                    existing["phone"] = f_conv["phone"]
+                    existing["channel"] = f_conv["channel"]
+                    existing["aiPaused"] = f_conv["aiPaused"]
+                    existing["status"] = f_conv["status"]
+                    existing["lastMessage"] = f_conv["lastMessage"]
+                    existing["time"] = f_conv["time"]
+                    existing["confidence"] = f_conv["confidence"]
+                    existing["intent"] = f_conv["intent"]
+
+            # If there are any in-memory conversations created recently not yet fetched in rows
+            formatted_ids = {f["id"] for f in formatted}
+            for mem_conv in IN_MEMORY_CONVERSATIONS:
+                if mem_conv["id"] not in formatted_ids:
+                    formatted.insert(0, mem_conv)
+
+            return {"success": True, "conversations": formatted, "count": len(formatted)}
+    except Exception as e:
+        logger.error(f"Error listing conversations from DB: {e}")
+        return {"success": True, "conversations": IN_MEMORY_CONVERSATIONS, "count": len(IN_MEMORY_CONVERSATIONS)}
 
 
 
@@ -294,18 +385,41 @@ async def create_conversation(body: dict):
     channel = body.get("channel", "website")
     initial_message = body.get("message", "Hello, I am interested in GLG properties.")
 
-    conv = get_or_create_conversation(conv_id, channel, name, phone)
+    conv = await async_get_or_create_conversation(conv_id, channel, name, phone)
+    
+    # Persist lead immediately to database
+    await _persist_message_to_db(
+        conv_id=conv_id,
+        channel=channel,
+        name=name,
+        phone=phone,
+        status="active",
+        ai_paused=False
+    )
+
     if initial_message:
-        await add_message_to_conversation(conv_id, "user", initial_message, channel)
+        conv, _ = await add_message_to_conversation(conv_id, "user", initial_message, channel)
         
     return {"success": True, "conversation": conv}
 
 
 @router.delete("/{conv_id}", summary="Delete or clear a conversation")
 async def delete_conversation(conv_id: str):
-    """Delete a conversation from memory."""
+    """Delete a conversation from memory and database."""
     global IN_MEMORY_CONVERSATIONS
     IN_MEMORY_CONVERSATIONS = [c for c in IN_MEMORY_CONVERSATIONS if c["id"] != conv_id]
+
+    try:
+        from sqlalchemy import delete
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord, MessageRecord
+        async with async_session_factory() as session:
+            await session.execute(delete(MessageRecord).where(MessageRecord.conversation_id == conv_id))
+            await session.execute(delete(ConversationRecord).where(ConversationRecord.conversation_id == conv_id))
+            await session.commit()
+    except Exception as e:
+        logger.error(f"Error deleting conversation {conv_id} from DB: {e}")
+
     await broadcaster.broadcast("conversation_deleted", {"conversation_id": conv_id})
     return {"success": True, "conversation_id": conv_id}
 
@@ -342,6 +456,47 @@ async def event_stream(request: Request):
     )
 
 
+@router.get("/{conv_id}/messages", summary="Get full message history for conversation")
+async def get_conversation_messages(conv_id: str, limit: int = 60):
+    """Fetch chronological message history for a specific conversation from DB or memory cache."""
+    messages = []
+    try:
+        from sqlalchemy import desc, select
+
+        from app.database import async_session_factory
+        from app.models.models import MessageRecord
+
+        async with async_session_factory() as session:
+            stmt = (
+                select(MessageRecord)
+                .where(MessageRecord.conversation_id == conv_id)
+                .order_by(desc(MessageRecord.created_at))
+                .limit(limit)
+            )
+            res = await session.execute(stmt)
+            records = res.scalars().all()
+            if records:
+                for r in reversed(records):
+                    messages.append({
+                        "id": r.message_id,
+                        "sender": r.sender,
+                        "text": r.text,
+                        "time": r.created_at.strftime("%I:%M %p") if r.created_at else "Just now",
+                        "createdAt": r.created_at.isoformat() if r.created_at else None
+                    })
+                return {"success": True, "conversation_id": conv_id, "messages": messages, "count": len(messages)}
+    except Exception as e:
+        logger.error(f"Error fetching messages for conversation {conv_id}: {e}")
+
+    # Fallback to in-memory conversation messages
+    conv = next((c for c in IN_MEMORY_CONVERSATIONS if c["id"] == conv_id), None)
+    if conv and conv.get("messages"):
+        messages = conv["messages"][-limit:]
+        return {"success": True, "conversation_id": conv_id, "messages": messages, "count": len(messages)}
+
+    return {"success": True, "conversation_id": conv_id, "messages": [], "count": 0}
+
+
 @router.post("/{conv_id}/message", summary="Process customer message (triggers AI pipeline if active)")
 async def send_customer_message(conv_id: str, body: dict):
     """Process incoming customer message. If AI is active, run through LangGraph pipeline."""
@@ -350,7 +505,7 @@ async def send_customer_message(conv_id: str, body: dict):
     if not text:
         raise HTTPException(status_code=400, detail="Text or message required")
 
-    conv = get_or_create_conversation(conv_id, channel)
+    conv = await async_get_or_create_conversation(conv_id, channel)
     
     # 1. Add user message
     conv, user_msg = await add_message_to_conversation(conv_id, "user", text, channel)
@@ -408,46 +563,41 @@ async def send_customer_message(conv_id: str, body: dict):
 @router.post("/{conv_id}/takeover", summary="Toggle AI vs Human Agent takeover")
 async def toggle_takeover(conv_id: str):
     """Toggle human takeover state for a conversation and broadcast state update."""
-    for conv in IN_MEMORY_CONVERSATIONS:
-        if conv["id"] == conv_id:
-            conv["aiPaused"] = not conv["aiPaused"]
-            conv["status"] = "human_takeover" if conv["aiPaused"] else "active"
-            
-            # Persist to database
-            try:
-                from sqlalchemy import update
+    conv = await async_get_or_create_conversation(conv_id)
 
-                from app.database import async_session_factory
-                from app.models.models import ConversationRecord
+    conv["aiPaused"] = not conv.get("aiPaused", False)
+    conv["status"] = "human_takeover" if conv["aiPaused"] else "active"
 
-                async with async_session_factory() as session:
-                    stmt = update(ConversationRecord).where(
-                        ConversationRecord.conversation_id == conv_id
-                    ).values(ai_paused=conv["aiPaused"], status=conv["status"])
-                    await session.execute(stmt)
-                    await session.commit()
-            except Exception:
-                pass
+    # Persist to database
+    try:
+        from sqlalchemy import update
+        from app.database import async_session_factory
+        from app.models.models import ConversationRecord
 
-            # Broadcast state change
-            await broadcaster.broadcast("agent_takeover", {
-                "conversation_id": conv_id,
-                "aiPaused": conv["aiPaused"],
-                "status": conv["status"],
-                "name": conv["name"],
-                "channel": conv["channel"]
-            })
-            
-            return {
-                "success": True,
-                "conversation_id": conv_id,
-                "aiPaused": conv["aiPaused"],
-                "status": conv["status"]
-            }
-    raise HTTPException(status_code=404, detail="Conversation not found")
+        async with async_session_factory() as session:
+            stmt = update(ConversationRecord).where(
+                ConversationRecord.conversation_id == conv_id
+            ).values(ai_paused=conv["aiPaused"], status=conv["status"])
+            await session.execute(stmt)
+            await session.commit()
+    except Exception as e:
+        logger.error(f"Error persisting takeover update to DB: {e}")
 
+    # Broadcast state change
+    await broadcaster.broadcast("agent_takeover", {
+        "conversation_id": conv_id,
+        "aiPaused": conv["aiPaused"],
+        "status": conv["status"],
+        "name": conv.get("name", "Prospective Buyer"),
+        "channel": conv.get("channel", "website")
+    })
 
-
+    return {
+        "success": True,
+        "conversation_id": conv_id,
+        "aiPaused": conv["aiPaused"],
+        "status": conv["status"]
+    }
 
 
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")
@@ -457,21 +607,37 @@ async def send_agent_reply(conv_id: str, body: dict):
     if not reply_text:
         raise HTTPException(status_code=400, detail="Text required")
 
-    conv = None
-    for c in IN_MEMORY_CONVERSATIONS:
-        if c["id"] == conv_id:
-            conv = c
-            break
+    conv = await async_get_or_create_conversation(conv_id)
 
-    if not conv:
-        conv = get_or_create_conversation(conv_id)
+    now = datetime.now()
+    now_time = now.strftime("%I:%M %p")
+    channel = conv.get("channel", "website")
 
-    msg_obj = {"sender": "human_agent", "text": reply_text, "time": "Just now"}
+    # Persist agent reply to DB first
+    persisted_record = await _persist_message_to_db(
+        conv_id=conv_id,
+        sender="human_agent",
+        text=reply_text,
+        channel=channel,
+        name=conv.get("name"),
+        phone=conv.get("phone")
+    )
+
+    msg_id = getattr(persisted_record, "message_id", None)
+    if persisted_record and hasattr(persisted_record, "created_at") and persisted_record.created_at:
+        now_time = persisted_record.created_at.strftime("%I:%M %p")
+
+    msg_obj = {
+        "id": msg_id,
+        "sender": "human_agent",
+        "text": reply_text,
+        "time": now_time,
+        "createdAt": persisted_record.created_at.isoformat() if persisted_record and hasattr(persisted_record, "created_at") and persisted_record.created_at else now.isoformat()
+    }
     conv["messages"].append(msg_obj)
     conv["lastMessage"] = reply_text
-    conv["time"] = "Just now"
+    conv["time"] = now_time
 
-    channel = conv.get("channel", "website")
     delivery_status = "internal_dashboard"
 
     # Dispatch reply to real Telegram user if channel is Telegram

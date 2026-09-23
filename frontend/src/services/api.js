@@ -410,7 +410,19 @@ export async function searchKnowledge(query, filter = {}) {
  * Fetch active conversations list
  */
 export async function getConversations() {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
+  const response = await fetch(buildApiUrl('/api/v1/conversations'), {
+    headers: {
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch full message history for a conversation (limit default 60)
+ */
+export async function getConversationMessages(convId, limit = 60) {
+  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/messages?limit=${limit}`), {
     headers: {
       'X-Automation-Secret': AUTOMATION_SECRET,
     },
@@ -422,7 +434,7 @@ export async function getConversations() {
  * Toggle human takeover state for a conversation
  */
 export async function toggleTakeover(convId) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}/takeover`, {
+  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/takeover`), {
     method: 'POST',
     headers: {
       'X-Automation-Secret': AUTOMATION_SECRET,
@@ -435,7 +447,7 @@ export async function toggleTakeover(convId) {
  * Send manual human agent reply to customer conversation
  */
 export async function sendAgentReply(convId, text) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}/reply`, {
+  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/reply`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -450,7 +462,7 @@ export async function sendAgentReply(convId, text) {
  * Create a new customer conversation / simulation lead
  */
 export async function createConversation(payload) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
+  const response = await fetch(buildApiUrl('/api/v1/conversations'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -465,7 +477,7 @@ export async function createConversation(payload) {
  * Send customer message (triggers AI graph pipeline if AI is active)
  */
 export async function sendCustomerMessage(convId, text, channel = 'website') {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}/message`, {
+  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/message`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -480,7 +492,7 @@ export async function sendCustomerMessage(convId, text, channel = 'website') {
  * Fetch executive analytics weekly report
  */
 export async function getAnalyticsReport() {
-  const response = await fetch(`${API_BASE_URL}/api/v1/analytics/weekly-digest`, {
+  const response = await fetch(buildApiUrl('/api/v1/analytics/weekly-digest'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -491,10 +503,39 @@ export async function getAnalyticsReport() {
 }
 
 /**
+ * Fetch dynamic manager overview analytics and active campaigns
+ */
+export async function getManagerOverview() {
+  const response = await fetch(buildApiUrl('/api/v1/analytics/manager-overview'), {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Update campaign status (ACTIVE / PAUSED)
+ */
+export async function updateCampaignStatus(campaignId, status) {
+  const response = await fetch(buildApiUrl(`/api/v1/analytics/campaigns/${campaignId}/status`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Automation-Secret': AUTOMATION_SECRET,
+    },
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse(response);
+}
+
+
+/**
  * Delete a conversation
  */
 export async function deleteConversation(convId) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${convId}`, {
+  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}`), {
     method: 'DELETE',
     headers: {
       'X-Automation-Secret': AUTOMATION_SECRET,

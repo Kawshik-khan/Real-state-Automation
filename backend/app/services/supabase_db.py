@@ -42,22 +42,36 @@ class SupabaseDBClient:
             return None
 
         target_url = f"{self.url}/rest/v1/{endpoint.lstrip('/')}"
-        payload_bytes = json.dumps(data).encode("utf-8") if data is not None else None
         headers = self._headers(prefer_return=method in ("POST", "PATCH"))
 
-        req = urllib.request.Request(target_url, data=payload_bytes, headers=headers, method=method)
-
         try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            import requests
+            resp = requests.request(
+                method=method,
+                url=target_url,
+                headers=headers,
+                json=data if data is not None else None,
+                timeout=5
+            )
+            if resp.status_code in (200, 201, 206):
+                return resp.json() if resp.text else []
+            if resp.status_code == 204:
+                return []
+            logger.debug(f"[SupabaseDB] HTTP {resp.status_code} on {method} {target_url}: {resp.text[:100]}")
+            return None
+        except Exception as req_err:
+            logger.debug(f"[SupabaseDB] requests error, attempting urllib fallback: {req_err}")
+
+        # Fallback to urllib.request if requests encounters an issue
+        try:
+            payload_bytes = json.dumps(data).encode("utf-8") if data is not None else None
+            req = urllib.request.Request(target_url, data=payload_bytes, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 status = resp.status
                 body = resp.read().decode("utf-8")
                 if body:
                     return json.loads(body)
                 return [] if status in (200, 201, 204) else None
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode("utf-8") if e.fp else str(e)
-            logger.debug(f"[SupabaseDB] HTTP {e.code} on {method} {target_url}: {err_msg}")
-            return None
         except Exception as e:
             logger.debug(f"[SupabaseDB] Request exception: {e}")
             return None
@@ -103,6 +117,57 @@ class SupabaseDBClient:
         """Retrieve chat logs for a thread."""
         res = self._request(f"messages?conversation_id=eq.{conversation_id}&select=*&order=created_at.asc&limit={limit}")
         return res if isinstance(res, list) else []
+
+    # ---------- Social Media & Ad Campaigns ----------
+
+    def get_ad_campaigns(
+        self,
+        platform: Optional[str] = None,
+        project_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Fetch marketing campaigns with attribution metrics from Supabase Cloud."""
+        query_parts = ["select=*"]
+        if platform and platform != "all":
+            query_parts.append(f"platform=eq.{platform.lower()}")
+        if project_id and project_id != "all":
+            query_parts.append(f"project_id=eq.{project_id}")
+        if status and status != "all":
+            query_parts.append(f"status=eq.{status.lower()}")
+        query_parts.append(f"order=created_at.desc&limit={limit}")
+        
+        endpoint = f"ad_campaigns?{'&'.join(query_parts)}"
+        res = self._request(endpoint)
+        return res if isinstance(res, list) else []
+
+    def get_social_posts(
+        self,
+        platform: Optional[str] = None,
+        project_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Fetch social media posts with engagement metrics from Supabase Cloud."""
+        query_parts = ["select=*"]
+        if platform and platform != "all":
+            query_parts.append(f"platform=eq.{platform.lower()}")
+        if project_id and project_id != "all":
+            query_parts.append(f"project_id=eq.{project_id}")
+        if status and status != "all":
+            query_parts.append(f"status=eq.{status.lower()}")
+        query_parts.append(f"order=created_at.desc&limit={limit}")
+        
+        endpoint = f"social_posts?{'&'.join(query_parts)}"
+        res = self._request(endpoint)
+        return res if isinstance(res, list) else []
+
+    def create_social_post(self, post_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Insert a newly drafted or published social post into Supabase Cloud."""
+        res = self._request("social_posts", method="POST", data=post_data)
+        if isinstance(res, list) and res:
+            return res[0]
+        return res if isinstance(res, dict) else None
 
     # ---------- Vector Search via Supabase RPC ----------
 

@@ -223,7 +223,7 @@ VALUES
     ('cmp-001', 'GLG Sky Tower - Gulshan 3BHK', 'meta_whatsapp', 45000.00, 65000, 120000, 520, 58, 775.00, 'active'),
     ('cmp-002', 'Palm Beach Villa - Coastal Luxury', 'instagram_reels', 38000.00, 52000, 98000, 410, 42, 904.00, 'active'),
     ('cmp-003', 'Dhanmondi Heights - Residential', 'google_search', 24000.00, 38000, 72000, 310, 28, 857.00, 'active'),
-    ('cmp-004', 'Bandra Skyline - Investment Units', 'meta_lead_form', 18000.00, 30000, 50000, 180, 14, 1285.00, 'paused')
+    ('cmp-004', 'GLG Banani Crest Towers - Luxury Commercial & Suites', 'meta_lead_form', 18000.00, 30000, 50000, 180, 14, 1285.00, 'paused')
 ON CONFLICT (campaign_id) DO UPDATE SET 
     ad_budget_spent = EXCLUDED.ad_budget_spent,
     qualified_leads = EXCLUDED.qualified_leads;

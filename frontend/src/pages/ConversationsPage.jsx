@@ -24,6 +24,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   getConversations, 
+  getConversationMessages,
   toggleTakeover, 
   sendAgentReply, 
   sendCustomerMessage, 
@@ -34,98 +35,16 @@ import {
 } from '../services/api';
 import Pagination from '../components/ui/Pagination';
 
-const INITIAL_CONVERSATIONS = [
-  {
-    id: 'wa_8801711122233',
-    name: 'Tanvir Hossain',
-    phone: '+880 1711-122233',
-    channel: 'whatsapp',
-    lastMessage: 'I want 3 BHK in Gulshan under 1 crore',
-    time: '2 mins ago',
-    status: 'active',
-    aiPaused: false,
-    confidence: 0.92,
-    intent: 'property_search',
-    messages: [
-      { sender: 'user', text: 'Hi, looking for apartments in Gulshan', time: '10:14 AM' },
-      { sender: 'ai', text: 'Hello Tanvir! Welcome to GLG Assets. What is your preferred budget?', time: '10:14 AM' },
-      { sender: 'user', text: 'I want 3 BHK in Gulshan under 1 crore', time: '10:16 AM' },
-      { sender: 'ai', text: 'Great choice! GLG Gulshan Heights features 3 BHK units priced from ৳95 Lakhs.', time: '10:16 AM' }
-    ]
-  },
-  {
-    id: 'tg_88018998877',
-    name: 'Mahmudur Rahman',
-    phone: '+880 1899-887766',
-    channel: 'telegram',
-    lastMessage: 'Send me the brochure and price list for Uttara project',
-    time: '5 mins ago',
-    status: 'active',
-    aiPaused: false,
-    confidence: 0.95,
-    intent: 'brochure',
-    messages: [
-      { sender: 'user', text: 'Send me the brochure and price list for Uttara project', time: '10:11 AM' },
-      { sender: 'ai', text: 'Brochure for GLG Uttara Paradise has been generated. Sent via Telegram PDF attachment.', time: '10:11 AM' }
-    ]
-  },
-  {
-    id: 'fb_1029384756',
-    name: 'Sarah Khan',
-    phone: '+880 1822-334455',
-    channel: 'facebook',
-    lastMessage: 'Can I visit the site tomorrow at 3 PM?',
-    time: '15 mins ago',
-    status: 'escalated',
-    aiPaused: true,
-    confidence: 0.68,
-    intent: 'booking',
-    messages: [
-      { sender: 'user', text: 'Is Banani Crest project open for site visit?', time: '09:45 AM' },
-      { sender: 'ai', text: 'Yes Sarah! Site visits are available daily from 10 AM to 5 PM.', time: '09:45 AM' },
-      { sender: 'user', text: 'Can I visit the site tomorrow at 3 PM?', time: '10:01 AM' }
-    ]
-  },
-  {
-    id: 'ig_99887766',
-    name: 'Anisur Rahman',
-    phone: '+880 1911-556677',
-    channel: 'instagram',
-    lastMessage: 'Is payment schedule flexible over 3 years?',
-    time: '1 hour ago',
-    status: 'active',
-    aiPaused: false,
-    confidence: 0.88,
-    intent: 'faq',
-    messages: [
-      { sender: 'user', text: 'Is payment schedule flexible over 3 years?', time: '09:12 AM' },
-      { sender: 'ai', text: 'Hello Anisur! Yes, GLG Assets offers up to 36-month flexible installment plans.', time: '09:13 AM' }
-    ]
-  },
-  {
-    id: 'email_thread_101',
-    name: 'Rahim Chowdhury',
-    phone: 'rahim.chowdhury@gmail.com',
-    channel: 'email',
-    lastMessage: 'Inquiry regarding 3 BHK Apartment - GLG Gulshan Heights',
-    time: 'Just now',
-    status: 'escalated',
-    aiPaused: true,
-    confidence: 0.78,
-    intent: 'property_inquiry',
-    messages: [
-      { sender: 'user', text: 'Hello GLG Team, I am interested in purchasing a 3 BHK apartment in Gulshan Heights. Could you please send me the latest price list, available floor plans, and site visit availability?', time: '10:15 AM' },
-      { sender: 'ai', text: 'Staged AI Reply Draft generated & pending agent approval. [n8n email node trigger ready]', time: '10:15 AM' }
-    ]
-  }
-];
 
 export default function ConversationsPage() {
   const { convId } = useParams();
   const navigate = useNavigate();
 
-  const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
-  const [selectedId, setSelectedId] = useState(() => convId || INITIAL_CONVERSATIONS[0].id);
+  const [conversations, setConversations] = useState([]);
+  const [selectedId, setSelectedId] = useState(convId || null);
+  const [isLoadingConvs, setIsLoadingConvs] = useState(true);
+  const [convsError, setConvsError] = useState(null);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState('');
 
   // Sync route param convId if present
@@ -167,14 +86,37 @@ export default function ConversationsPage() {
   const messagesEndRef = useRef(null);
 
   // Fetch initial conversations from API
-  const loadConversations = () => {
-    getConversations()
-      .then(res => {
-        if (res.conversations && res.conversations.length > 0) {
-          setConversations(res.conversations);
+  const loadConversations = async () => {
+    setIsLoadingConvs(true);
+    setConvsError(null);
+    try {
+      const res = await getConversations();
+      if (res && Array.isArray(res.conversations)) {
+        setConversations(prev => {
+          // Retain loaded message histories across refreshes
+          const messagesMap = new Map();
+          prev.forEach(c => {
+            if (c.messages && c.messages.length > 0) {
+              messagesMap.set(c.id, c.messages);
+            }
+          });
+          return res.conversations.map(c => ({
+            ...c,
+            messages: messagesMap.get(c.id) || c.messages || []
+          }));
+        });
+        if (res.conversations.length > 0 && !selectedId) {
+          setSelectedId(res.conversations[0].id);
         }
-      })
-      .catch(err => console.error('Failed to load conversations:', err));
+      } else {
+        setConversations([]);
+      }
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+      setConvsError('Failed to load live conversations. Check backend connectivity.');
+    } finally {
+      setIsLoadingConvs(false);
+    }
   };
 
   useEffect(() => {
@@ -238,8 +180,8 @@ export default function ConversationsPage() {
                   return {
                     ...c,
                     lastMessage: data.message?.text || c.lastMessage,
-                    time: 'Just now',
-                    messages: [...c.messages, data.message]
+                    time: data.message?.time || 'Just now',
+                    messages: [...(c.messages || []), data.message]
                   };
                 }
                 return c;
@@ -252,11 +194,12 @@ export default function ConversationsPage() {
                   phone: '+880 1700-000000',
                   channel: data.channel || 'website',
                   lastMessage: data.message?.text || 'New conversation',
-                  time: 'Just now',
+                  time: data.message?.time || 'Just now',
                   status: data.requires_escalation ? 'escalated' : 'active',
                   aiPaused: data.requires_escalation || false,
                   confidence: 0.90,
                   intent: 'inquiry',
+                  beliefs: {},
                   messages: [data.message]
                 },
                 ...prev
@@ -274,21 +217,44 @@ export default function ConversationsPage() {
             if (c.id === data.conversation_id) {
               const textToMatch = (data.message?.text || '').trim();
               const senderToMatch = data.message?.sender;
-              const exists = c.messages.some(
-                m => (m.text || '').trim() === textToMatch && m.sender === senderToMatch
-              );
-              if (exists) {
+              const incomingId = data.message?.id;
+
+              const currentMessages = c.messages || [];
+              const lastMsg = currentMessages.length > 0 ? currentMessages[currentMessages.length - 1] : null;
+
+              // Check if incoming message is duplicate of the most recent message (e.g. optimistic user/agent send)
+              const isDuplicateOfLast = lastMsg && 
+                (lastMsg.text || '').trim() === textToMatch && 
+                lastMsg.sender === senderToMatch;
+
+              // Check if message ID matches any existing message
+              const isSameId = incomingId && currentMessages.some(m => m.id && m.id === incomingId);
+
+              if (isDuplicateOfLast) {
+                // Update the last optimistic message with the server-confirmed timestamp and id
                 return {
                   ...c,
                   lastMessage: textToMatch || c.lastMessage,
-                  time: 'Just now'
+                  time: data.message?.time || c.time,
+                  messages: currentMessages.map((m, idx) => 
+                    idx === currentMessages.length - 1 ? { ...m, ...data.message } : m
+                  )
                 };
               }
+
+              if (isSameId) {
+                return {
+                  ...c,
+                  lastMessage: textToMatch || c.lastMessage,
+                  time: data.message?.time || c.time,
+                };
+              }
+
               return {
                 ...c,
                 lastMessage: textToMatch || c.lastMessage,
-                time: 'Just now',
-                messages: [...c.messages, data.message]
+                time: data.message?.time || 'Just now',
+                messages: [...currentMessages, data.message]
               };
             }
             return c;
@@ -317,7 +283,41 @@ export default function ConversationsPage() {
     return () => eventSource.close();
   }, []);
 
-  const selectedConv = conversations.find(c => c.id === selectedId) || conversations[0] || INITIAL_CONVERSATIONS[0];
+  const selectedConv = conversations.find(c => c.id === selectedId) || conversations[0] || null;
+
+  // Lazy-load full message history (up to 60 messages) when a conversation is selected
+  useEffect(() => {
+    if (!selectedConv?.id) return;
+
+    let isMounted = true;
+    setLoadingMessages(true);
+
+    getConversationMessages(selectedConv.id, 60)
+      .then(res => {
+        if (!isMounted) return;
+        if (res && res.success && Array.isArray(res.messages)) {
+          setConversations(prev => prev.map(c => {
+            if (c.id === selectedConv.id) {
+              return {
+                ...c,
+                messages: res.messages
+              };
+            }
+            return c;
+          }));
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch messages for conversation:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingMessages(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedConv?.id]);
 
   // Auto-scroll chat window when messages update
   useEffect(() => {
@@ -360,17 +360,18 @@ export default function ConversationsPage() {
 
     const text = replyText.trim();
     setReplyText('');
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     if (inputMode === 'customer') {
       // 1. Optimistic append user message
-      const userMsg = { sender: 'user', text, time: 'Just now' };
+      const userMsg = { sender: 'user', text, time: nowTime, createdAt: new Date().toISOString() };
       setConversations(prev => prev.map(c => {
         if (c.id === selectedId) {
           return {
             ...c,
             lastMessage: text,
-            time: 'Just now',
-            messages: [...c.messages, userMsg]
+            time: nowTime,
+            messages: [...(c.messages || []), userMsg]
           };
         }
         return c;
@@ -378,18 +379,19 @@ export default function ConversationsPage() {
 
       setIsSending(true);
       try {
-        const res = await sendCustomerMessage(selectedId, text, selectedConv.channel);
-        if (res.ai_reply) {
+        const res = await sendCustomerMessage(selectedId, text, selectedConv?.channel || 'website');
+        if (res && res.ai_reply) {
           setConversations(prev => prev.map(c => {
             if (c.id === selectedId) {
-              const hasAiMsg = c.messages.some(
-                m => (m.text || '').trim() === (res.ai_reply.text || '').trim() && m.sender === 'ai'
-              );
+              const currentMessages = c.messages || [];
+              const lastMsg = currentMessages.length > 0 ? currentMessages[currentMessages.length - 1] : null;
+              const hasAiMsg = lastMsg && lastMsg.sender === 'ai' && (lastMsg.text || '').trim() === (res.ai_reply.text || '').trim();
               return {
                 ...c,
                 confidence: res.conversation?.confidence || c.confidence,
                 intent: res.conversation?.intent || c.intent,
-                messages: hasAiMsg ? c.messages : [...c.messages, res.ai_reply]
+                beliefs: res.conversation?.beliefs || c.beliefs,
+                messages: hasAiMsg ? currentMessages : [...currentMessages, res.ai_reply]
               };
             }
             return c;
@@ -403,14 +405,14 @@ export default function ConversationsPage() {
 
     } else {
       // Role: HUMAN SALES AGENT
-      const agentMsg = { sender: 'human_agent', text, time: 'Just now' };
+      const agentMsg = { sender: 'human_agent', text, time: nowTime, createdAt: new Date().toISOString() };
       setConversations(prev => prev.map(c => {
         if (c.id === selectedId) {
           return {
             ...c,
             lastMessage: text,
-            time: 'Just now',
-            messages: [...c.messages, agentMsg]
+            time: nowTime,
+            messages: [...(c.messages || []), agentMsg]
           };
         }
         return c;
@@ -423,7 +425,7 @@ export default function ConversationsPage() {
   // Quick Action Buttons
   const handleQuickAction = (type) => {
     if (type === 'brochure') {
-      const activeProjectName = currentConv?.projectName || 'GLG Gulshan Heights';
+      const activeProjectName = selectedConv?.projectName || 'GLG Gulshan Heights';
       const msg = `📄 Here is our official GLG Assets Property Catalog & Brochure for ${activeProjectName}: https://fdjzbtkypedzlkwpzzzt.supabase.co/storage/v1/object/public/brochures/gulshan_heights_brochure.pdf`;
       setReplyText(msg);
     } else if (type === 'visit') {
@@ -463,8 +465,8 @@ export default function ConversationsPage() {
       await deleteConversation(id);
       setConversations(prev => {
         const updated = prev.filter(c => c.id !== id);
-        if (selectedId === id && updated.length > 0) {
-          setSelectedId(updated[0].id);
+        if (selectedId === id) {
+          setSelectedId(updated.length > 0 ? updated[0].id : null);
         }
         return updated;
       });
@@ -682,9 +684,61 @@ export default function ConversationsPage() {
 
         {/* List of Conversations (Individual Rounded Cards) */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filteredConversations.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-              No matching live conversations found.
+          {isLoadingConvs ? (
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <RefreshCw size={22} className="spin-anim" style={{ color: 'var(--primary-coral)' }} />
+              <span>Loading conversations...</span>
+            </div>
+          ) : convsError ? (
+            <div style={{ padding: '20px 16px', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.25)', margin: '8px 0' }}>
+              <AlertTriangle size={20} color="#EF4444" style={{ marginBottom: '6px' }} />
+              <div style={{ color: '#EF4444', fontWeight: 600, fontSize: '0.82rem', marginBottom: '4px' }}>Sync Notice</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: '1.4' }}>{convsError}</div>
+              <button
+                onClick={loadConversations}
+                style={{
+                  marginTop: '10px',
+                  padding: '5px 14px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--primary-coral)',
+                  color: '#FFFFFF',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+              {conversations.length === 0 ? (
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontWeight: 700, color: 'var(--text-main)' }}>No conversations yet</p>
+                  <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Incoming leads from WhatsApp, Telegram, or Web will appear here in real time.
+                  </p>
+                  <button
+                    onClick={() => setShowNewLeadModal(true)}
+                    style={{
+                      marginTop: '14px',
+                      padding: '6px 14px',
+                      borderRadius: '999px',
+                      border: 'none',
+                      background: 'var(--grad-coral)',
+                      color: '#FFFFFF',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Create Test Lead
+                  </button>
+                </div>
+              ) : (
+                'No matching live conversations found.'
+              )}
             </div>
           ) : (
             paginatedConversations.map(conv => {
@@ -780,8 +834,30 @@ export default function ConversationsPage() {
       </div>
 
       {/* Right Floating Card: Chat Window & Controls */}
-      <div className="chat-floating-card" style={{ flex: 1 }}>
-        
+      <div className="chat-floating-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {!selectedConv ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(232, 101, 74, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', color: 'var(--primary-coral)' }}>
+              <MessageSquare size={30} />
+            </div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 8px 0' }}>
+              {conversations.length === 0 ? 'No Conversations Available' : 'Select a Conversation'}
+            </h3>
+            <p style={{ maxWidth: '380px', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 20px 0' }}>
+              {conversations.length === 0 
+                ? 'Incoming messages from WhatsApp, Telegram, or the Website bot will appear here automatically.' 
+                : 'Choose a contact from the left sidebar to view message history, test AI responses, or take over as human agent.'}
+            </p>
+            <button
+              onClick={() => setShowNewLeadModal(true)}
+              className="btn-gradient"
+              style={{ padding: '10px 20px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            >
+              <Plus size={16} /> Simulate New Lead
+            </button>
+          </div>
+        ) : (
+          <>
         {/* Chat Window Header */}
         <div style={{
           padding: '14px 24px',
@@ -933,39 +1009,52 @@ export default function ConversationsPage() {
 
         {/* Messages Stream Area */}
         <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {selectedConv.messages?.map((msg, idx) => {
-            const isUser = msg.sender === 'user';
-            const isHumanAgent = msg.sender === 'human_agent';
-            return (
-              <div 
-                key={idx}
-                style={{
-                  alignSelf: isUser ? 'flex-start' : 'flex-end',
-                  maxWidth: '68%',
-                  background: isUser 
-                    ? 'var(--bg-main)' 
-                    : isHumanAgent 
-                      ? 'linear-gradient(135deg, #F59E0B, #D97706)' 
-                      : 'var(--grad-coral)',
-                  padding: '12px 18px',
-                  borderRadius: isUser ? '18px 18px 18px 6px' : '18px 18px 6px 18px',
-                  color: isUser ? 'var(--text-main)' : '#FFFFFF',
-                  border: isUser ? '1px solid var(--border-glass)' : 'none',
-                  boxShadow: isUser ? '0 2px 8px rgba(0,0,0,0.04)' : '0 4px 16px rgba(232, 101, 74, 0.25)'
-                }}
-              >
-                <div style={{ fontSize: '0.68rem', opacity: isUser ? 0.75 : 0.9, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                  <span style={{ fontWeight: 700 }}>
-                    {isUser ? selectedConv.name : isHumanAgent ? '👨‍💼 You (Sales Agent)' : '🤖 GLG AI Assistant'}
-                  </span>
-                  <span>{msg.time}</span>
+          {loadingMessages ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', gap: '12px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <RefreshCw size={22} className="spin-anim" style={{ color: 'var(--primary-coral)' }} />
+              <span>Loading message history...</span>
+            </div>
+          ) : (!selectedConv.messages || selectedConv.messages.length === 0) ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', gap: '8px', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+              <MessageSquare size={24} style={{ opacity: 0.4, color: 'var(--text-muted)' }} />
+              <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>No messages in this conversation yet</span>
+              <span style={{ fontSize: '0.78rem' }}>Type below to test the AI agent or chat as human agent.</span>
+            </div>
+          ) : (
+            selectedConv.messages.map((msg, idx) => {
+              const isUser = msg.sender === 'user';
+              const isHumanAgent = msg.sender === 'human_agent';
+              return (
+                <div 
+                  key={idx}
+                  style={{
+                    alignSelf: isUser ? 'flex-start' : 'flex-end',
+                    maxWidth: '68%',
+                    background: isUser 
+                      ? 'var(--bg-main)' 
+                      : isHumanAgent 
+                        ? 'linear-gradient(135deg, #F59E0B, #D97706)' 
+                        : 'var(--grad-coral)',
+                    padding: '12px 18px',
+                    borderRadius: isUser ? '18px 18px 18px 6px' : '18px 18px 6px 18px',
+                    color: isUser ? 'var(--text-main)' : '#FFFFFF',
+                    border: isUser ? '1px solid var(--border-glass)' : 'none',
+                    boxShadow: isUser ? '0 2px 8px rgba(0,0,0,0.04)' : '0 4px 16px rgba(232, 101, 74, 0.25)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.68rem', opacity: isUser ? 0.75 : 0.9, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                    <span style={{ fontWeight: 700 }}>
+                      {isUser ? selectedConv.name : isHumanAgent ? '👨‍💼 You (Sales Agent)' : '🤖 GLG AI Assistant'}
+                    </span>
+                    <span>{msg.time}</span>
+                  </div>
+                  <div style={{ fontSize: '0.88rem', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
+                    {msg.text}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.88rem', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
-                  {msg.text}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
 
           {/* Typing indicator when AI is generating response */}
           {isSending && (
@@ -1099,6 +1188,8 @@ export default function ConversationsPage() {
           </form>
         </div>
 
+          </>
+        )}
       </div>
 
       {/* Modal: Simulate New Lead */}
@@ -1205,7 +1296,7 @@ export default function ConversationsPage() {
       )}
 
       {/* Modal: AI Lead Requirement Summary */}
-      {showAiSummaryModal && (
+      {showAiSummaryModal && selectedConv && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -1233,23 +1324,66 @@ export default function ConversationsPage() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>Buyer Name:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{selectedConv.name}</span>
-              </div>
-              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>Detected Intent:</strong> <span className="badge badge-cyan" style={{ borderRadius: '999px' }}>{selectedConv.intent || 'property_search'}</span>
-              </div>
-              <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)' }}>
-                <strong style={{ color: 'var(--text-muted)' }}>AI Confidence Score:</strong> <span className="text-emerald-themed" style={{ fontWeight: 700 }}>{Math.round((selectedConv.confidence || 0.9) * 100)}%</span>
-              </div>
-              <div style={{ background: 'rgba(232, 101, 74, 0.08)', border: '1px solid rgba(232, 101, 74, 0.25)', padding: '14px 16px', borderRadius: '14px' }}>
-                <strong style={{ color: 'var(--primary-coral)', display: 'block', marginBottom: '6px' }}>Requirements Summary:</strong>
-                <span style={{ color: 'var(--text-main)' }}>
-                  {selectedConv.lastMessage ? `Customer expressed: "${selectedConv.lastMessage}". System recommends offering GLG Gulshan Heights or Banani Crest units with customized 3-year installment plans.` : 'No key requirements recorded yet.'}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const b = selectedConv.beliefs || {};
+              const locations = Array.isArray(b.preferred_locations) && b.preferred_locations.length > 0 ? b.preferred_locations.join(', ') : 'Not specified yet';
+              const bedrooms = b.bedrooms ? `${b.bedrooms} BHK` : 'Not specified';
+              const budget = b.budget_raw || (b.budget_max ? `৳${Number(b.budget_max).toLocaleString()} BDT` : (b.budget_min ? `৳${Number(b.budget_min).toLocaleString()} BDT+` : 'Not specified'));
+              const facing = b.facing || 'Any / Flexible';
+              const handover = b.handover_status || 'Any';
+              const buyerProfile = b.buyer_profile && typeof b.buyer_profile === 'object' ? b.buyer_profile : {};
+              const urgency = buyerProfile.urgency || 'Active Inquiry';
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
+                  <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ color: 'var(--text-muted)' }}>Buyer: </strong>
+                      <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{selectedConv.name}</span>
+                      <span style={{ marginLeft: '8px', color: 'var(--text-dim)', fontSize: '0.78rem' }}>({selectedConv.phone})</span>
+                    </div>
+                    <span className={`badge badge-${selectedConv.channel === 'whatsapp' ? 'emerald' : selectedConv.channel === 'telegram' ? 'cyan' : selectedConv.channel === 'facebook' ? 'blue' : 'violet'}`} style={{ fontSize: '0.65rem', borderRadius: '999px', padding: '2px 8px' }}>
+                      {selectedConv.channel}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ background: 'var(--bg-main)', padding: '10px 12px', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', display: 'block' }}>Detected Intent</span>
+                      <span className="badge badge-cyan" style={{ borderRadius: '999px', marginTop: '4px', display: 'inline-block' }}>{selectedConv.intent || 'property_inquiry'}</span>
+                    </div>
+                    <div style={{ background: 'var(--bg-main)', padding: '10px 12px', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', display: 'block' }}>AI Confidence Score</span>
+                      <span className="text-emerald-themed" style={{ fontWeight: 800, fontSize: '1rem', display: 'block', marginTop: '2px' }}>
+                        {Math.round((selectedConv.confidence || 0.9) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* AI Dynamic Memory Reflection Attributes */}
+                  <div style={{ background: 'var(--bg-main)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                      Extracted Constraints &amp; Preferences
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.78rem' }}>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Location:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{locations}</span></div>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Bedrooms:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{bedrooms}</span></div>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Budget:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{budget}</span></div>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Facing:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{facing}</span></div>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Handover:</strong> <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{handover}</span></div>
+                      <div><strong style={{ color: 'var(--text-dim)' }}>Priority:</strong> <span style={{ color: 'var(--primary-coral)', fontWeight: 600 }}>{urgency}</span></div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(232, 101, 74, 0.08)', border: '1px solid rgba(232, 101, 74, 0.25)', padding: '14px 16px', borderRadius: '14px' }}>
+                    <strong style={{ color: 'var(--primary-coral)', display: 'block', marginBottom: '6px' }}>Latest Requirement Context:</strong>
+                    <span style={{ color: 'var(--text-main)', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                      {selectedConv.lastMessage ? `"${selectedConv.lastMessage}"` : 'Initial inquiry recorded. Ready for personalized project recommendations.'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
               <button
