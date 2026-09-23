@@ -44,6 +44,7 @@ from app.api.v1.moderation.endpoints import router as moderation_router
 from app.api.v1.notifications.endpoints import router as notifications_router
 from app.api.v1.projects.endpoints import create_project, get_project, list_projects
 from app.api.v1.projects.endpoints import router as projects_router
+from app.api.v1.reports import router as reports_router
 from app.api.v1.search.endpoints import router as search_router
 from app.api.v1.search.endpoints import search_knowledge
 from app.api.v1.social import router as social_router
@@ -95,7 +96,17 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("[startup] Gmail credentials not configured — email poller disabled.")
 
+    # Start scheduled report generation worker
+    scheduler_task = None
+    from app.services.report_scheduler import report_scheduler_worker, stop_report_scheduler
+    scheduler_task = asyncio.create_task(report_scheduler_worker(check_interval_seconds=60))
+    logger.info("[startup] Scheduled report generator & multi-channel delivery worker started.")
+
     yield
+
+    stop_report_scheduler()
+    if scheduler_task and not scheduler_task.done():
+        scheduler_task.cancel()
 
     stop_email_poller()
     if poller_task and not poller_task.done():
@@ -355,4 +366,5 @@ app.include_router(projects_router,     prefix="/api/v1",              tags=["pr
 app.include_router(search_router,       prefix="/api/v1",              tags=["search"])
 app.include_router(calendar_router,     prefix="/api/v1/calendar",     tags=["calendar"])
 app.include_router(calendar_router,     prefix="/api/calendar",        tags=["calendar"])
+app.include_router(reports_router,      prefix="/api/v1",              tags=["reports"])
 app.include_router(ws_router,           prefix="/api/v1",              tags=["websockets"])

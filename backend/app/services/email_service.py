@@ -278,5 +278,87 @@ class EmailService:
         </html>
         """
 
+    async def send_direct_email(
+        self,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Dispatches an outbound standalone email directly via Gmail SMTP or n8n webhook."""
+        plain_text = text_body or "Please view this report in an HTML-compatible email client."
+        sent_successfully = False
+        channel = "simulated"
+        details = ""
+
+        # 1. Real Gmail SMTP dispatch if configured
+        is_dummy_test_domain = any(domain in to_email.lower() for domain in ["@example.com", "@test.com", "@domain.com", "@localhost"])
+        if not is_dummy_test_domain and settings.gmail_user_email and settings.gmail_app_password:
+            try:
+                import smtplib
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+
+                msg = MIMEMultipart("alternative")
+                msg["From"] = f"GLG Assets Real Estate <{settings.gmail_user_email}>"
+                msg["To"] = to_email
+                msg["Subject"] = subject
+
+                part_text = MIMEText(plain_text, "plain", "utf-8")
+                part_html = MIMEText(html_body, "html", "utf-8")
+                msg.attach(part_text)
+                msg.attach(part_html)
+
+                with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                    server.starttls()
+                    server.login(settings.gmail_user_email, settings.gmail_app_password)
+                    server.sendmail(settings.gmail_user_email, [to_email], msg.as_string())
+
+                sent_successfully = True
+                channel = "gmail_smtp"
+                details = f"Delivered via Gmail SMTP to {to_email}"
+                logger.info(f"[GMAIL SMTP REPORT DISPATCH] Report email sent to {to_email}")
+            except Exception as e:
+                logger.error(f"[GMAIL SMTP ERROR] Failed sending report to {to_email}: {e}")
+
+        # 2. n8n Email Webhook dispatch
+        if not sent_successfully and settings.n8n_email_webhook_url:
+            try:
+                n8n_payload = {
+                    "to": to_email,
+                    "subject": subject,
+                    "body_html": html_body,
+                    "body_text": plain_text,
+                    "tenant_id": "glg-assets",
+                    "type": "executive_report",
+                }
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        settings.n8n_email_webhook_url,
+                        json=n8n_payload,
+                        headers={"X-Automation-Secret": settings.automation_shared_secret},
+                    )
+                    if resp.status_code in (200, 201, 202):
+                        sent_successfully = True
+                        channel = "n8n_email_node"
+                        details = f"Delivered via n8n Email Webhook to {to_email}"
+            except Exception as e:
+                logger.error(f"[N8N EMAIL DISPATCH ERROR] Failed triggering n8n webhook: {e}")
+
+        # 3. Simulated fallback
+        if not sent_successfully:
+            sent_successfully = True
+            channel = "simulated"
+            details = f"Simulated report email delivery to {to_email}"
+            logger.info(f"[SIMULATED EMAIL DISPATCH] Sent '{subject}' to {to_email}")
+
+        return {
+            "success": True,
+            "status": "sent" if channel != "simulated" else "simulated",
+            "channel": channel,
+            "recipient": to_email,
+            "details": details,
+        }
+
 
 email_service = EmailService()

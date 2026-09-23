@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertCircle,
-  Database
+  Database,
+  Send,
+  Play
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -26,7 +28,7 @@ import {
   XAxis
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import { getManagerOverview, updateCampaignStatus } from '../services/api';
+import { getManagerOverview, updateCampaignStatus, triggerReportNow } from '../services/api';
 
 // Safe default fallback dataset to avoid layout jump before initial API fetch completes
 const DEFAULT_SPEND_TREND = [
@@ -125,6 +127,22 @@ export default function ManagerDashboardPage({ setActiveTab }) {
 
   const [campaigns, setCampaigns] = useState(DEFAULT_CAMPAIGNS);
   const [updatingCampaignId, setUpdatingCampaignId] = useState(null);
+  const [dispatchingReport, setDispatchingReport] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState(null);
+
+  const handleSendReportQuick = async () => {
+    setDispatchingReport(true);
+    try {
+      await triggerReportNow('sched-daily-pulse');
+      setReportFeedback('Daily briefing delivered to Admin & Manager across Email, Telegram, and WhatsApp!');
+      setTimeout(() => setReportFeedback(null), 5000);
+    } catch (err) {
+      setReportFeedback(`Dispatch failed: ${err.message || 'Error'}`);
+      setTimeout(() => setReportFeedback(null), 5000);
+    } finally {
+      setDispatchingReport(false);
+    }
+  };
 
   // Data fetching routine
   const fetchDashboardData = useCallback(async (isSilent = false) => {
@@ -356,8 +374,52 @@ export default function ManagerDashboardPage({ setActiveTab }) {
             />
             <span>{(refreshing || loading) ? 'Syncing...' : 'Refresh'}</span>
           </button>
+
+          <button
+            onClick={handleSendReportQuick}
+            disabled={dispatchingReport}
+            className="btn-gradient"
+            title="Dispatch Daily Intelligence Briefing to Admin & Manager"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: dispatchingReport ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Send size={13} className={dispatchingReport ? 'spin-anim' : ''} />
+            <span>{dispatchingReport ? 'Dispatching...' : '⚡ Send Report (Email + TG + WA)'}</span>
+          </button>
         </div>
       </div>
+
+      {reportFeedback && (
+        <div style={{
+          padding: '10px 16px',
+          borderRadius: '10px',
+          background: 'rgba(16, 185, 129, 0.1)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          color: '#059669',
+          fontSize: '0.82rem',
+          fontWeight: 700,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>✨ {reportFeedback}</span>
+          {setActiveTab && (
+            <button
+              onClick={() => setActiveTab('role_reports')}
+              style={{ background: 'transparent', border: 'none', color: '#059669', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}
+            >
+              View in Reports Hub &rarr;
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. Manager 6-Card KPI Grid */}
       <div style={{

@@ -1395,3 +1395,146 @@ export async function testAgentPlayground(payload) {
   return handleResponse(response);
 }
 
+/**
+ * ==========================================================
+ * SCHEDULED REPORTS & MULTI-CHANNEL DELIVERY API
+ * ==========================================================
+ */
+
+/**
+ * Fetch all report schedules with configured recipients and channels
+ */
+export async function getReportSchedules() {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch('/api/v1/reports/schedules', {
+    method: 'GET',
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Create or configure a new report schedule (Admin only)
+ */
+export async function createReportSchedule(scheduleData) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch('/api/v1/reports/schedules', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(scheduleData),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Toggle an automated schedule active/paused
+ */
+export async function toggleReportSchedule(scheduleId, isActive) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/reports/schedules/${encodeURIComponent(scheduleId)}/toggle`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Manually trigger immediate report generation & multi-channel delivery ("Run Now")
+ */
+export async function triggerReportNow(scheduleId, payload = {}) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/reports/schedules/${encodeURIComponent(scheduleId)}/trigger`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch report execution history & channel delivery audit logs
+ */
+export async function getReportHistory(limit = 20) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/reports/history?limit=${limit}`, {
+    method: 'GET',
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Fetch single report detail including rendered HTML preview
+ */
+export async function getReportDetail(reportId) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/reports/history/${encodeURIComponent(reportId)}`, {
+    method: 'GET',
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Send an immediate test brief across Email, Telegram, or WhatsApp
+ */
+export async function sendTestReport(payload) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Automation-Secret': AUTOMATION_SECRET,
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch('/api/v1/reports/test-dispatch', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+

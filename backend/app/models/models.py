@@ -260,3 +260,41 @@ class FineTuningJobRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
+
+class ReportScheduleRecord(Base):
+    __tablename__ = "report_schedules"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    report_type: Mapped[str] = mapped_column(String(64), default="daily_digest")  # daily_digest, weekly_cross_role
+    frequency: Mapped[str] = mapped_column(String(32), default="daily")  # daily, weekly, monthly
+    execution_hour_utc: Mapped[int] = mapped_column(Integer, default=8)
+    execution_day_of_week: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    recipients: Mapped[list] = mapped_column(JSON, default=list)  # list of dicts with role, email, whatsapp, telegram
+    channels: Mapped[list] = mapped_column(JSON, default=list)  # list of strings: ["email", "telegram", "whatsapp", "in_app"]
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class GeneratedReportRecord(Base):
+    __tablename__ = "generated_reports"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    schedule_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    report_type: Mapped[str] = mapped_column(String(64), default="daily_digest")
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    metrics_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    executive_summary: Mapped[str] = mapped_column(Text, default="")
+    html_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    whatsapp_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    telegram_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_status: Mapped[str] = mapped_column(String(32), default="delivered")  # delivered, partially_delivered, failed
+    delivery_details: Mapped[list] = mapped_column(JSON, default=list)  # channel delivery logs
+    triggered_by: Mapped[str] = mapped_column(String(64), default="scheduled_worker")  # scheduled_worker, manual, n8n_webhook
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
