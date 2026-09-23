@@ -51,6 +51,14 @@ services:
         value: https://glg-ai.app.n8n.cloud/webhook/glg-email-webhook
       - key: N8N_WEBHOOK_BASE_URL
         value: https://glg-ai.app.n8n.cloud
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_ENDPOINT
+        value: https://api.smith.langchain.com
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: glg-assets-ai-os
 
   # ── React Frontend Static Site ──
   - type: web

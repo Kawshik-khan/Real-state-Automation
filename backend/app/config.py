@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-large"
     openai_base_url: Optional[str] = None
 
+    # LangSmith Observability & Tracing
+    langsmith_tracing: bool = False
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_api_key: Optional[str] = None
+    langsmith_project: str = "glg-assets-ai-os"
+
     # Knowledge Base & Vector Store
     knowledge_base_dir: str = "data/knowledge"
     vector_dim: int = 1024
