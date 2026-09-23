@@ -121,8 +121,9 @@ async def sync_pinecone_and_supabase() -> Dict[str, Any]:
         "Prefer": "resolution=merge-duplicates",
     } if (supabase_url and supabase_key) else {}
 
-    # 1. Locate & Process All PDF Knowledge Documents
-    pdf_files = list(workspace_root.glob("*.pdf"))
+    # 1. Locate & Process All PDF Knowledge Documents (Root and docs/domain_knowledge)
+    pdf_files = list(workspace_root.glob("*.pdf")) + list((workspace_root / "docs").glob("**/*.pdf"))
+    pdf_files = list({p.resolve(): p for p in pdf_files}.values())
     print(f"\n[*] Found {len(pdf_files)} PDF knowledge documents in workspace:")
 
     raw_chunks_to_embed = []

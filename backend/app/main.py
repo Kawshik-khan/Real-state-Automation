@@ -16,6 +16,9 @@ import time
 import warnings
 from contextlib import asynccontextmanager
 
+# Suppress known LangGraph/LangChain internal serializer deprecation warnings before imports
+warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
+
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -55,9 +58,6 @@ from app.dependencies import require_roles
 from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
-# Suppress known LangGraph/LangChain internal serializer deprecation warnings
-warnings.filterwarnings("ignore", message=r".*allowed_objects.*")
-
 logger = logging.getLogger(__name__)
 
 
@@ -81,7 +81,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"[startup] Database initialization note: {db_err}")
 
     logger.info(f"[startup] {settings.app_name} — MVP routes registered at /api/")
-    logger.info("[startup] Docs available at http://localhost:8000/docs")
+    active_port = os.getenv("PORT", "8000")
+    logger.info(f"[startup] Docs available at http://0.0.0.0:{active_port}/docs (or /docs behind reverse proxy)")
 
     # Only start email poller if Gmail credentials are configured
     poller_task = None
@@ -246,21 +247,21 @@ async def verify_automation_secret(
     return {"tenant_id": x_tenant_id or settings.default_tenant_id}
 
 
-# ---------- Health Probes ----------
+# ---------- Health Probes (Supports GET and HEAD for Cloud Health Checks) ----------
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"status": "ok", "service": settings.app_name, "docs": "/docs"}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "ok", "service": settings.app_name}
 
-@app.get("/health/ready")
+@app.api_route("/health/ready", methods=["GET", "HEAD"])
 async def health_ready():
     return {"status": "ok", "ready": True}
 
-@app.get("/health/live")
+@app.api_route("/health/live", methods=["GET", "HEAD"])
 async def health_live():
     return {"status": "ok", "live": True}
 

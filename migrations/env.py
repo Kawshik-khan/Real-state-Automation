@@ -26,8 +26,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Normalise DATABASE_URL for Alembic (sync driver vs asyncpg)
-_raw_url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or ""
+_raw_url = (os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or "").strip()
 _sync_url = re.sub(r"\+asyncpg", "", _raw_url)
+_sync_url = re.sub(r"^postgres://", "postgresql://", _sync_url)
 config.set_main_option("sqlalchemy.url", _sync_url)
 
 target_metadata = Base.metadata

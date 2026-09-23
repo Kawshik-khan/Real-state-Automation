@@ -56,8 +56,9 @@ class Settings(BaseSettings):
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
-    n8n_email_webhook_url: Optional[str] = "http://localhost:5678/webhook/email-send"
-    n8n_api_url: str = "http://localhost:5678/api/v1"
+    n8n_email_webhook_url: Optional[str] = "https://glg-ai.app.n8n.cloud/webhook/glg-email-webhook"
+    n8n_api_url: str = "https://glg-ai.app.n8n.cloud/api/v1"
+    n8n_webhook_base_url: Optional[str] = "https://glg-ai.app.n8n.cloud"
     n8n_api_key: Optional[str] = None
     default_slack_channel: str = "#leads"
     default_telegram_chat_id: Optional[str] = None
@@ -75,6 +76,16 @@ class Settings(BaseSettings):
     # Gmail SMTP / IMAP Settings
     gmail_user_email: Optional[str] = None
     gmail_app_password: Optional[str] = None
+
+    @property
+    def async_database_url(self) -> str:
+        """Ensure database_url has explicit async driver (postgresql+asyncpg://) for SQLAlchemy async engine."""
+        url = (self.database_url or "").strip()
+        if url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + url[len("postgres://"):]
+        if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            return "postgresql+asyncpg://" + url[len("postgresql://"):]
+        return url
 
     @property
     def allowed_origins(self) -> list[str]:

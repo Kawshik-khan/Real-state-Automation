@@ -7,11 +7,14 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: APP_NAME
         value: GLG Assets Automation API
       - key: DEBUG
         value: "false"
+      - key: CORS_ORIGINS
+        value: "*"
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
@@ -40,6 +43,12 @@ services:
         value: real-state-automation
       - key: PINECONE_HOST
         value: https://real-state-automation-o25ptb6.svc.aped-4627-b74a.pinecone.io
+      - key: N8N_API_URL
+        value: https://glg-ai.app.n8n.cloud/api/v1
+      - key: N8N_EMAIL_WEBHOOK_URL
+        value: https://glg-ai.app.n8n.cloud/webhook/glg-email-webhook
+      - key: N8N_WEBHOOK_BASE_URL
+        value: https://glg-ai.app.n8n.cloud
 
   # ── React Frontend Static Site ──
   - type: web
@@ -54,3 +63,8 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://glg-realestate-backend.onrender.com
+      - key: VITE_AUTOMATION_SECRET
+        sync: false

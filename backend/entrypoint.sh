@@ -29,7 +29,7 @@ WORKERS="${WEB_CONCURRENCY:-2}"
 echo "[entrypoint] Workers: ${WORKERS}"
 
 # Step 3: Launch Uvicorn FastAPI Production App
-echo "[entrypoint] Launching FastAPI backend server on 0.0.0.0:8000..."
+echo "[entrypoint] Launching FastAPI backend server on 0.0.0.0:${PORT:-8000}..."
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port "${PORT:-8000}" \

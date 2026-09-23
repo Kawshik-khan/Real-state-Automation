@@ -50,6 +50,11 @@ backend/scripts/test_supabase_rest_vector.py
 /test_*.py
 !backend/tests/
 
+# Archive & Local Debris
+archive/
+pytest-cache*
+pytest-cache-files*
+
 # Python Caches, Coverage & Test Outputs
 __pycache__/
 *.py[cod]

@@ -29,8 +29,18 @@ export const getApiBaseUrl = () => {
     return resolveDynamicHost(raw);
   }
 
-  // 2. Browser dynamic detection
+  // 2. Runtime global or storage override (allows dynamic cloud configuration)
   if (typeof window !== 'undefined') {
+    if (window.__GLG_API_BASE_URL__) {
+      return window.__GLG_API_BASE_URL__.replace(/\/+$/, '');
+    }
+    try {
+      const stored = localStorage.getItem('glg_api_base_url');
+      if (stored) return stored.replace(/\/+$/, '');
+    } catch {
+      // Ignore storage access errors
+    }
+
     const { protocol, hostname, port } = window.location;
     const isHttps = protocol === 'https:';
     const httpProto = isHttps ? 'https:' : 'http:';
@@ -52,6 +62,16 @@ export const getApiBaseUrl = () => {
         return '';
       }
       return `${httpProto}//${hostname}:${backendPort}`;
+    }
+
+    // Auto-detect Render hosting convention:
+    // If frontend is deployed on `xxx-frontend.onrender.com`, default backend is `https://xxx-backend.onrender.com`
+    // Or if hostname ends with `.onrender.com`, fallback to default production backend `https://glg-realestate-backend.onrender.com`
+    if (hostname.endsWith('.onrender.com')) {
+      if (hostname.includes('-frontend.')) {
+        return `https://${hostname.replace('-frontend.', '-backend.')}`;
+      }
+      return 'https://glg-realestate-backend.onrender.com';
     }
 
     // In production or when co-located behind reverse proxy
@@ -125,6 +145,11 @@ export function getBackendCandidates(path = '') {
         candidates.push(`${httpProto}//localhost:${backendPort}${cleanPath}`);
       }
     }
+
+    // Render candidate fallback
+    if (hostname.endsWith('.onrender.com')) {
+      candidates.push(`https://glg-realestate-backend.onrender.com${cleanPath}`);
+    }
   }
 
   // Deduplicate and filter empty
@@ -166,6 +191,12 @@ export async function resilientFetch(path, options = {}) {
     try {
       const resp = await fetch(url, options);
       if (resp) {
+        // If an API request returned HTML (static SPA rewrite fallback), discard and try next candidate
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('text/html') && !cleanPath.endsWith('.html') && !cleanPath.endsWith('.svg')) {
+          lastErr = new Error(`Endpoint ${url} returned HTML fallback instead of API response.`);
+          continue;
+        }
         return resp;
       }
     } catch (err) {

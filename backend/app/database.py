@@ -16,14 +16,14 @@ from app.models.models import Base
 
 # Enhanced engine parameters for Supabase Transaction Pooler (Port 6543 / 5432)
 engine = create_async_engine(
-    settings.database_url,
+    settings.async_database_url,
     echo=settings.debug,
     future=True,
     pool_size=10,
     max_overflow=20,
     pool_recycle=300,
     pool_pre_ping=True,
-    connect_args={"timeout": 3, "command_timeout": 5} if "postgresql" in settings.database_url else {}
+    connect_args={"timeout": 3, "command_timeout": 5} if "postgresql" in settings.async_database_url else {}
 )
 
 async_session_factory = async_sessionmaker(
@@ -51,7 +51,7 @@ def is_db_reachable(timeout: float = 0.3) -> bool:
     if now - _db_status["checked_at"] < 15.0 and _db_status["reachable"] is not None:
         return _db_status["reachable"]
     try:
-        clean = settings.database_url.replace("postgresql+asyncpg://", "http://").replace("postgresql://", "http://")
+        clean = settings.async_database_url.replace("postgresql+asyncpg://", "http://").replace("postgresql://", "http://")
         p = urlparse(clean)
         host = p.hostname or "localhost"
         port = p.port or 5432
