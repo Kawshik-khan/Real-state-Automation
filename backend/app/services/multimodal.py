@@ -64,27 +64,43 @@ class MultimodalService:
         if not audio_bytes:
             return ""
 
-        # Determine MIME type based on file extension
-        ext = filename.lower().split(".")[-1]
-        mime_map = {
-            "ogg": "audio/ogg",
-            "oga": "audio/ogg",
-            "mp3": "audio/mpeg",
-            "wav": "audio/wav",
-            "m4a": "audio/mp4",
-            "webm": "audio/webm",
-        }
-        content_type = mime_map.get(ext, "audio/ogg")
+        # Normalize extension and MIME type to Whisper-compatible formats:
+        # Supported: [flac, mp3, mp4, mpeg, mpga, m4a, ogg, opus, wav, webm]
+        # Telegram voice notes arrive as 'voice/file_xxx.oga' which must be presented as .ogg
+        raw_ext = filename.lower().split(".")[-1] if "." in filename else "ogg"
+        if raw_ext in ["oga", "ogg", "opus"]:
+            clean_ext = "ogg"
+            content_type = "audio/ogg"
+        elif raw_ext in ["m4a", "mp4", "aac"]:
+            clean_ext = "m4a"
+            content_type = "audio/mp4"
+        elif raw_ext in ["mp3", "mpeg", "mpga"]:
+            clean_ext = "mp3"
+            content_type = "audio/mpeg"
+        elif raw_ext in ["wav"]:
+            clean_ext = "wav"
+            content_type = "audio/wav"
+        elif raw_ext in ["webm"]:
+            clean_ext = "webm"
+            content_type = "audio/webm"
+        elif raw_ext in ["flac"]:
+            clean_ext = "flac"
+            content_type = "audio/flac"
+        else:
+            clean_ext = "ogg"
+            content_type = "audio/ogg"
+
+        clean_filename = f"voice.{clean_ext}"
 
         target_model = self.whisper_model
         logger.info(
-            f"Transcribing audio ({len(audio_bytes)} bytes, format: {content_type}) using {target_model}..."
+            f"Transcribing audio ({len(audio_bytes)} bytes, format: {clean_filename}/{content_type}) using {target_model}..."
         )
 
         try:
             kwargs = {
                 "model": target_model,
-                "file": (filename, audio_bytes, content_type),
+                "file": (clean_filename, audio_bytes, content_type),
                 "response_format": "text",
             }
             if language:
@@ -102,7 +118,7 @@ class MultimodalService:
                     logger.info("Retrying transcription with whisper-large-v3-turbo...")
                     resp = await client.audio.transcriptions.create(
                         model="whisper-large-v3-turbo",
-                        file=(filename, audio_bytes, content_type),
+                        file=(clean_filename, audio_bytes, content_type),
                         response_format="text",
                     )
                     return str(resp).strip()
