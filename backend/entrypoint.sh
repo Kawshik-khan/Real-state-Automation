@@ -5,7 +5,7 @@ set -e
 export PYTHONPATH="/app:${PYTHONPATH:-}"
 
 # Suppress known upstream LangChain/LangGraph deprecation warnings before Python interpreter initializes
-export PYTHONWARNINGS="ignore:The default value of ,ignore::DeprecationWarning,${PYTHONWARNINGS:-}"
+export PYTHONWARNINGS="ignore"
 
 echo "====================================================="
 echo "  GLG Assets Social AI OS — Container Entrypoint"
@@ -33,7 +33,7 @@ echo "[entrypoint] Workers: ${WORKERS}"
 
 # Step 3: Launch Uvicorn FastAPI Production App
 echo "[entrypoint] Launching FastAPI backend server on 0.0.0.0:${PORT:-8000}..."
-exec uvicorn app.main:app \
+exec python -W ignore -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port "${PORT:-8000}" \
     --workers "${WORKERS}" \
