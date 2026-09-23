@@ -91,5 +91,42 @@ class TelegramService:
         except Exception as err:
             return {"success": False, "error": str(err)}
 
+    async def send_chat_action(self, chat_id: str | int, action: str = "typing") -> dict:
+        """Broadcast user status indicator (typing, upload_photo, record_voice)."""
+        if not self.is_configured():
+            return {"success": False, "error": "TELEGRAM_BOT_TOKEN missing"}
+
+        url = f"{self.base_url}/sendChatAction"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(url, json={"chat_id": chat_id, "action": action})
+                return resp.json()
+        except Exception as err:
+            return {"success": False, "error": str(err)}
+
+    async def download_file_bytes(self, file_id: str) -> tuple[bytes, str]:
+        """Download binary file bytes (voice note, photo, document) from Telegram.
+        
+        Returns (content_bytes, file_path).
+        """
+        if not self.is_configured():
+            return b"", ""
+
+        get_file_url = f"{self.base_url}/getFile?file_id={file_id}"
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(get_file_url)
+                data = resp.json()
+                if not data.get("ok"):
+                    return b"", ""
+
+                file_path = data["result"]["file_path"]
+                download_url = f"https://api.telegram.org/file/bot{self.bot_token}/{file_path}"
+                file_resp = await client.get(download_url)
+                return file_resp.content, file_path
+        except Exception as err:
+            print(f"[TelegramService] Error downloading file {file_id}: {err}")
+            return b"", ""
+
 
 telegram_service = TelegramService()

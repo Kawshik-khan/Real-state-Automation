@@ -35,6 +35,10 @@ services:
         value: https://api.groq.com/openai/v1
       - key: OPENAI_EMBEDDING_MODEL
         value: text-embedding-3-large
+      - key: WHISPER_MODEL
+        value: whisper-large-v3
+      - key: VISION_MODEL
+        value: llama-3.2-11b-vision-preview
       - key: VECTOR_DIM
         value: "1024"
       - key: VECTOR_STORE_PROVIDER

@@ -346,16 +346,75 @@ async def telegram_webhook(request: Request, body: dict):
     """Processes incoming Telegram updates, executes RAG + AI graph pipeline, and sends reply."""
     from app.api.v1.ai.endpoints import ai_chat
     from app.schemas.chat import ChatRequest
+    from app.services.multimodal import multimodal_service
 
     message = body.get("message") or body.get("edited_message") or {}
     chat = message.get("chat") or {}
     chat_id = chat.get("id")
-    text = message.get("text", "").strip()
 
-    if not chat_id or not text:
+    if not chat_id:
+        return {"ok": True, "status": "ignored"}
+
+    text = ""
+    media_type = "text"
+
+    # 1. Handle Voice Note / Audio Message
+    if "voice" in message or "audio" in message:
+        media_type = "voice"
+        audio_info = message.get("voice") or message.get("audio") or {}
+        file_id = audio_info.get("file_id")
+        if file_id:
+            await telegram_service.send_chat_action(chat_id, "record_voice")
+            audio_bytes, path = await telegram_service.download_file_bytes(file_id)
+            if audio_bytes:
+                transcript = await multimodal_service.transcribe_audio(
+                    audio_bytes,
+                    filename=path or "voice.ogg",
+                )
+                if transcript:
+                    text = transcript
+                else:
+                    await telegram_service.send_message(
+                        chat_id=chat_id,
+                        text="I received your voice note, but couldn't transcribe it clearly. Could you please send it again or type your message?",
+                    )
+                    return {"ok": True, "status": "transcription_empty"}
+
+    # 2. Handle Photo / Architectural Floor Plan
+    elif "photo" in message or (message.get("document", {}).get("mime_type", "").startswith("image/")):
+        media_type = "image"
+        caption = message.get("caption", "").strip()
+        photos = message.get("photo") or []
+        file_id = photos[-1].get("file_id") if photos else message.get("document", {}).get("file_id")
+
+        if file_id:
+            await telegram_service.send_chat_action(chat_id, "upload_photo")
+            img_bytes, path = await telegram_service.download_file_bytes(file_id)
+            if img_bytes:
+                ext = path.split(".")[-1].lower() if "." in path else "jpeg"
+                mime = f"image/{ext}" if ext in ["jpeg", "jpg", "png", "webp"] else "image/jpeg"
+                analysis = await multimodal_service.analyze_image(
+                    img_bytes,
+                    caption=caption,
+                    mime_type=mime,
+                )
+                if analysis:
+                    text = (
+                        f"[Customer uploaded property photo / floor plan. Visual Analysis: {analysis}]\n"
+                        f"Customer inquiry: {caption or 'Please provide details, pricing, and availability for this unit.'}"
+                    )
+                elif caption:
+                    text = caption
+
+    # 3. Handle Standard Text Message
+    if not text:
+        text = message.get("text", "").strip()
+
+    if not text:
         return {"ok": True, "status": "ignored"}
 
     conv_id = f"tg_{chat_id}"
+    await telegram_service.send_chat_action(chat_id, "typing")
 
     try:
         chat_req = ChatRequest(
@@ -375,6 +434,7 @@ async def telegram_webhook(request: Request, body: dict):
     return {
         "ok": True,
         "chat_id": chat_id,
+        "media_type": media_type,
         "incoming_text": text,
         "reply": reply_text,
     }

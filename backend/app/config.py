@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-large"
     openai_base_url: Optional[str] = None
 
+    # Multimodal: Audio Transcription & Vision
+    whisper_model: str = "whisper-large-v3"
+    vision_model: str = "llama-3.2-11b-vision-preview"
+
     # LangSmith Observability & Tracing
     langsmith_tracing: bool = False
     langsmith_endpoint: str = "https://api.smith.langchain.com"

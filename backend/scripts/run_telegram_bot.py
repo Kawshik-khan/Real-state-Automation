@@ -20,6 +20,7 @@ load_dotenv(backend_dir / ".env")
 
 from app.agents.graph import ai_graph  # noqa: E402
 from app.agents.state import AIState  # noqa: E402
+from app.services.multimodal import multimodal_service  # noqa: E402
 from app.services.telegram import telegram_service  # noqa: E402
 
 logging.basicConfig(
@@ -52,20 +53,66 @@ async def process_update(client: httpx.AsyncClient, update: dict) -> int:
     msg = update.get("message") or update.get("edited_message") or {}
     chat = msg.get("chat", {})
     chat_id = chat.get("id")
-    text = msg.get("text", "").strip()
     sender = msg.get("from", {})
     username = sender.get("username", sender.get("first_name", "Unknown"))
 
-    if not chat_id or not text:
+    if not chat_id:
         return update_id + 1
 
-    logger.info(f"Incoming message from @{username} (chat_id: {chat_id}): '{text}'")
+    text = ""
 
-    # Send typing indicator
-    try:
-        await client.post(f"{base_url}/sendChatAction", json={"chat_id": chat_id, "action": "typing"}, timeout=5.0)
-    except Exception:
-        pass
+    # 1. Voice Note / Audio Message
+    if "voice" in msg or "audio" in msg:
+        audio_info = msg.get("voice") or msg.get("audio") or {}
+        file_id = audio_info.get("file_id")
+        logger.info(f"Received voice note from @{username} (chat_id: {chat_id}). Downloading and transcribing...")
+        await telegram_service.send_chat_action(chat_id, "record_voice")
+
+        if file_id:
+            audio_bytes, path = await telegram_service.download_file_bytes(file_id)
+            if audio_bytes:
+                text = await multimodal_service.transcribe_audio(audio_bytes, filename=path or "voice.ogg")
+                if text:
+                    logger.info(f"Transcribed voice from @{username}: '{text}'")
+                else:
+                    await telegram_service.send_message(
+                        chat_id=chat_id,
+                        text="I received your voice note, but couldn't transcribe it clearly. Could you please send it again or type your message?",
+                    )
+                    return update_id + 1
+
+    # 2. Photo / Floor Plan Image
+    elif "photo" in msg or (msg.get("document", {}).get("mime_type", "").startswith("image/")):
+        photos = msg.get("photo") or []
+        file_id = photos[-1].get("file_id") if photos else msg.get("document", {}).get("file_id")
+        caption = msg.get("caption", "").strip()
+        logger.info(f"Received photo/floor plan from @{username} (chat_id: {chat_id}). Analyzing via Vision AI...")
+        await telegram_service.send_chat_action(chat_id, "upload_photo")
+
+        if file_id:
+            img_bytes, path = await telegram_service.download_file_bytes(file_id)
+            if img_bytes:
+                ext = path.split(".")[-1].lower() if "." in path else "jpeg"
+                mime = f"image/{ext}" if ext in ["jpeg", "jpg", "png", "webp"] else "image/jpeg"
+                analysis = await multimodal_service.analyze_image(img_bytes, caption=caption, mime_type=mime)
+                if analysis:
+                    logger.info(f"Visual analysis complete for @{username}: '{analysis[:80]}...'")
+                    text = (
+                        f"[Customer uploaded property photo / floor plan. Visual Analysis: {analysis}]\n"
+                        f"Customer inquiry: {caption or 'Please provide details, pricing, and availability for this unit.'}"
+                    )
+                elif caption:
+                    text = caption
+
+    # 3. Standard Text
+    if not text:
+        text = msg.get("text", "").strip()
+
+    if not text:
+        return update_id + 1
+
+    logger.info(f"Processing inquiry from @{username} (chat_id: {chat_id}): '{text[:80]}...'")
+    await telegram_service.send_chat_action(chat_id, "typing")
 
     # Process through LangGraph
     state = AIState(
