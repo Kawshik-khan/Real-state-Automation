@@ -11,16 +11,13 @@ Verifies all 10 critical audit findings:
 """
 
 import asyncio
-import pytest
-from app.repositories.property_repository import property_repository, CANONICAL_PROPERTIES
-from app.repositories.policy_repository import policy_repository
-from app.repositories.contact_repository import contact_repository
-from app.services.grounding_validator import grounding_validator
-from app.agents.property_agent import property_agent
-from app.agents.faq_agent import faq_agent
+
 from app.agents.email_agent import email_agent
-from app.agents.social_bridge_agent import social_bridge_agent
-from app.utils.language import detect_language, is_english_query
+from app.repositories.contact_repository import contact_repository
+from app.repositories.policy_repository import policy_repository
+from app.repositories.property_repository import property_repository
+from app.services.grounding_validator import grounding_validator
+from app.utils.language import detect_language
 
 
 class TestP0ForeignArtifactPurge:
@@ -51,6 +48,9 @@ class TestP0ForeignArtifactPurge:
         assert "+91" not in cfg["hotline"]
         assert "+880" in cfg["primary_phone"]
         assert "Dhaka" in cfg["head_office"]["formatted_en"]
+        assert "House # 12" in cfg["head_office"]["formatted_en"]
+        assert "1212" in cfg["head_office"]["formatted_en"]
+        assert "013178610" in cfg["hotline"] or "013178610" in cfg["primary_phone"]
 
 
 class TestPricingIntegrityAndCanonicalSource:

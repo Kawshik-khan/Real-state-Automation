@@ -123,8 +123,7 @@ def _ensure_interactive_cta(text: str, is_english: bool, is_banglish: bool) -> s
             "📌 *Next Steps for You*:\n"
             "1️⃣ Which location do you prefer? (Gulshan, Banani, or Baridhara?)\n"
             "2️⃣ What bedroom configuration do you need? (2 Bed, 3 Bed, or 4 Bed?)\n\n"
-            "👉 *Simply reply with your preferred area or bedroom count, and I will share the detailed brochure and floor plans!*\n"
-            "📞 Direct Hotline: +880-9612-888-999 | WhatsApp: +880-1700-777-666"
+            "👉 *Simply reply with your preferred area or bedroom count, and I will share the detailed brochure and floor plans!*"
         )
     elif is_banglish:
         hook = (
@@ -132,8 +131,7 @@ def _ensure_interactive_cta(text: str, is_english: bool, is_banglish: bool) -> s
             "📌 *Apnar subidharte poroborti podokkhep*:\n"
             "1️⃣ Apnar pochonder location konti? (Gulshan, Banani, naki Baridhara?)\n"
             "2️⃣ Apnar koto bedroom er flat proyojon? (2 Bed, 3 Bed, naki 4 Bed?)\n\n"
-            "👉 *Shudhu elaka ba bedroom likhe reply din, ami apnake bistatito brochure o floor plan pathacchi!*\n"
-            "📞 Sorasori kotha bolte hotline: +880-9612-888-999 | WhatsApp: +880-1700-777-666"
+            "👉 *Shudhu elaka ba bedroom likhe reply din, ami apnake bistatito brochure o floor plan pathacchi!*"
         )
     else:
         hook = (
@@ -141,13 +139,19 @@ def _ensure_interactive_cta(text: str, is_english: bool, is_banglish: bool) -> s
             "📌 *আপনার সুবিধার্থে পরবর্তী পদক্ষেপ*:\n"
             "১️⃣ আপনার পছন্দের লোকেশন কোনটি? (Gulshan, Banani, নাকি Baridhara?)\n"
             "২️⃣ আপনার কত বেডরুমের ফ্ল্যাট প্রয়োজন? (2 Bed, 3 Bed, নাকি 4 Bed?)\n\n"
-            "👉 *শুধু এলাকা বা বেডরুম লিখে রিপ্লাই দিন, আমি আপনাকে বিস্তারিত ব্রোশার ও ফ্লোর প্ল্যান পাঠাচ্ছি!*\n"
-            "📞 সরাসরি কথা বলতে হটলাইন: +880-9612-888-999 | WhatsApp: +880-1700-777-666"
+            "👉 *শুধু এলাকা বা বেডরুম লিখে রিপ্লাই দিন, আমি আপনাকে বিস্তারিত ব্রোশার ও ফ্লোর প্ল্যান পাঠাচ্ছি!*"
         )
     return text.strip() + hook
 
 
-def _sanitize_and_format_reply(text: str, is_english: bool, is_banglish: bool, has_multi: bool) -> str:
+def _sanitize_and_format_reply(
+    text: str,
+    is_english: bool,
+    is_banglish: bool,
+    has_multi: bool,
+    wants_contact: bool = False,
+    is_unsolvable: bool = False,
+) -> str:
     """Cleans up raw LLM responses to conform strictly with Template 1 standards."""
     # 1. Strip meta tags like (Banglish), [Banglish], (Bangla), (English)
     cleaned = re.sub(r"\s*[\(\[]\s*Banglish\s*[\)\]]", "", text, flags=re.IGNORECASE)
@@ -155,19 +159,30 @@ def _sanitize_and_format_reply(text: str, is_english: bool, is_banglish: bool, h
     cleaned = re.sub(r"\s*[\(\[]\s*English\s*[\)\]]", "", cleaned, flags=re.IGNORECASE)
 
     # 2. Fix any placeholder telephone numbers
-    cleaned = re.sub(r"\+880\s*2\s*x{3,}[-\s]*x{3,}", "+880-9612-888-999", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\+880\s*1\s*x{3,}[-\s]*x{3,}", "+880-1700-777-666", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"017xxxxxxxx", "+880-1700-777-666", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\+880\s*2\s*x{3,}[-\s]*x{3,}", "+880-13178610", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\+880\s*1\s*x{3,}[-\s]*x{3,}", "+880-13178610", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"017xxxxxxxx", "013178610", cleaned, flags=re.IGNORECASE)
 
-    # 3. Convert markdown tables to cards if any table slipped through
+    # 3. Intent & Escalation contact filter:
+    # If customer did NOT ask for contact and this is NOT an unsolvable issue,
+    # strip premature hotline footer dumps from routine property recommendations.
+    if not wants_contact and not is_unsolvable:
+        cleaned = re.sub(
+            r"(\n*\s*📞\s*(?:Direct Hotline|Hotline|হটলাইন|Sorasori kotha bolte hotline|Sorasori|Call)[^\n]*)",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+
+    # 4. Convert markdown tables to cards if any table slipped through
     if "|" in cleaned and "---" in cleaned:
         cleaned = _convert_markdown_table_to_cards(cleaned, is_english=is_english, is_banglish=is_banglish)
 
-    # 4. Attach interactive CTA hook for multi-project/running project inquiries
+    # 5. Attach interactive CTA hook for multi-project/running project inquiries
     if has_multi:
         cleaned = _ensure_interactive_cta(cleaned, is_english=is_english, is_banglish=is_banglish)
 
-    return cleaned
+    return cleaned.strip()
 
 
 class PropertyAgent:
@@ -177,6 +192,9 @@ class PropertyAgent:
         """Process a property query by synthesizing canonical repository records with RAG context."""
         entities = entities or {}
         location = entities.get("location")
+        if not location:
+            from app.services.location_service import location_service
+            location = await location_service.resolve_location_from_text(message)
 
         # 1. Detect customer language
         lang_info = detect_language(message)
@@ -200,6 +218,13 @@ class PropertyAgent:
         # If no projects matched specific query, fetch relevant canonical records for context
         if not projects:
             projects = property_repository.to_legacy_dict_format()
+
+        # Check if customer explicitly inquired about contact info or sales assistance
+        wants_contact = any(kw in message.lower() for kw in [
+            "contact", "phone", "number", "hotline", "helpline", "jogajog", "kotha bolte",
+            "call", "office", "address", "thikana", "sales team", "sales rep", "agent"
+        ])
+        is_unsolvable = is_unsupported_location
 
         # Check if query requests multi-project list or overview
         is_multi_project_query = (
@@ -237,8 +262,8 @@ class PropertyAgent:
                 f"--- NOTICE: CUSTOMER INQUIRY LOCATION OUT OF PORTFOLIO ---\n"
                 f"The customer is inquiring about: '{searched_loc}'.\n"
                 f"GLG Assets Limited DOES NOT currently have any ongoing or completed projects in '{searched_loc}'.\n"
-                f"You MUST explicitly and politely inform the customer that GLG Assets has no ongoing projects in {searched_loc}.\n"
-                f"You may mention our active luxury portfolio in Gulshan, Banani, Baridhara, and Uttara if helpful.\n"
+                f"You MUST inform the customer that GLG Assets has no ongoing projects in {searched_loc}. "
+                f"Since this cannot be resolved from records, provide our sales hotline (013178610 / +880-13178610) if they wish to inquire about custom projects.\n"
                 f"NEVER claim or imply that any project listed below is located in {searched_loc}.\n\n"
             )
 
@@ -271,13 +296,13 @@ class PropertyAgent:
                     raw_reply = (
                         f"Thank you for contacting GLG Assets. Currently, we do not have any ongoing projects in {searched_loc.title()}. "
                         f"Our primary luxury developments are located in Gulshan, Banani, Baridhara, and Uttara. "
-                        f"Please contact our sales advisory desk if you would like details on our available developments."
+                        f"For upcoming developments or custom inquiries, please contact our sales advisory team: 📞 013178610 | +880-13178610."
                     )
                 else:
                     raw_reply = (
                         f"GLG Assets-এ যোগাযোগ করার জন্য ধন্যবাদ। বর্তমানে {searched_loc}-এ আমাদের কোনো চলমান প্রকল্প নেই। "
                         f"আমাদের সক্রিয় প্রিমিয়াম প্রকল্পগুলো মূলত গুলশান, বনানী, বারিধারা ও উত্তরায় অবস্থিত। "
-                        f"আমাদের বিদ্যমান প্রজেক্টসমূহ সম্পর্কে জানতে আমাদের সেলস টিমের সাথে যোগাযোগ করার অনুরোধ করছি।"
+                        f"আসন্ন প্রজেক্ট বা কাস্টম চাহিদার জন্য আমাদের সেলস টিমের সাথে যোগাযোগ করার অনুরোধ করছি: 📞 013178610 | +880-13178610।"
                     )
             elif any(retail_kw in message.lower() for retail_kw in ["jacket", "shirt", "pant", "chocolate", "kitkat", "candy", "phone", "food", "shoe"]):
                 if is_english:
@@ -339,12 +364,12 @@ class PropertyAgent:
                 if is_english:
                     raw_reply = (
                         "We apologize, but we are currently experiencing a brief delay retrieving property specifications. "
-                        "Please connect directly with our sales advisory team for immediate assistance."
+                        "Please connect directly with our sales advisory team for immediate assistance: 📞 013178610 | +880-13178610."
                     )
                 else:
                     raw_reply = (
                         "আমি আন্তরিকভাবে দুঃখিত, এই মুহূর্তে প্রপার্টি সংক্রান্ত তথ্য পেতে সাময়িক বিলম্ব হচ্ছে। "
-                        "অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সরাসরি আমাদের সেলস টিমের সাথে যোগাযোগ করুন।"
+                        "সরাসরি তথ্যের জন্য আমাদের সেলস টিমের সাথে যোগাযোগ করার অনুরোধ করছি: 📞 013178610 | +880-13178610।"
                     )
 
         # 6. Apply Template 1 Sanitization and Formatting (strips tables, tags, placeholder numbers)
@@ -353,7 +378,14 @@ class PropertyAgent:
             is_english=is_english,
             is_banglish=is_banglish,
             has_multi=is_multi_project_query,
+            wants_contact=wants_contact,
+            is_unsolvable=is_unsolvable,
         )
+
+        # If user explicitly asked for contact info and it's missing from the reply, append official contact card
+        if wants_contact and not any(p in formatted_reply for p in ["+880", "Hotline", "Helpline"]):
+            title = "Official Contact" if is_english else "অফিসিয়াল যোগাযোগ"
+            formatted_reply += f"\n\n📋 *{title}*:\n{contact_card}"
 
         # 7. Pre-Send Grounding Validation
         validation = grounding_validator.validate(

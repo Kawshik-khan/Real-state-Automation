@@ -27,6 +27,7 @@ DEFAULT_LOCATIONS = [
     "Bashundhara",
     "Mohakhali DOHS",
     "Mirpur DOHS",
+    "Mirpur",
 ]
 
 class DynamicLocationService:

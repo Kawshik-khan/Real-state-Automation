@@ -59,3 +59,4 @@ When editing or creating files in this workspace, all agents must adhere to:
 2. **Design System Adherence**: Always enforce the **Warm Executive Modernism** aesthetic. Never use generic browser default components, plain unstyled buttons, or unharmonized color schemes.
 3. **No Mock or Fake Completion**: Code must be genuinely wired to active services, database tables, or robust fallback adapters.
 4. **Verification Gate**: Any frontend change must compile cleanly via `npm run build`. Any backend change must pass Python syntax and service unit tests.
+5. **No Automatic Git Commits**: Never perform automatic `git commit` or `git push` operations after making changes. All modifications must remain uncommitted in the working tree for developer review and validation, unless the user explicitly instructs to commit.

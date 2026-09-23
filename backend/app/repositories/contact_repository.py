@@ -7,19 +7,19 @@ from typing import Any, Dict
 
 OFFICIAL_CONTACT_CONFIG: Dict[str, Any] = {
     "company_name": "GLG Assets Limited",
-    "primary_phone": "+880-9612-888-999",
-    "hotline": "+880-1700-GLG-ASSET",
-    "whatsapp_support": "+880-1700-777-666",
+    "primary_phone": "+880-13178610",
+    "hotline": "013178610",
+    "whatsapp_support": "+880-13178610",
     "sales_email": "sales@glgassets.com",
     "support_email": "concierge@glgassets.com",
     "head_office": {
-        "building": "GLG Tower, Level 11",
-        "road": "Road 11, Block D",
-        "area": "Banani",
-        "city": "Dhaka - 1213",
+        "building": "House # 12",
+        "road": "Rd 16/A",
+        "area": "Gulshan-1",
+        "city": "Dhaka - 1212",
         "country": "Bangladesh",
-        "formatted_en": "GLG Tower (Level 11), Road 11, Block D, Banani, Dhaka-1213, Bangladesh",
-        "formatted_bn": "জিএলজি টাওয়ার (লেভেল ১১), রোড ১১, ব্লক ডি, বনানী, ঢাকা-১২১৩, বাংলাদেশ",
+        "formatted_en": "House # 12, Rd 16/A, Gulshan-1, Dhaka 1212, Bangladesh",
+        "formatted_bn": "হাউজ # ১২, রোড ১৬/এ, গুলশান-১, ঢাকা ১২১২, বাংলাদেশ",
     },
     "operating_hours": {
         "days_en": "Saturday – Thursday",
@@ -29,7 +29,7 @@ OFFICIAL_CONTACT_CONFIG: Dict[str, Any] = {
         "friday_support": "By Prior Appointment / Digital Concierge Active",
     },
     "active": True,
-    "last_verified_at": "2026-09-01",
+    "last_verified_at": "2026-09-23",
 }
 
 
@@ -48,14 +48,14 @@ class ContactRepository:
         cfg = self._config
         if is_english:
             return (
-                f"📞 *Official Helpline*: {cfg['primary_phone']}\n"
+                f"📞 *Official Helpline*: {cfg['hotline']} ({cfg['primary_phone']})\n"
                 f"💬 *WhatsApp Support*: {cfg['whatsapp_support']}\n"
                 f"✉️ *Email*: {cfg['sales_email']}\n"
                 f"🏢 *Head Office*: {cfg['head_office']['formatted_en']}\n"
                 f"🕒 *Office Hours*: {cfg['operating_hours']['days_en']}, {cfg['operating_hours']['hours_en']}"
             )
         return (
-            f"📞 *অফিসিয়াল হেল্পলাইন*: {cfg['primary_phone']}\n"
+            f"📞 *অফিসিয়াল হেল্পলাইন*: {cfg['hotline']} ({cfg['primary_phone']})\n"
             f"💬 *হোয়াটসঅ্যাপ সাপোর্ট*: {cfg['whatsapp_support']}\n"
             f"✉️ *ইমেইল*: {cfg['sales_email']}\n"
             f"🏢 *হেড অফিস*: {cfg['head_office']['formatted_bn']}\n"
