@@ -8,8 +8,9 @@ generates executive AI insights, and renders responsive multi-channel formats:
 """
 
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, timezone
+from typing import Any, Dict
+
 from sqlalchemy import func, select
 
 from app.database import async_session_factory, is_db_reachable
@@ -17,9 +18,6 @@ from app.models.models import (
     AdCampaignRecord,
     BookingRecord,
     ConversationRecord,
-    KnowledgeDocumentRecord,
-    MessageRecord,
-    ProjectRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,14 +141,14 @@ class ReportBuilder:
         inquiries = metrics["total_inquiries"]
         res_rate = metrics["ai_resolution_rate"]
         visits = metrics["site_visits_booked"]
-        hot_leads = metrics["hot_leads_count"]
+        metrics["hot_leads_count"]
         top_channel = max(metrics["channels"], key=metrics["channels"].get).capitalize()
         pending_emails = metrics["manager_operations"]["pending_review_emails"]
 
         takeaways = [
             f"Frontline AI Assistant handled {inquiries} inquiries with an autonomous resolution rate of {res_rate}%.",
             f"Leading customer channel is {top_channel} ({metrics['channels'].get(top_channel.lower(), 0)} chats), driving {visits} confirmed site tour bookings.",
-            f"Identified {hot_leads} high-intent buyers (intent score ≥ 80) interested in Gulshan and Banani luxury residential units.",
+            f"Identified {metrics['hot_leads_count']} high-intent buyers (intent score ≥ 80) interested in Gulshan and Banani luxury residential units.",
         ]
 
         recommendations = [
@@ -182,7 +180,7 @@ class ReportBuilder:
         res_rate = metrics["ai_resolution_rate"]
         inquiries = metrics["total_inquiries"]
         site_visits = metrics["site_visits_booked"]
-        hot_leads = metrics["hot_leads_count"]
+        metrics["hot_leads_count"]
         pending_review = metrics["manager_operations"]["pending_review_emails"]
 
         channels_html = ""
@@ -324,7 +322,7 @@ class ReportBuilder:
         res_rate = metrics["ai_resolution_rate"]
         inquiries = metrics["total_inquiries"]
         site_visits = metrics["site_visits_booked"]
-        hot_leads = metrics["hot_leads_count"]
+        metrics["hot_leads_count"]
         pending_review = metrics["manager_operations"]["pending_review_emails"]
 
         text = (
@@ -335,7 +333,7 @@ class ReportBuilder:
             f"• 💬 *Total Inquiries:* {inquiries}\n"
             f"• 🤖 *AI Resolution Rate:* {res_rate}%\n"
             f"• 📅 *Site Tours Booked:* {site_visits}\n"
-            f"• 🔥 *Hot Leads (Score ≥ 80):* {hot_leads}\n"
+            f"• 🔥 *Hot Leads (Score ≥ 80):* {metrics['hot_leads_count']}\n"
             f"• ⏳ *Pending Manager Review:* {pending_review} emails\n\n"
             f"📍 *Channel Breakdown:*\n"
             f"• 🟢 WhatsApp: {metrics['channels'].get('whatsapp', 0)}\n"
