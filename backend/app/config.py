@@ -34,8 +34,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    # CORS — comma-separated allowed origins (no wildcard with credentials)
+    # CORS — comma-separated allowed origins or regex pattern
     cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    cors_origin_regex: Optional[str] = r"^https?://.*"
 
     # Defaults
     default_tenant_id: str = "glg-assets-main"
