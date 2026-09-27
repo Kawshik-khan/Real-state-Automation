@@ -14,7 +14,7 @@ import asyncio
 import logging
 import os
 import time
-import warnings
+
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
@@ -57,9 +57,7 @@ from app.dependencies import require_roles
 from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
-# Suppress all deprecation and runtime warnings globally
-warnings.simplefilter("ignore")
-warnings.filterwarnings("ignore")
+
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +72,12 @@ async def lifespan(app: FastAPI):
         if is_connected:
             await init_db()
             logger.info("[startup] Supabase/PostgreSQL schema initialized successfully (pgvector & tables verified).")
+            from app.core.token_store import token_store
+            from app.services.user_service import user_service
+            from app.services.integration_service import integration_service
+            await token_store.cleanup_expired_tokens()
+            await user_service.seed_default_users()
+            await integration_service.warm_cache()
         else:
             supa_health = supabase_db.check_health()
             if supa_health.get("configured"):

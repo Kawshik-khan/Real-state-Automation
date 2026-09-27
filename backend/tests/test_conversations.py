@@ -112,3 +112,84 @@ class TestConversationsEndpoints:
         data = response.json()
         assert data["success"] is True
         assert data["conversation_id"] == conv_id
+
+
+class TestConversationsQueryOptimization:
+    """Verifies that list_conversations executes a single query with zero secondary N+1 queries."""
+
+    def test_single_query_execution_and_message_mapping(self):
+        """Verify session.execute is called exactly once and handles both present and None messages."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from app.models.models import ConversationRecord, MessageRecord, UserRecord
+
+        now = datetime.now(timezone.utc)
+        conv1 = ConversationRecord(
+            conversation_id="conv_opt_1",
+            user_id="usr_1",
+            channel="whatsapp",
+            status="active",
+            ai_paused=False,
+            beliefs={"intent": "schedule_tour", "confidence": 0.95},
+            last_message_at=now,
+            created_at=now
+        )
+        usr1 = UserRecord(user_id="usr_1", name="Mahir Rahman", phone="+880 1819-112233")
+        msg1 = MessageRecord(
+            message_id="msg_opt_1",
+            conversation_id="conv_opt_1",
+            sender="user",
+            text="I want to visit Gulshan Heights.",
+            created_at=now
+        )
+
+        # Conversation 2 has NO messages (edge case: 0 messages)
+        conv2 = ConversationRecord(
+            conversation_id="conv_opt_2",
+            user_id="usr_2",
+            channel="website",
+            status="active",
+            ai_paused=False,
+            beliefs=None,
+            last_message_at=now,
+            created_at=now
+        )
+        usr2 = None  # edge case: unregistered user / null user join
+
+        mock_rows = [
+            (conv1, usr1, msg1),
+            (conv2, usr2, None),
+        ]
+
+        mock_result = MagicMock()
+        mock_result.all.return_value = mock_rows
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_context_manager = MagicMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.database.async_session_factory", return_value=mock_context_manager):
+            response = client.get("/api/v1/conversations?channel=all&status=all", headers=HEADERS)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+
+            # Verify EXACTLY ONE query was executed (0 secondary queries)
+            assert mock_session.execute.call_count == 1
+
+            convs = {c["id"]: c for c in data["conversations"]}
+            assert "conv_opt_1" in convs
+            assert convs["conv_opt_1"]["name"] == "Mahir Rahman"
+            assert convs["conv_opt_1"]["lastMessage"] == "I want to visit Gulshan Heights."
+            assert convs["conv_opt_1"]["intent"] == "schedule_tour"
+            assert convs["conv_opt_1"]["confidence"] == 0.95
+
+            assert "conv_opt_2" in convs
+            # Edge cases handled gracefully:
+            assert convs["conv_opt_2"]["name"] == "Prospective Buyer"  # null user fallback
+            assert convs["conv_opt_2"]["avatar"] == "C"
+            assert convs["conv_opt_2"]["lastMessage"] == "Inquiry initiated"  # null msg fallback
+

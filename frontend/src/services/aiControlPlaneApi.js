@@ -1,17 +1,9 @@
-import { resilientFetch, fetchWithAuth } from './api';
-
-const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || '3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8';
+import { resilientFetch, fetchWithAuth, getAuthHeaders as getBaseAuthHeaders } from './api';
 
 function getAuthHeaders(isJson = false) {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
-  };
+  const headers = getBaseAuthHeaders();
   if (isJson) {
     headers['Content-Type'] = 'application/json';
-  }
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }

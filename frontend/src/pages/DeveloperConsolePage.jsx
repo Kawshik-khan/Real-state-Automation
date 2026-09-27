@@ -38,8 +38,10 @@ import {
   CheckSquare,
   SlidersHorizontal,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  KeyRound
 } from 'lucide-react';
+import ServiceIntegrationsTab from '../components/developer/ServiceIntegrationsTab';
 import { 
   getDeveloperSystemHealth, 
   simulateDeveloperWebhook, 
@@ -959,7 +961,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         overflowX: 'auto'
       }}>
         {[
-          { id: 'engineering_summary', label: 'Engineering Summary & Health', icon: LayoutDashboard, count: '6 Modules', highlight: true },
+          { id: 'engineering_summary', label: 'Engineering Summary & Health', icon: LayoutDashboard, count: '7 Modules', highlight: true },
+          { id: 'service_integrations', label: 'Service Connections & Secrets', icon: KeyRound, count: '6 Services', highlight: true },
           { id: 'n8n_health', label: 'n8n Workflow Health', icon: Workflow, count: '6 Workflows', highlight: true },
           { 
             id: 'evals_benchmarks', 
@@ -1020,6 +1023,11 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           );
         })}
       </div>
+
+      {/* ── TAB: SERVICE CONNECTIONS & SECRETS VAULT (S-04) ── */}
+      {activeTab === 'service_integrations' && (
+        <ServiceIntegrationsTab />
+      )}
 
       {/* ── TAB 0: ENGINEERING SUMMARY & HEALTH HUB (PRIMARY PANEL) ── */}
       {activeTab === 'engineering_summary' && (
@@ -1625,6 +1633,15 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       latency: '148ms',
                       status: 'HEALTHY',
                       tabTarget: setActiveParentTab ? 'parent_n8n' : 'health_matrix'
+                    },
+                    {
+                      name: 'Service Connections & Secrets Vault',
+                      cat: 'Security & Auth',
+                      endpoint: '/api/v1/developer/integrations',
+                      tech: 'AES-256 Vault + Dynamic Reload',
+                      latency: '< 2ms',
+                      status: 'ACTIVE',
+                      tabTarget: 'service_integrations'
                     },
                     {
                       name: 'Pinecone Vector Search & RAG',

@@ -8,12 +8,22 @@ from app.config import settings
 
 
 class TelegramService:
-    def __init__(self):
-        self.bot_token = settings.telegram_bot_token
-        self.base_url = f"https://api.telegram.org/bot{self.bot_token}" if self.bot_token else None
+    @property
+    def bot_token(self) -> Optional[str]:
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("telegram")
+        if creds and creds.get("bot_token"):
+            return creds["bot_token"]
+        return settings.telegram_bot_token
+
+    @property
+    def base_url(self) -> Optional[str]:
+        token = self.bot_token
+        return f"https://api.telegram.org/bot{token}" if token else None
 
     def is_configured(self) -> bool:
-        return bool(self.bot_token and len(self.bot_token) > 10)
+        token = self.bot_token
+        return bool(token and len(token) > 10)
 
     async def send_message(
         self,

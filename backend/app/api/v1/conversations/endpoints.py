@@ -7,10 +7,11 @@ import logging
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
+from app.dependencies import require_automation_secret
 from app.services.event_broadcaster import broadcaster
 from app.services.telegram import telegram_service
 
@@ -18,20 +19,37 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Runtime conversation cache (hydrated from database on first API call)
-IN_MEMORY_CONVERSATIONS = []
+from typing import Any, Dict, List, Optional
+
+# Retain strong references to background asyncio tasks to prevent premature garbage collection
+_background_tasks = set()
+
+# S-08: Concurrency-safe in-memory cache keyed by conv_id for O(1) lookups
+_conversations_cache: Dict[str, dict] = {}
+_conversations_lock = asyncio.Lock()
+MAX_CACHE_SIZE = 200
+MAX_MESSAGES_PER_CONV = 100
+
+# Retain module-level list for backward compatibility with external references
+IN_MEMORY_CONVERSATIONS: List[dict] = []
+
+
+def _sync_in_memory_list():
+    """Keep legacy IN_MEMORY_CONVERSATIONS list synchronized with _conversations_cache."""
+    global IN_MEMORY_CONVERSATIONS
+    IN_MEMORY_CONVERSATIONS = list(_conversations_cache.values())
 
 
 def get_or_create_conversation(conv_id: str, channel: str = "website", name: str = None, phone: str = None):
-    """Retrieve existing or create new conversation in memory."""
-    for conv in IN_MEMORY_CONVERSATIONS:
-        if conv["id"] == conv_id:
-            if name and conv.get("name") in [None, "Prospective Buyer", f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}"]:
-                conv["name"] = name
-            if phone and conv.get("phone") in [None, "+880 1700-000000"]:
-                conv["phone"] = phone
-            return conv
-    
+    """Retrieve existing or create new conversation in memory cache in O(1) time."""
+    conv = _conversations_cache.get(conv_id)
+    if conv:
+        if name and conv.get("name") in [None, "Prospective Buyer", f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}"]:
+            conv["name"] = name
+        if phone and conv.get("phone") in [None, "+880 1700-000000"]:
+            conv["phone"] = phone
+        return conv
+
     new_conv = {
         "id": conv_id,
         "name": name or f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}",
@@ -46,14 +64,19 @@ def get_or_create_conversation(conv_id: str, channel: str = "website", name: str
         "beliefs": {},
         "messages": []
     }
-    IN_MEMORY_CONVERSATIONS.insert(0, new_conv)
+    _conversations_cache[conv_id] = new_conv
+    if len(_conversations_cache) > MAX_CACHE_SIZE:
+        oldest_key = next(iter(_conversations_cache))
+        _conversations_cache.pop(oldest_key, None)
+    _sync_in_memory_list()
     return new_conv
 
 
 async def async_get_or_create_conversation(conv_id: str, channel: str = "website", name: str = None, phone: str = None):
     """Retrieve existing conversation from memory cache or database, or create a new one."""
-    for conv in IN_MEMORY_CONVERSATIONS:
-        if conv["id"] == conv_id:
+    async with _conversations_lock:
+        conv = _conversations_cache.get(conv_id)
+        if conv:
             if name and conv.get("name") in [None, "Prospective Buyer", f"Lead {conv_id[-6:] if len(conv_id)>=6 else conv_id}"]:
                 conv["name"] = name
             if phone and conv.get("phone") in [None, "+880 1700-000000"]:
@@ -92,13 +115,19 @@ async def async_get_or_create_conversation(conv_id: str, channel: str = "website
                     "createdAt": db_c.created_at.isoformat() if db_c.created_at else None,
                     "messages": []
                 }
-                IN_MEMORY_CONVERSATIONS.insert(0, conv)
+                async with _conversations_lock:
+                    _conversations_cache[conv_id] = conv
+                    if len(_conversations_cache) > MAX_CACHE_SIZE:
+                        oldest_key = next(iter(_conversations_cache))
+                        _conversations_cache.pop(oldest_key, None)
+                    _sync_in_memory_list()
                 return conv
     except Exception as e:
-        logger.error(f"Error fetching conversation {conv_id} from DB: {e}")
+        logger.error(f"[S-15] Database error fetching conversation '{conv_id}', falling back to in-memory: {e}", exc_info=True)
 
     # Fallback to in-memory creation
-    return get_or_create_conversation(conv_id, channel, name, phone)
+    async with _conversations_lock:
+        return get_or_create_conversation(conv_id, channel, name, phone)
 
 
 async def _persist_message_to_db(
@@ -231,6 +260,8 @@ async def add_message_to_conversation(
         "createdAt": persisted_record.created_at.isoformat() if persisted_record and hasattr(persisted_record, "created_at") and persisted_record.created_at else now.isoformat()
     }
     conv["messages"].append(msg_obj)
+    if len(conv["messages"]) > MAX_MESSAGES_PER_CONV:
+        conv["messages"] = conv["messages"][-MAX_MESSAGES_PER_CONV:]
     conv["lastMessage"] = text
     conv["time"] = now_time
 
@@ -251,8 +282,10 @@ async def add_message_to_conversation(
             "reason": "AI confidence low or escalation requested"
         })
 
-    # Trigger background sync to n8n Google Sheets webhook
-    asyncio.create_task(_sync_lead_to_n8n_sheets(conv))
+    # Trigger background sync to n8n Google Sheets webhook with strong reference
+    sync_task = asyncio.create_task(_sync_lead_to_n8n_sheets(conv))
+    _background_tasks.add(sync_task)
+    sync_task.add_done_callback(_background_tasks.discard)
         
     return conv, msg_obj
 
@@ -277,8 +310,8 @@ async def _sync_lead_to_n8n_sheets(conv: dict):
                 "confidence": conv.get("confidence", 0.90),
                 "status": conv.get("status", "active")
             })
-    except Exception:
-        pass  # Non-blocking background sync
+    except Exception as e:
+        logger.debug(f"[S-15] Non-blocking background n8n sheet sync failed for lead {conv.get('id')}: {e}")
 
 
 @router.get("", summary="List active conversations")
@@ -287,7 +320,8 @@ async def list_conversations(
     limit: int = 50,
     offset: int = 0,
     channel: str = "all",
-    status: str = "all"
+    status: str = "all",
+    auth: dict = Depends(require_automation_secret),
 ):
     """Returns active customer conversations from database or cache."""
     try:
@@ -297,8 +331,18 @@ async def list_conversations(
         from app.models.models import ConversationRecord, MessageRecord, UserRecord
 
         async with async_session_factory() as session:
-            stmt = select(ConversationRecord, UserRecord).join(
-                UserRecord, ConversationRecord.user_id == UserRecord.user_id, isouter=True
+            # 1. Correlated scalar subquery for latest message text (indexed, 0 table scan)
+            latest_msg_subq = (
+                select(MessageRecord.text)
+                .where(MessageRecord.conversation_id == ConversationRecord.conversation_id)
+                .order_by(desc(MessageRecord.created_at))
+                .limit(1)
+                .scalar_subquery()
+            )
+
+            stmt = (
+                select(ConversationRecord, UserRecord, latest_msg_subq.label("last_message_text"))
+                .join(UserRecord, ConversationRecord.user_id == UserRecord.user_id, isouter=True)
             )
             filters = []
             if channel != "all":
@@ -314,17 +358,15 @@ async def list_conversations(
             rows = res.all()
 
             formatted = []
-            for conv, usr in rows:
-                msg_stmt = (
-                    select(MessageRecord)
-                    .where(MessageRecord.conversation_id == conv.conversation_id)
-                    .order_by(desc(MessageRecord.created_at))
-                    .limit(1)
-                )
-                msg_res = await session.execute(msg_stmt)
-                last_msg = msg_res.scalar_one_or_none()
+            for conv, usr, last_msg in rows:
+                if isinstance(last_msg, str):
+                    last_msg_text = last_msg
+                elif last_msg and hasattr(last_msg, "text"):
+                    last_msg_text = last_msg.text
+                else:
+                    last_msg_text = "Inquiry initiated"
 
-                last_msg_time = conv.last_message_at or (last_msg.created_at if last_msg else None)
+                last_msg_time = conv.last_message_at or (last_msg.created_at if (last_msg and hasattr(last_msg, "created_at")) else None)
                 time_display = last_msg_time.strftime("%I:%M %p") if last_msg_time else "Just now"
 
                 beliefs = conv.beliefs if isinstance(conv.beliefs, dict) else {}
@@ -335,7 +377,7 @@ async def list_conversations(
                     "channel": conv.channel,
                     "status": conv.status,
                     "aiPaused": conv.ai_paused,
-                    "lastMessage": last_msg.text if last_msg and hasattr(last_msg, 'text') else "Inquiry initiated",
+                    "lastMessage": last_msg_text,
                     "time": time_display,
                     "unread": 0,
                     "avatar": (usr.name[0].upper() if (usr and usr.name) else "C"),
@@ -347,37 +389,50 @@ async def list_conversations(
                 })
 
             # Hydrate in-memory cache with DB data
-            for f_conv in formatted:
-                existing = next((c for c in IN_MEMORY_CONVERSATIONS if c["id"] == f_conv["id"]), None)
-                if not existing:
-                    IN_MEMORY_CONVERSATIONS.append(dict(f_conv))
-                else:
-                    existing["name"] = f_conv["name"]
-                    existing["phone"] = f_conv["phone"]
-                    existing["channel"] = f_conv["channel"]
-                    existing["aiPaused"] = f_conv["aiPaused"]
-                    existing["status"] = f_conv["status"]
-                    existing["lastMessage"] = f_conv["lastMessage"]
-                    existing["time"] = f_conv["time"]
-                    existing["confidence"] = f_conv["confidence"]
-                    existing["intent"] = f_conv["intent"]
+            async with _conversations_lock:
+                for f_conv in formatted:
+                    cid = f_conv["id"]
+                    if cid not in _conversations_cache:
+                        _conversations_cache[cid] = dict(f_conv)
+                    else:
+                        existing = _conversations_cache[cid]
+                        existing.update({
+                            "name": f_conv["name"],
+                            "phone": f_conv["phone"],
+                            "channel": f_conv["channel"],
+                            "aiPaused": f_conv["aiPaused"],
+                            "status": f_conv["status"],
+                            "lastMessage": f_conv["lastMessage"],
+                            "time": f_conv["time"],
+                            "confidence": f_conv["confidence"],
+                            "intent": f_conv["intent"],
+                        })
 
-            # If there are any in-memory conversations created recently not yet fetched in rows
-            formatted_ids = {f["id"] for f in formatted}
-            for mem_conv in IN_MEMORY_CONVERSATIONS:
-                if mem_conv["id"] not in formatted_ids:
-                    formatted.insert(0, mem_conv)
+                # Cap in-memory cache size to prevent memory leaks
+                while len(_conversations_cache) > MAX_CACHE_SIZE:
+                    oldest_key = next(iter(_conversations_cache))
+                    _conversations_cache.pop(oldest_key, None)
+                _sync_in_memory_list()
+
+                # Only on page 1: if there are any pending in-memory conversations not yet in DB
+                if offset == 0:
+                    formatted_ids = {f["id"] for f in formatted}
+                    for mem_conv in list(_conversations_cache.values()):
+                        if mem_conv["id"] not in formatted_ids:
+                            formatted.insert(0, mem_conv)
 
             return {"success": True, "conversations": formatted, "count": len(formatted)}
     except Exception as e:
-        logger.error(f"Error listing conversations from DB: {e}")
-        return {"success": True, "conversations": IN_MEMORY_CONVERSATIONS, "count": len(IN_MEMORY_CONVERSATIONS)}
+        logger.error(f"[S-15] Database error listing conversations, falling back to cache: {e}", exc_info=True)
+        async with _conversations_lock:
+            cached_list = list(_conversations_cache.values())
+        return {"success": True, "conversations": cached_list, "count": len(cached_list)}
 
 
 
 @router.post("", summary="Create a new conversation / lead")
 @router.post("/", summary="Create a new conversation / lead")
-async def create_conversation(body: dict):
+async def create_conversation(body: dict, auth: dict = Depends(require_automation_secret)):
     """Create a new conversation lead manually or via simulation."""
     conv_id = body.get("id") or f"lead_{int(asyncio.get_event_loop().time() * 1000)}"
     name = body.get("name", "New Visitor")
@@ -404,10 +459,11 @@ async def create_conversation(body: dict):
 
 
 @router.delete("/{conv_id}", summary="Delete or clear a conversation")
-async def delete_conversation(conv_id: str):
+async def delete_conversation(conv_id: str, auth: dict = Depends(require_automation_secret)):
     """Delete a conversation from memory and database."""
-    global IN_MEMORY_CONVERSATIONS
-    IN_MEMORY_CONVERSATIONS = [c for c in IN_MEMORY_CONVERSATIONS if c["id"] != conv_id]
+    async with _conversations_lock:
+        _conversations_cache.pop(conv_id, None)
+        _sync_in_memory_list()
 
     try:
         from sqlalchemy import delete
@@ -425,9 +481,34 @@ async def delete_conversation(conv_id: str):
 
 
 @router.get("/stream", summary="SSE Real-time Conversation Event Stream")
-async def event_stream(request: Request):
+async def event_stream(
+    request: Request,
+    token: str | None = None,
+    x_automation_secret: str | None = Header(None, alias="X-Automation-Secret"),
+    authorization: str | None = Header(None, alias="Authorization"),
+):
     """Server-Sent Events (SSE) endpoint pushing live lead & chat events to dashboard clients."""
-    queue = broadcaster.subscribe()
+    # Verify authentication for SSE stream
+    auth_secret = x_automation_secret
+    if not auth_secret and authorization and authorization.startswith("Bearer "):
+        auth_secret = authorization[7:].strip()
+    elif not auth_secret and token:
+        auth_secret = token.strip()
+
+    is_authenticated = False
+    if auth_secret:
+        if auth_secret == settings.automation_shared_secret:
+            is_authenticated = True
+        else:
+            from app.core.security import decode_access_token
+            payload = decode_access_token(auth_secret)
+            if payload and "role" in payload:
+                is_authenticated = True
+
+    if not is_authenticated:
+        raise HTTPException(status_code=401, detail="Authentication required for SSE live stream")
+
+    queue = broadcaster.subscribe(maxsize=256)
 
     async def event_generator():
         try:
@@ -457,7 +538,11 @@ async def event_stream(request: Request):
 
 
 @router.get("/{conv_id}/messages", summary="Get full message history for conversation")
-async def get_conversation_messages(conv_id: str, limit: int = 60):
+async def get_conversation_messages(
+    conv_id: str,
+    limit: int = 60,
+    auth: dict = Depends(require_automation_secret),
+):
     """Fetch chronological message history for a specific conversation from DB or memory cache."""
     messages = []
     try:
@@ -486,24 +571,29 @@ async def get_conversation_messages(conv_id: str, limit: int = 60):
                     })
                 return {"success": True, "conversation_id": conv_id, "messages": messages, "count": len(messages)}
     except Exception as e:
-        logger.error(f"Error fetching messages for conversation {conv_id}: {e}")
+        logger.error(f"[S-15] Database error fetching messages for conversation '{conv_id}', falling back to cache: {e}", exc_info=True)
 
     # Fallback to in-memory conversation messages
-    conv = next((c for c in IN_MEMORY_CONVERSATIONS if c["id"] == conv_id), None)
-    if conv and conv.get("messages"):
-        messages = conv["messages"][-limit:]
-        return {"success": True, "conversation_id": conv_id, "messages": messages, "count": len(messages)}
+    async with _conversations_lock:
+        conv = _conversations_cache.get(conv_id)
+        if conv and conv.get("messages"):
+            messages = conv["messages"][-limit:]
+            return {"success": True, "conversation_id": conv_id, "messages": messages, "count": len(messages)}
 
     return {"success": True, "conversation_id": conv_id, "messages": [], "count": 0}
 
 
 @router.post("/{conv_id}/message", summary="Process customer message (triggers AI pipeline if active)")
-async def send_customer_message(conv_id: str, body: dict):
+async def send_customer_message(conv_id: str, body: dict, auth: dict = Depends(require_automation_secret)):
     """Process incoming customer message. If AI is active, run through LangGraph pipeline."""
+    if len(conv_id) > 120:
+        raise HTTPException(status_code=400, detail="conv_id exceeds maximum allowed length")
     text = body.get("text") or body.get("message", "")
     channel = body.get("channel", "website")
     if not text:
         raise HTTPException(status_code=400, detail="Text or message required")
+    if len(text) > 4000:
+        raise HTTPException(status_code=400, detail="Message text exceeds maximum allowed length")
 
     conv = await async_get_or_create_conversation(conv_id, channel)
     
@@ -561,7 +651,7 @@ async def send_customer_message(conv_id: str, body: dict):
 
 
 @router.post("/{conv_id}/takeover", summary="Toggle AI vs Human Agent takeover")
-async def toggle_takeover(conv_id: str):
+async def toggle_takeover(conv_id: str, auth: dict = Depends(require_automation_secret)):
     """Toggle human takeover state for a conversation and broadcast state update."""
     conv = await async_get_or_create_conversation(conv_id)
 
@@ -601,7 +691,7 @@ async def toggle_takeover(conv_id: str):
 
 
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")
-async def send_agent_reply(conv_id: str, body: dict):
+async def send_agent_reply(conv_id: str, body: dict, auth: dict = Depends(require_automation_secret)):
     """Post manual agent reply, broadcast message_received event, and dispatch to real social channel."""
     reply_text = body.get("text", "")
     if not reply_text:

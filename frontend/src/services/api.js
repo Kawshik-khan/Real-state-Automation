@@ -82,7 +82,25 @@ export const getApiBaseUrl = () => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
-const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || '3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8';
+/**
+ * Zero-Trust Auth Header Provider.
+ * Automatically injects the active authenticated user JWT Bearer token for staff operations.
+ * Prevents embedding shared secret keys in client-side bundles.
+ */
+export function getAuthHeaders(customHeaders = {}, isPublic = false) {
+  const headers = { ...customHeaders };
+  if (!isPublic && typeof window !== 'undefined') {
+    try {
+      const token = localStorage.getItem('glg_token');
+      if (token && token !== 'null' && token !== 'undefined') {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch {
+      // Storage access fallback
+    }
+  }
+  return headers;
+}
 
 /**
  * Robust API URL builder that correctly joins base URL and path
@@ -286,7 +304,7 @@ export async function sendChatMessage(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -301,7 +319,7 @@ export async function generateContent(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -320,7 +338,7 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
   if (metadata.document_type) formData.append('document_type', metadata.document_type);
 
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -340,7 +358,7 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
 export async function getKnowledgeDocuments() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -360,7 +378,7 @@ export async function checkModeration(text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text }),
   });
@@ -373,7 +391,7 @@ export async function checkModeration(text) {
 export async function getProjects() {
   const response = await fetch(`${API_BASE_URL}/api/projects`, {
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -385,7 +403,7 @@ export async function getProjects() {
 export async function getProjectById(projectId) {
   const response = await fetch(`${API_BASE_URL}/api/project/${projectId}`, {
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -399,7 +417,7 @@ export async function searchKnowledge(query, filter = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ query, filter }),
   });
@@ -412,7 +430,7 @@ export async function searchKnowledge(query, filter = {}) {
 export async function getConversations() {
   const response = await fetch(buildApiUrl('/api/v1/conversations'), {
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -424,7 +442,7 @@ export async function getConversations() {
 export async function getConversationMessages(convId, limit = 60) {
   const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/messages?limit=${limit}`), {
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -437,7 +455,7 @@ export async function toggleTakeover(convId) {
   const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/takeover`), {
     method: 'POST',
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -451,7 +469,7 @@ export async function sendAgentReply(convId, text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text }),
   });
@@ -466,7 +484,7 @@ export async function createConversation(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -481,7 +499,7 @@ export async function sendCustomerMessage(convId, text, channel = 'website') {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text, channel }),
   });
@@ -496,7 +514,7 @@ export async function getAnalyticsReport() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -509,7 +527,7 @@ export async function getManagerOverview() {
   const response = await fetch(buildApiUrl('/api/v1/analytics/manager-overview'), {
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -523,7 +541,7 @@ export async function updateCampaignStatus(campaignId, status) {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ status }),
   });
@@ -538,7 +556,7 @@ export async function deleteConversation(convId) {
   const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}`), {
     method: 'DELETE',
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -548,7 +566,18 @@ export async function deleteConversation(convId) {
  * Get SSE stream URL for live conversation event listening
  */
 export function getConversationsStreamUrl() {
-  return buildApiUrl('/api/v1/conversations/stream');
+  const baseUrl = buildApiUrl('/api/v1/conversations/stream');
+  if (typeof window !== 'undefined') {
+    try {
+      const token = localStorage.getItem('glg_token');
+      if (token && token !== 'null' && token !== 'undefined') {
+        return `${baseUrl}?token=${encodeURIComponent(token)}`;
+      }
+    } catch {
+      // Storage access fallback
+    }
+  }
+  return baseUrl;
 }
 
 export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
@@ -602,7 +631,7 @@ export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
 export async function getN8nTelemetry() {
   const response = await resilientFetch('/api/v1/automation/n8n/health', {
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -616,7 +645,7 @@ export async function toggleN8nWorkflow(workflowId, active) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ active }),
   });
@@ -630,7 +659,7 @@ export async function testN8nWorkflow(workflowId) {
   const response = await resilientFetch(`/api/v1/automation/n8n/workflows/${workflowId}/test`, {
     method: 'POST',
     headers: {
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -642,7 +671,7 @@ export async function testN8nWorkflow(workflowId) {
 export async function getDeveloperSystemHealth() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -660,7 +689,7 @@ export async function simulateDeveloperWebhook(payload) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -680,7 +709,7 @@ export async function benchmarkDeveloperRAG(payload) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -700,7 +729,7 @@ export async function syncDeveloperDatabases() {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -719,7 +748,7 @@ export async function getCrossRoleSummaryReport(period = '7d') {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -739,7 +768,7 @@ export async function getDeveloperLogs(params = {}) {
   const query = new URLSearchParams(params).toString();
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -758,7 +787,7 @@ export async function clearDeveloperLogs() {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -784,7 +813,7 @@ export async function getSocialAnalyticsKPIs(params = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -810,7 +839,7 @@ export async function simulateSocialCommentToDm(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -824,7 +853,7 @@ export async function runDeveloperEvals(suite = 'all', sampleSize = null, backgr
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -853,7 +882,7 @@ export async function checkBackendHealth() {
       const id = setTimeout(() => controller.abort(), 2000);
       const resp = await fetch(ep, {
         signal: controller.signal,
-        headers: { 'X-Automation-Secret': AUTOMATION_SECRET }
+        headers: getAuthHeaders()
       });
       clearTimeout(id);
       // Any response indicating server process is alive!
@@ -875,7 +904,7 @@ export async function getLatestDeveloperEvals() {
     const token = localStorage.getItem('glg_token');
     const headers = {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     };
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -908,7 +937,7 @@ export async function getDeveloperEvalsStatus() {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -928,7 +957,7 @@ export async function getDeveloperEvalSuites() {
     const token = localStorage.getItem('glg_token');
     const headers = {
       'Content-Type': 'application/json',
-      'X-Automation-Secret': AUTOMATION_SECRET,
+      ...getAuthHeaders(),
     };
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -961,7 +990,7 @@ export async function createProject(projectData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -980,7 +1009,7 @@ export async function createProject(projectData) {
 export async function getEmailThreads() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -998,7 +1027,7 @@ export async function approveEmailDraft(threadId, payload = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1018,7 +1047,7 @@ export async function rejectEmailDraft(threadId) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1038,7 +1067,7 @@ export async function updateKnowledgeAccess(docId, accessLevel) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1057,7 +1086,7 @@ export async function updateKnowledgeAccess(docId, accessLevel) {
 export async function getCalendarEvents() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1074,7 +1103,7 @@ export async function getCalendarEvents() {
 export async function getCalendarMilestones(params = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1092,7 +1121,7 @@ export async function createCalendarMilestone(milestoneData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1112,7 +1141,7 @@ export async function createSiteTourBooking(bookingData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1132,7 +1161,7 @@ export async function publishSocialPost(postData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1151,7 +1180,7 @@ export async function publishSocialPost(postData) {
 export async function getSocialPosts(params = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1168,7 +1197,7 @@ export async function getSocialPosts(params = {}) {
 export async function getTimeSeriesAnalytics(params = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1187,7 +1216,7 @@ export const getSocialKPIs = getSocialAnalyticsKPIs;
 export async function getDeveloperCacheStats() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1203,7 +1232,7 @@ export async function flushDeveloperCaches() {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1222,7 +1251,7 @@ export async function unlockUserAccount(email) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1243,7 +1272,7 @@ export async function unlockUserAccount(email) {
 export async function getAgentConfigs() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1258,7 +1287,7 @@ export async function getAgentConfigs() {
 export async function getAgentConfig(agentKey) {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1274,7 +1303,7 @@ export async function saveAgentConfig(configData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1294,7 +1323,7 @@ export async function resetAgentConfig(agentKey = null) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1313,7 +1342,7 @@ export async function resetAgentConfig(agentKey = null) {
 export async function getTokenUsageTelemetry() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1328,7 +1357,7 @@ export async function getTokenUsageTelemetry() {
 export async function getFineTuningJobs() {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1344,7 +1373,7 @@ export async function triggerFineTuningJob(payload) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1363,7 +1392,7 @@ export async function triggerFineTuningJob(payload) {
 export async function generateSyntheticData(targetAgent = 'property_agent', count = 50) {
   const token = localStorage.getItem('glg_token');
   const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1382,7 +1411,7 @@ export async function testAgentPlayground(payload) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1408,7 +1437,7 @@ export async function getReportSchedules() {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1427,7 +1456,7 @@ export async function createReportSchedule(scheduleData) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1447,7 +1476,7 @@ export async function toggleReportSchedule(scheduleId, isActive) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1467,7 +1496,7 @@ export async function triggerReportNow(scheduleId, payload = {}) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1487,7 +1516,7 @@ export async function getReportHistory(limit = 20) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1506,7 +1535,7 @@ export async function getReportDetail(reportId) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1525,7 +1554,7 @@ export async function sendTestReport(payload) {
   const token = localStorage.getItem('glg_token');
   const headers = {
     'Content-Type': 'application/json',
-    'X-Automation-Secret': AUTOMATION_SECRET,
+    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1534,6 +1563,90 @@ export async function sendTestReport(payload) {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * ==========================================================
+ * DEVELOPER SERVICE CONNECTIONS & SECRETS MANAGEMENT API (S-04)
+ * ==========================================================
+ */
+
+/**
+ * Fetch catalog of third-party integrations with encrypted/masked status
+ */
+export async function getServiceIntegrations() {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch('/api/v1/developer/integrations', {
+    method: 'GET',
+    headers,
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Save and encrypt third-party credentials in PostgreSQL
+ */
+export async function saveServiceIntegration(serviceKey, credentials, isActive = true) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ credentials, is_active: isActive }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Perform real-time live connectivity ping test
+ */
+export async function testServiceIntegration(serviceKey, credentials = null) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}/test`, {
+    method: 'POST',
+    headers,
+    body: credentials ? JSON.stringify({ credentials }) : JSON.stringify({}),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Disconnect service and purge credentials from database
+ */
+export async function deleteServiceIntegration(serviceKey) {
+  const token = localStorage.getItem('glg_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+  };
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
+    method: 'DELETE',
+    headers,
   });
   return handleResponse(response);
 }

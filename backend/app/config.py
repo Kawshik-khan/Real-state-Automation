@@ -26,16 +26,18 @@ class Settings(BaseSettings):
     # Redis / Distributed Cache
     redis_url: Optional[str] = None
 
-    # Security
-    automation_shared_secret: str = "change-me-to-a-random-secret"
-    jwt_secret: Optional[str] = None  # Falls back to automation_shared_secret if unset
-    password_hash_salt: str = "glg_assets_salt_2026"
+    # Security — REQUIRED: Must be provided via .env or environment variables.
+    # The application will refuse to start if these are missing, preventing
+    # accidental deployment with known/default credentials.
+    automation_shared_secret: str
+    jwt_secret: str
+    password_hash_salt: str
     api_key: Optional[str] = None
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    # CORS — comma-separated origins; "*" for development
-    cors_origins: str = "*"
+    # CORS — comma-separated allowed origins (no wildcard with credentials)
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
 
     # Defaults
     default_tenant_id: str = "glg-assets-main"
@@ -62,7 +64,7 @@ class Settings(BaseSettings):
     vector_store_provider: str = "auto"  # "auto", "pinecone", "pgvector"
     pinecone_api_key: Optional[str] = None
     pinecone_index_name: str = "real-state-automation"
-    pinecone_host: Optional[str] = "https://real-state-automation-o25ptb6.svc.aped-4627-b74a.pinecone.io"
+    pinecone_host: Optional[str] = None
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
@@ -99,9 +101,14 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        """Parse CORS_ORIGINS into a list; handles '*' for development."""
-        if self.cors_origins == "*":
-            return ["*"]
+        """Parse CORS_ORIGINS into a list. Prevents raw wildcard '*' with allow_credentials=True."""
+        if not self.cors_origins or self.cors_origins.strip() == "*":
+            return [
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:3000",
+            ]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     model_config = SettingsConfigDict(

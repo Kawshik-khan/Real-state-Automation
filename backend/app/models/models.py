@@ -298,3 +298,56 @@ class GeneratedReportRecord(Base):
     tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
+
+class ActiveRefreshTokenRecord(Base):
+    """Active refresh token sessions for stateful JWT refresh token rotation (RTR)."""
+    __tablename__ = "active_refresh_tokens"
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    role: Mapped[str] = mapped_column(String(32), default="agent")
+    email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class RevokedTokenRecord(Base):
+    """Revoked token blacklist for replay attack detection and cross-worker invalidation."""
+    __tablename__ = "revoked_tokens"
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    token_type: Mapped[str] = mapped_column(String(32), default="refresh")
+    reason: Mapped[str | None] = mapped_column(String(128), nullable=True)  # rotation, logout, replay_attack, admin_revocation
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AuthUserRecord(Base):
+    """Staff user accounts for authentication, credentials, and RBAC (S-03)."""
+    __tablename__ = "auth_users"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(256), unique=True, index=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), default="agent", nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-default", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class SystemIntegrationRecord(Base):
+    """Encrypted third-party service connections and API credentials."""
+    __tablename__ = "system_integrations"
+    service_key: Mapped[str] = mapped_column(String(64), primary_key=True)  # groq, pinecone, telegram, gmail, langsmith, whatsapp
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), default="ai")  # ai, vector_db, notifications, communication, observability
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    encrypted_credentials: Mapped[str] = mapped_column(Text, nullable=False)
+    masked_preview: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(32), default="not_tested")  # connected, failed, not_tested
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+

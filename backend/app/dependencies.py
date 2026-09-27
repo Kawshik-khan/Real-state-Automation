@@ -43,7 +43,7 @@ async def require_automation_secret(
     return {
         "tenant_id": x_tenant_id or settings.default_tenant_id,
         "authenticated": True,
-        "role": UserRole.ADMIN.value,
+        "role": UserRole.SERVICE.value,
     }
 
 
@@ -52,12 +52,12 @@ async def get_current_user(
     x_automation_secret: Optional[str] = Header(None, alias="X-Automation-Secret"),
 ) -> dict:
     """Extract and decode current authenticated user from Bearer JWT token or automation secret."""
-    # 1. Check automation shared secret first (foolproof for developer console & background benchmarks)
+    # 1. Check automation shared secret first (machine-to-machine service auth)
     if x_automation_secret and x_automation_secret == settings.automation_shared_secret:
         return {
-            "sub": "sys-admin-000",
-            "email": "admin@glgassets.com",
-            "role": UserRole.ADMIN.value,
+            "sub": "sys-service-000",
+            "email": "service@glgassets.com",
+            "role": UserRole.SERVICE.value,
             "tenant_id": getattr(settings, "default_tenant_id", "default-tenant"),
         }
 
@@ -79,9 +79,9 @@ async def get_current_user(
     # 2. Check if bearer token itself is the automation shared secret
     if token == settings.automation_shared_secret:
         return {
-            "sub": "sys-admin-000",
-            "email": "admin@glgassets.com",
-            "role": UserRole.ADMIN.value,
+            "sub": "sys-service-000",
+            "email": "service@glgassets.com",
+            "role": UserRole.SERVICE.value,
             "tenant_id": getattr(settings, "default_tenant_id", "default-tenant"),
         }
 

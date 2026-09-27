@@ -80,5 +80,3 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://glg-realestate-backend.onrender.com
-      - key: VITE_AUTOMATION_SECRET
-        sync: false

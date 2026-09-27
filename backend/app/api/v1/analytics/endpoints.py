@@ -46,13 +46,13 @@ async def _fetch_live_db_analytics():
             doc_count = doc_res.scalar() or 0
 
             return {
-                "total_conversations": max(total_convs, 42),  # Use DB count or baseline
+                "total_conversations": total_convs,
                 "escalated": escalated_count,
-                "resolved_by_ai": max(total_convs - escalated_count, 38),
-                "total_messages": max(total_messages, 156),
+                "resolved_by_ai": max(total_convs - escalated_count, 0),
+                "total_messages": total_messages,
                 "channel_counts": channel_counts,
                 "projects": projects,
-                "document_count": max(doc_count, 6),
+                "document_count": doc_count,
             }
     except Exception:
         return None

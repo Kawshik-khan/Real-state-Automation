@@ -9,16 +9,24 @@ from app.config import settings
 
 class LLMService:
     def get_client(self) -> Optional[AsyncOpenAI]:
-        if not settings.openai_api_key:
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("groq")
+        api_key = (creds.get("api_key") if creds else None) or settings.openai_api_key
+        base_url = (creds.get("base_url") if creds else None) or settings.openai_base_url
+        if not api_key:
             return None
-        kwargs = {"api_key": settings.openai_api_key, "timeout": 20.0}
-        if settings.openai_base_url:
-            kwargs["base_url"] = settings.openai_base_url
+        kwargs = {"api_key": api_key, "timeout": 20.0}
+        if base_url:
+            kwargs["base_url"] = base_url
         return AsyncOpenAI(**kwargs)
 
     @property
     def model(self) -> str:
-        return settings.openai_model or "openai/gpt-oss-120b"
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("groq")
+        if creds and creds.get("model"):
+            return creds["model"]
+        return settings.openai_model or "llama-3.3-70b-versatile"
 
     async def chat(
         self,
@@ -150,12 +158,17 @@ class LLMService:
         self._pinecone_offline = False
 
     def get_pinecone_client(self):
-        if getattr(self, "_pinecone_offline", False):
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("pinecone")
+        api_key = (creds.get("api_key") if creds else None) or settings.pinecone_api_key
+        if not api_key:
             return None
-        if not self._pinecone_client and settings.pinecone_api_key:
+        if not self._pinecone_client or getattr(self, "_pinecone_current_key", None) != api_key:
             try:
                 from pinecone import Pinecone
-                self._pinecone_client = Pinecone(api_key=settings.pinecone_api_key)
+                self._pinecone_client = Pinecone(api_key=api_key)
+                self._pinecone_current_key = api_key
+                self._pinecone_offline = False
             except Exception as e:
                 print(f"[LLMService] Pinecone init error: {e}")
                 self._pinecone_offline = True
