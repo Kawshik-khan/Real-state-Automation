@@ -36,6 +36,7 @@ class DistributedTokenStore:
         self._active_local: Dict[str, Dict[str, Any]] = {}
         self._revoked_local: set = set()
         self._user_revoked_at_local: Dict[str, float] = {}
+        self._revoked_sessions_local: set = set()
         self._lock = asyncio.Lock()
 
     async def record_active_token(
@@ -84,16 +85,24 @@ class DistributedTokenStore:
                 f"[TokenStore] Database persist active token '{jti}' failed (using L1/L2): {err}"
             )
 
-    async def is_token_revoked(self, jti: str, user_id: Optional[str] = None) -> bool:
-        """Check if a refresh token has been revoked or replayed."""
+    async def is_token_revoked(
+        self, jti: str, user_id: Optional[str] = None, issued_at: Optional[float] = None
+    ) -> bool:
+        """Check if a refresh token has been revoked or replayed.
+
+        A per-user revoke-all only invalidates tokens issued at or before the cut-off
+        (``issued_at``); tokens from a later login stay valid.
+        """
         now = time.time()
+
+        if user_id and issued_at is not None:
+            cutoff = await self.get_user_revoked_cutoff(user_id)
+            if cutoff is not None and float(issued_at) <= cutoff:
+                return True
 
         # 1. L1 Local Memory check
         async with self._lock:
             if jti in self._revoked_local:
-                return True
-            if user_id and user_id in self._user_revoked_at_local:
-                # If all tokens for this user were revoked after token creation, consider revoked
                 return True
 
         # 2. L2 Redis check
@@ -103,13 +112,6 @@ class DistributedTokenStore:
                 async with self._lock:
                     self._revoked_local.add(jti)
                 return True
-
-            if user_id:
-                user_cutoff = await resilient_store.get(f"user:revoked_all:{user_id}")
-                if user_cutoff is not None:
-                    async with self._lock:
-                        self._user_revoked_at_local[user_id] = float(user_cutoff)
-                    return True
         except Exception as err:
             logger.debug(f"[TokenStore] Redis check revoked failed: {err}")
 
@@ -132,6 +134,64 @@ class DistributedTokenStore:
         except Exception as err:
             logger.warning(f"[TokenStore] Database check revoked token '{jti}' failed: {err}")
 
+        return False
+
+    async def get_user_revoked_cutoff(self, user_id: str) -> Optional[float]:
+        """Epoch of the latest revoke-all for this user, if any (L1, then L2)."""
+        async with self._lock:
+            local = self._user_revoked_at_local.get(user_id)
+        try:
+            remote = await resilient_store.get(f"user:revoked_all:{user_id}")
+        except Exception as err:
+            logger.debug(f"[TokenStore] Redis get user cut-off failed: {err}")
+            remote = None
+        values = [v for v in (local, float(remote) if remote is not None else None) if v is not None]
+        if not values:
+            return None
+        cutoff = max(values)
+        async with self._lock:
+            self._user_revoked_at_local[user_id] = cutoff
+        return cutoff
+
+    async def revoke_session(
+        self, sid: str, user_id: str, ttl_seconds: int, reason: str = "logout"
+    ) -> None:
+        """Revoke a login session (its access tokens and refresh chain).
+
+        Checked on every authenticated request, so reads stay in L1/L2; the L3 row is kept
+        for durability and audit. Without Redis, a revocation is per-process and lost on
+        restart for the remaining access-token lifetime (the refresh chain stays revoked).
+        """
+        async with self._lock:
+            self._revoked_sessions_local.add(sid)
+        try:
+            await resilient_store.set(f"session:revoked:{sid}", "1", expire_seconds=ttl_seconds)
+        except Exception as err:
+            logger.debug(f"[TokenStore] Redis session revocation failed: {err}")
+        try:
+            async with async_session_factory() as session:
+                session.add(RevokedTokenRecord(
+                    jti=sid,
+                    user_id=user_id,
+                    token_type="session",
+                    reason=reason,
+                    expires_at=_utc_from_timestamp(time.time() + ttl_seconds),
+                ))
+                await session.commit()
+        except Exception as err:
+            logger.debug(f"[TokenStore] Database session revocation record failed: {err}")
+
+    async def is_session_revoked(self, sid: str) -> bool:
+        async with self._lock:
+            if sid in self._revoked_sessions_local:
+                return True
+        try:
+            if await resilient_store.get(f"session:revoked:{sid}") is not None:
+                async with self._lock:
+                    self._revoked_sessions_local.add(sid)
+                return True
+        except Exception as err:
+            logger.debug(f"[TokenStore] Redis session check failed: {err}")
         return False
 
     async def get_active_token(self, jti: str) -> Optional[Dict[str, Any]]:

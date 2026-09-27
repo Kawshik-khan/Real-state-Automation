@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Create httpHeaderAuth credential in local n8n and wire it to all HTTP nodes."""
+import os
 import json, requests, sys, re
 
 BASE = "http://localhost:5678"
@@ -9,7 +10,7 @@ session.headers.update({"Content-Type": "application/json"})
 def login():
     r = session.post(f"{BASE}/rest/login", json={
         "emailOrLdapLoginId": "admin@glgassets.local",
-        "password": "Admin123!"
+        "password": os.environ["N8N_ADMIN_PASSWORD"]
     })
     if r.status_code != 200:
         print(f"LOGIN FAILED: {r.status_code}")
@@ -32,7 +33,7 @@ def find_or_create_credential():
         "type": "httpHeaderAuth",
         "data": {
             "name": "X-Automation-Secret",
-            "value": "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
+            "value": os.environ["AUTOMATION_SHARED_SECRET"]
         }
     }
     r = session.post(f"{BASE}/rest/credentials", json=payload)

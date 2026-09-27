@@ -30,7 +30,7 @@
           "parameters": [
             {
               "name": "X-Automation-Secret",
-              "value": "change-me-in-production"
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
             },
             {
               "name": "Content-Type",

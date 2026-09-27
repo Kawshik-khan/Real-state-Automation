@@ -8,6 +8,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_access_token,
+    decode_refresh_token,
 )
 
 SECRET_KEY = settings.jwt_secret or settings.automation_shared_secret
@@ -59,15 +60,18 @@ def test_decode_access_token_alg_mismatch():
 
 @pytest.mark.asyncio
 async def test_decode_access_token_type_differentiation():
-    """Verify decode_access_token decodes both access and refresh tokens, but preserves type."""
+    """Each decoder accepts only its own token type: a refresh token must never pass as an
+    access token (review finding F3), and vice versa."""
     access_token = create_access_token({"sub": "usr-123"})
     refresh_token = await create_refresh_token({"sub": "usr-123"})
 
     access_payload = decode_access_token(access_token)
     assert access_payload is not None
     assert access_payload.get("type") == "access"
+    assert decode_refresh_token(access_token) is None
 
-    refresh_payload = decode_access_token(refresh_token)
+    assert decode_access_token(refresh_token) is None
+    refresh_payload = decode_refresh_token(refresh_token)
     assert refresh_payload is not None
     assert refresh_payload.get("type") == "refresh"
 

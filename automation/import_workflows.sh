@@ -6,7 +6,7 @@ COOKIE_JAR="/tmp/n8n_cookies2.txt"
 # Login
 curl -s -c "$COOKIE_JAR" -X POST "$N8N_URL/rest/login" \
   -H "Content-Type: application/json" \
-  -d '{"emailOrLdapLoginId":"admin@glgassets.local","password":"Admin123!"}' > /dev/null
+  -d '{"emailOrLdapLoginId":"admin@glgassets.local","password":"'"${N8N_ADMIN_PASSWORD:?set N8N_ADMIN_PASSWORD}"'"}' > /dev/null
 
 echo "Logged in."
 

@@ -8,14 +8,22 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 from typing import Any, Dict, Optional
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 # Derive master 256-bit encryption key using PBKDF2
 def _get_master_key() -> bytes:
+    dedicated = (getattr(settings, "credentials_encryption_key", None) or "").strip()
+    if dedicated:
+        # Independent of JWT/automation secrets, so rotating those keeps stored credentials readable.
+        return hashlib.pbkdf2_hmac("sha256", dedicated.encode("utf-8"), b"glg_assets_credential_vault_v2", 100000)
+    # Legacy derivation (data encrypted before CREDENTIALS_ENCRYPTION_KEY existed).
     master_secret = (
         getattr(settings, "jwt_secret", "")
         + getattr(settings, "password_hash_salt", "")
@@ -96,7 +104,10 @@ def decrypt_data(token_str: str) -> Dict[str, Any]:
 
         # Fallback to direct JSON if unencrypted legacy
         return json.loads(token_str)
-    except Exception:
+    except Exception as err:
+        # Surface key mismatches (e.g. rotated JWT/automation secret without
+        # CREDENTIALS_ENCRYPTION_KEY) instead of silently dropping stored credentials.
+        logger.error(f"[crypto] Failed to decrypt stored credentials: {type(err).__name__}")
         return {}
 
 

@@ -6,11 +6,21 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.agents.social_bridge_agent import social_bridge_agent
 from app.config import settings
+from app.core.webhook_security import (
+    read_verified_meta_payload,
+    verify_meta_subscription_token,
+    verify_telegram_secret,
+)
 from app.dependencies import require_automation_secret as _auth
+from app.dependencies import require_roles
+from app.models.user import UserRole
 from app.services.meta_social import meta_social_service
 from app.services.telegram import telegram_service
 
 router = APIRouter()
+
+# Simulator posts real public replies/DMs via the Graph API; webhook setup re-points the bot.
+_social_admin = require_roles([UserRole.ADMIN, UserRole.DEVELOPER])
 
 
 # ── Core Helper: Execute Comment-to-DM Bridge ─────────────────────────
@@ -179,7 +189,7 @@ async def instagram_comment(body: dict, auth: dict = Depends(_auth)):
 
 
 @router.post("/simulator/comment-to-dm", summary="Interactive Comment-to-DM Bridge Simulator")
-async def simulate_comment_to_dm(body: dict):
+async def simulate_comment_to_dm(body: dict, current_user: dict = Depends(_social_admin)):
     """Developer & Dashboard Simulation endpoint for testing social lead bridge in real-time."""
     comment_text = body.get("comment_text") or body.get("text") or "Banani 3 BHK flat er price koto? Details inbox korun"
     author_name = body.get("author_name") or "Mahmudur Rahman"
@@ -208,15 +218,15 @@ async def verify_meta_webhook(
     hub_challenge: str = Query(None, alias="hub.challenge"),
 ):
     """Handles Meta (Facebook/WhatsApp/Instagram) Webhook Subscription Verification."""
-    expected_token = getattr(settings, "whatsapp_verify_token", None) or "glg_wa_verify_2026"
-    if hub_mode == "subscribe" and hub_verify_token == expected_token:
+    if hub_mode == "subscribe" and verify_meta_subscription_token(hub_verify_token):
         return Response(content=str(hub_challenge or ""), media_type="text/plain")
     return Response(content="Verification failed", status_code=403)
 
 
 @router.post("/facebook/webhook", summary="Live Meta Facebook Webhook Event Handler")
-async def facebook_webhook_event(body: dict):
+async def facebook_webhook_event(request: Request):
     """Ingests live Meta Webhook events for Facebook Page feed comments and messages."""
+    body = await read_verified_meta_payload(request)
     entries = body.get("entry", [])
     for entry in entries:
         changes = entry.get("changes", [])
@@ -242,8 +252,9 @@ async def facebook_webhook_event(body: dict):
 
 
 @router.post("/instagram/webhook", summary="Live Meta Instagram Webhook Event Handler")
-async def instagram_webhook_event(body: dict):
+async def instagram_webhook_event(request: Request):
     """Ingests live Meta Webhook events for Instagram comments."""
+    body = await read_verified_meta_payload(request)
     entries = body.get("entry", [])
     for entry in entries:
         changes = entry.get("changes", [])
@@ -344,6 +355,7 @@ async def lead_capture(body: dict, auth: dict = Depends(_auth)):
 @router.post("/telegram/webhook", summary="Telegram Bot Webhook Endpoint")
 async def telegram_webhook(request: Request, body: dict):
     """Processes incoming Telegram updates, executes RAG + AI graph pipeline, and sends reply."""
+    verify_telegram_secret(request)
     from app.api.v1.ai.endpoints import ai_chat
     from app.schemas.chat import ChatRequest
     from app.services.multimodal import multimodal_service
@@ -441,16 +453,18 @@ async def telegram_webhook(request: Request, body: dict):
 
 
 @router.post("/telegram/setup-webhook", summary="Set Telegram Webhook URL")
-async def setup_telegram_webhook(body: dict):
+async def setup_telegram_webhook(body: dict, current_user: dict = Depends(_social_admin)):
     """Register public HTTPS webhook URL with Telegram Bot API."""
-    url = body.get("url")
-    if not url:
-        return {"success": False, "error": "url parameter is required"}
-    return await telegram_service.set_webhook(url)
+    url = (body.get("url") or "").strip()
+    if not url.startswith("https://"):
+        return {"success": False, "error": "An https:// url parameter is required"}
+    if not settings.telegram_webhook_secret:
+        return {"success": False, "error": "TELEGRAM_WEBHOOK_SECRET must be configured before registering a webhook"}
+    return await telegram_service.set_webhook(url, secret_token=settings.telegram_webhook_secret)
 
 
 @router.get("/telegram/status", summary="Get Telegram Bot & Webhook Status")
-async def telegram_status():
+async def telegram_status(current_user: dict = Depends(_social_admin)):
     """Retrieve Bot Info and current Webhook configuration."""
     bot_info = await telegram_service.get_me()
     webhook_info = await telegram_service.get_webhook_info()

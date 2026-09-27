@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import select
 
+from app.config import settings
 from app.core.security import hash_password
 from app.database import async_session_factory
 from app.models.models import AuthUserRecord
@@ -76,7 +77,10 @@ class UserService:
         self._in_memory: Dict[str, UserInDB] = {}
         self._lock = asyncio.Lock()
         self._has_seeded = False
-        self._init_in_memory_defaults()
+        # Demo accounts have publicly known passwords: only create them when explicitly enabled
+        # (development / tests). Otherwise the in-memory fallback starts empty.
+        if settings.seed_demo_users:
+            self._init_in_memory_defaults()
 
     def _init_in_memory_defaults(self):
         """Pre-populate in-memory cache with hashed seed users for zero-delay offline fallback."""
@@ -100,8 +104,11 @@ class UserService:
         return self._in_memory
 
     async def seed_default_users(self) -> None:
-        """Seed default staff accounts into PostgreSQL `auth_users` table on startup."""
-        if self._has_seeded:
+        """Seed default staff accounts into PostgreSQL `auth_users` table on startup.
+
+        Only when SEED_DEMO_USERS=true — the demo passwords are public.
+        """
+        if self._has_seeded or not settings.seed_demo_users:
             return
 
         try:

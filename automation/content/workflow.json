@@ -16,7 +16,7 @@
         "url": "http://localhost:8000/api/content",
         "options": {
           "headers": {
-            "X-Automation-Secret": "glg-secret-key"
+            "X-Automation-Secret": "={{ $env.AUTOMATION_SHARED_SECRET }}"
           }
         }
       },

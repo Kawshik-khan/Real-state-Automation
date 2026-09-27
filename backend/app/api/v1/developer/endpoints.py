@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.dependencies import require_roles
+from app.dependencies import require_roles, require_stream_roles
 from app.models.user import UserRole
 from app.services.llm import llm_service
 from app.services.log_streamer import log_streamer
@@ -311,7 +311,7 @@ async def clear_developer_logs(
 @router.get("/logs/stream", summary="Real-time Server-Sent Events (SSE) live log stream")
 async def stream_developer_logs(
     request: Request,
-    current_user: dict = Depends(require_roles([UserRole.DEVELOPER])),
+    current_user: dict = Depends(require_stream_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
 ):
     """Pushes live log events to connected developer console clients in real time."""
     queue = log_streamer.subscribe()

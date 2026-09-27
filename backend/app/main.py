@@ -16,7 +16,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,14 +126,20 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
 
+_cors_origins = settings.allowed_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_origin_regex=settings.cors_origin_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    # Anchored regex for origins that cannot be listed (e.g. this project's Vercel previews);
+    # unset by default.
+    allow_origin_regex=settings.cors_origin_regex or None,
+    # Credentialed (cookie) requests only for explicitly allowed origins, never with "*".
+    allow_credentials="*" not in _cors_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "X-Automation-Secret", "X-GLG-Client"],
 )
+if "*" in _cors_origins:
+    logger.warning("CORS_ORIGINS is '*': acceptable for local development only; set explicit origins in production.")
 
 setup_live_logging()
 
@@ -247,19 +253,6 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
             client_ip=client_ip
         )
         raise exc
-
-
-# ---------- Global Auth Dependency ----------
-
-async def verify_automation_secret(
-    x_automation_secret: str = Header(None, alias="X-Automation-Secret"),
-    x_tenant_id: str = Header(None, alias="X-Tenant-Id"),
-):
-    if not x_automation_secret:
-        raise HTTPException(status_code=401, detail="Missing X-Automation-Secret header")
-    if x_automation_secret != settings.automation_shared_secret:
-        raise HTTPException(status_code=403, detail="Invalid automation secret")
-    return {"tenant_id": x_tenant_id or settings.default_tenant_id}
 
 
 # ---------- Health Probes (Supports GET and HEAD for Cloud Health Checks) ----------

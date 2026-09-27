@@ -5,22 +5,23 @@ All endpoints require X-Automation-Secret and X-Tenant-Id headers.
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import settings
+from app.dependencies import require_roles, require_service
+from app.models.user import UserRole
 
 router = APIRouter()
 
 
 # ---------- Dependency ----------
 
-async def verify_auth(
-    x_automation_secret: str = Header(..., alias="X-Automation-Secret"),
-    x_tenant_id: str = Header(None, alias="X-Tenant-Id"),
-):
-    if x_automation_secret != settings.automation_shared_secret:
-        raise HTTPException(status_code=403, detail="Invalid secret")
-    return {"tenant_id": x_tenant_id or settings.default_tenant_id}
+# n8n workflow endpoints: server-to-server only.
+verify_auth = require_service
+# Bookings come from the n8n booking workflow and from staff in the dashboard.
+_booking_auth = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT], allow_service=True)
+# n8n monitoring dashboard: developer/admin users.
+_n8n_ops = require_roles([UserRole.DEVELOPER, UserRole.ADMIN])
 
 
 # ==========================================================
@@ -30,7 +31,7 @@ async def verify_auth(
 @router.post("/booking", summary="Create a property tour booking")
 async def create_booking(
     body: dict,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(_booking_auth),
 ):
     """Receives a booking request from the Booking Calendar n8n workflow.
 
@@ -342,14 +343,14 @@ async def record_idempotency(
 # ==========================================================
 
 @router.get("/n8n/health", summary="Get n8n workflow execution status, node health, and latency metrics")
-async def get_n8n_monitoring_health():
+async def get_n8n_monitoring_health(current_user: dict = Depends(_n8n_ops)):
     """Returns telemetry metrics for all n8n workflows, node health, latencies, and node processing errors."""
     from app.services.n8n_monitoring import N8nMonitoringService
     return await N8nMonitoringService.get_system_telemetry()
 
 
 @router.post("/n8n/workflows/{workflow_id}/toggle", summary="Enable or disable an n8n workflow")
-async def toggle_n8n_workflow(workflow_id: str, body: dict):
+async def toggle_n8n_workflow(workflow_id: str, body: dict, current_user: dict = Depends(_n8n_ops)):
     """Toggles active state of an n8n workflow."""
     from app.services.n8n_monitoring import N8nMonitoringService
     active = body.get("active", True)
@@ -360,7 +361,7 @@ async def toggle_n8n_workflow(workflow_id: str, body: dict):
 
 
 @router.post("/n8n/workflows/{workflow_id}/test", summary="Run a latency ping test on an n8n workflow and its nodes")
-async def test_n8n_workflow(workflow_id: str):
+async def test_n8n_workflow(workflow_id: str, current_user: dict = Depends(_n8n_ops)):
     """Executes a real-time latency ping test across all nodes in the workflow."""
     from app.services.n8n_monitoring import N8nMonitoringService
     try:

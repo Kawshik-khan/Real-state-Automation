@@ -53,6 +53,7 @@ jobs:
       AUTOMATION_SHARED_SECRET: "test-ci-secret-key"
       JWT_SECRET: "test-jwt-secret-key-for-ci-minimum-32-chars-long"
       PASSWORD_HASH_SALT: "glg_assets_salt_2026"
+      SEED_DEMO_USERS: "true"
       DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/glg_assets_test"
       DEFAULT_TENANT_ID: "glg-assets-test"
       CORS_ORIGINS: "*"
@@ -107,9 +108,23 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
+      - name: Run Frontend tests
+        working-directory: ./frontend
+        run: npm test
+
       - name: Build Frontend bundle
         working-directory: ./frontend
         run: npm run build
+
+      - name: Fail if a service secret leaked into the client bundle
+        working-directory: ./frontend
+        run: |
+          # The browser must authenticate with the user's JWT only; the automation secret
+          # (or any value previously committed) must never be compiled into dist/.
+          if grep -rEq "X-Automation-Secret|VITE_AUTOMATION_SECRET" dist/; then
+            echo "::error::Service secret reference found in frontend bundle"; exit 1
+          fi
+          echo "Bundle clean"
 
   # ── Stage 4: Docker Build Validation ──
   docker-build:

@@ -1,5 +1,6 @@
 """Upload and publish all modular n8n workflows to Cloud n8n MCP Server."""
 
+import os
 import re
 import sys
 import json
@@ -8,7 +9,7 @@ import requests
 from pathlib import Path
 
 MCP_URL = "https://glg-ai.app.n8n.cloud/mcp-server/http"
-AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkOTE3ZmU3Ni1kNDg0LTQ3ZGYtYmUyMy1iMmYxZjIyMzdiOGIiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImVhOWFkNTM1LTk2ZjYtNDJhYS1hZWY3LTUxZDUyZjU1ZjY3NSIsImlhdCI6MTc4NjQyNTUyMn0.xg85vsK2U_YELYHste2tX8ENVt9KQXkYspcHBBoi1E0"
+AUTH_TOKEN = os.environ["N8N_MCP_TOKEN"]  # never hardcode; rotate if previously committed
 
 HEADERS = {
     "Authorization": f"Bearer {AUTH_TOKEN}",

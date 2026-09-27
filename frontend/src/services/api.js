@@ -1,20 +1,46 @@
 import baselineEvalReport from '../assets/baseline_eval_report.json';
 import benchmarkSuitesData from '../assets/benchmark_suites.json';
+import { clearSession, getAccessToken, setSession } from './session';
 
 /**
- * Dynamic API Base URL resolver:
- * 1. Honors explicit VITE_API_BASE_URL (stripping trailing slashes).
- *    If client is accessing via mobile/LAN and target was set to localhost/127.0.0.1,
- *    it dynamically replaces it with current window hostname so the device can reach the backend.
- * 2. In browser local dev or LAN (localhost, 127.0.0.1, 192.168.x.x, 10.x.x.x, *.local):
- *    Directly routes to ${protocol}//${hostname}:${backendPort} (default port 8000, or VITE_BACKEND_PORT).
- * 3. In production or behind reverse proxy (same-origin / port matching):
- *    Returns '' (relative path) to leverage same-origin routing with zero CORS and zero mixed-content issues.
+ * API transport layer.
+ *
+ * Security model:
+ * - The browser authenticates ONLY with the logged-in user's short-lived access token
+ *   (`Authorization: Bearer`), held in memory (see ./session.js). No service secret is
+ *   ever shipped to or sent from the browser.
+ * - The API base URL comes from build configuration and the page's own location only —
+ *   never from localStorage or other runtime-writable state — and credentials are only
+ *   attached to requests whose origin is on that allow-list.
+ * - EventSource/WebSocket connections use short-lived stream tickets (they cannot send
+ *   an Authorization header).
+ */
+
+const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '8000';
+const CLIENT_HEADER = { 'X-GLG-Client': 'dashboard' };
+
+/** True for loopback / RFC1918 / mDNS hosts used during local development. */
+export function isLocalOrLanHost(hostname) {
+  if (!hostname) return false;
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.local') ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+  );
+}
+
+/**
+ * When VITE_API_BASE_URL points at localhost but the dashboard is opened from another
+ * device on the LAN, swap in the page's hostname so the device can reach the backend.
  */
 export function resolveDynamicHost(targetUrl) {
   if (!targetUrl || typeof window === 'undefined') return targetUrl;
   const currentHost = window.location.hostname;
-  if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+  if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1' && isLocalOrLanHost(currentHost)) {
     return targetUrl
       .replace('://localhost:', `://${currentHost}:`)
       .replace('://127.0.0.1:', `://${currentHost}:`);
@@ -23,89 +49,35 @@ export function resolveDynamicHost(targetUrl) {
 }
 
 export const getApiBaseUrl = () => {
-  // 1. Explicit environment variable override
+  // 1. Explicit build-time configuration
   if (import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== '') {
-    const raw = import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '');
-    return resolveDynamicHost(raw);
+    return resolveDynamicHost(import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, ''));
   }
 
-  // 2. Runtime global or storage override (allows dynamic cloud configuration)
-  if (typeof window !== 'undefined') {
-    if (window.__GLG_API_BASE_URL__) {
-      return window.__GLG_API_BASE_URL__.replace(/\/+$/, '');
-    }
-    try {
-      const stored = localStorage.getItem('glg_api_base_url');
-      if (stored) return stored.replace(/\/+$/, '');
-    } catch {
-      // Ignore storage access errors
-    }
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const isHttps = protocol === 'https:';
 
-    const { protocol, hostname, port } = window.location;
-    const isHttps = protocol === 'https:';
-    const httpProto = isHttps ? 'https:' : 'http:';
-    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
-
-    const isLocalOrLan = (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      hostname.startsWith('172.') ||
-      hostname.endsWith('.local')
-    );
-
-    // If local dev server (e.g. Vite on 5173) and not HTTPS, target backendPort
-    if (isLocalOrLan && port && port !== backendPort && !isHttps) {
-      if (import.meta.env.VITE_USE_PROXY === 'true') {
-        return '';
-      }
-      return `${httpProto}//${hostname}:${backendPort}`;
-    }
-
-    // Auto-detect Render hosting convention:
-    // If frontend is deployed on `xxx-frontend.onrender.com`, default backend is `https://xxx-backend.onrender.com`
-    // Or if hostname ends with `.onrender.com`, fallback to default production backend `https://glg-realestate-backend.onrender.com`
-    if (hostname.endsWith('.onrender.com')) {
-      if (hostname.includes('-frontend.')) {
-        return `https://${hostname.replace('-frontend.', '-backend.')}`;
-      }
-      return 'https://glg-realestate-backend.onrender.com';
-    }
-
-    // In production or when co-located behind reverse proxy
-    return '';
+  // 2. Local dev server (e.g. Vite on 5173) talking straight to the backend port
+  if (isLocalOrLanHost(hostname) && port && port !== BACKEND_PORT && !isHttps) {
+    if (import.meta.env.VITE_USE_PROXY === 'true') return '';
+    return `http://${hostname}:${BACKEND_PORT}`;
   }
 
+  // 3. Render convention: xxx-frontend.onrender.com -> xxx-backend.onrender.com
+  if (hostname.endsWith('.onrender.com')) {
+    if (hostname.includes('-frontend.')) {
+      return `https://${hostname.replace('-frontend.', '-backend.')}`;
+    }
+    return 'https://glg-realestate-backend.onrender.com';
+  }
+
+  // 4. Same origin (reverse proxy)
   return '';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
-/**
- * Zero-Trust Auth Header Provider.
- * Automatically injects the active authenticated user JWT Bearer token for staff operations.
- * Prevents embedding shared secret keys in client-side bundles.
- */
-export function getAuthHeaders(customHeaders = {}, isPublic = false) {
-  const headers = { ...customHeaders };
-  if (!isPublic && typeof window !== 'undefined') {
-    try {
-      const token = localStorage.getItem('glg_token');
-      if (token && token !== 'null' && token !== 'undefined') {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-    } catch {
-      // Storage access fallback
-    }
-  }
-  return headers;
-}
 
-/**
- * Robust API URL builder that correctly joins base URL and path
- * avoiding double slashes or missing slashes.
- */
 export function buildApiUrl(path) {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const base = getApiBaseUrl();
@@ -113,110 +85,135 @@ export function buildApiUrl(path) {
 }
 
 /**
- * Dynamic candidate generator for resilient fetching, authentication fallback, and health probing.
+ * Candidate URLs for a path, derived only from build config and the page location
+ * (never from storage an attacker could write to).
  */
 export function getBackendCandidates(path = '') {
   const cleanPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
   const candidates = [];
 
-  // 1. Primary resolved base URL
   const primaryBase = getApiBaseUrl();
-  if (primaryBase) {
-    candidates.push(`${primaryBase.replace(/\/+$/, '')}${cleanPath}`);
-  }
+  if (primaryBase) candidates.push(`${primaryBase.replace(/\/+$/, '')}${cleanPath}`);
 
-  // 2. Relative path (same origin or Vite dev proxy)
+  // Same origin (Vite dev proxy or reverse proxy)
   candidates.push(cleanPath || '/');
 
-  // 3. Last known working backend from auth session
   if (typeof window !== 'undefined') {
-    try {
-      const working = localStorage.getItem('glg_working_backend');
-      if (working) {
-        candidates.push(`${working.replace(/\/+$/, '')}${cleanPath}`);
-      }
-    } catch {
-      // Ignore storage access errors
-    }
-
-    // 4. Local dev / LAN alternate endpoints
     const { protocol, hostname } = window.location;
-    const isHttps = protocol === 'https:';
-    const httpProto = isHttps ? 'https:' : 'http:';
-    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
-
-    const isLocalOrLan = (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      hostname.startsWith('172.') ||
-      hostname.endsWith('.local')
-    );
-
-    if (isLocalOrLan && !isHttps) {
-      candidates.push(`${httpProto}//${hostname}:${backendPort}${cleanPath}`);
-      if (hostname === 'localhost') {
-        candidates.push(`${httpProto}//127.0.0.1:${backendPort}${cleanPath}`);
-      } else if (hostname === '127.0.0.1') {
-        candidates.push(`${httpProto}//localhost:${backendPort}${cleanPath}`);
-      }
-    }
-
-    // Render candidate fallback
-    if (hostname.endsWith('.onrender.com')) {
-      candidates.push(`https://glg-realestate-backend.onrender.com${cleanPath}`);
+    if (isLocalOrLanHost(hostname) && protocol !== 'https:') {
+      candidates.push(`http://${hostname}:${BACKEND_PORT}${cleanPath}`);
+      if (hostname === 'localhost') candidates.push(`http://127.0.0.1:${BACKEND_PORT}${cleanPath}`);
+      else if (hostname === '127.0.0.1') candidates.push(`http://localhost:${BACKEND_PORT}${cleanPath}`);
     }
   }
 
-  // Deduplicate and filter empty
-  const unique = [];
-  for (const c of candidates) {
-    if (c && !unique.includes(c)) {
-      unique.push(c);
-    }
-  }
-  return unique;
+  return [...new Set(candidates.filter(Boolean))];
 }
 
-/**
- * Returns candidate base URLs (for auth service and health checks)
- */
+/** Candidate base URLs (without path) — used for health probing. */
 export function getApiCandidates() {
-  const candidates = getBackendCandidates('/api/v1/health');
-  return [...new Set(candidates.map(url => {
-    if (url.endsWith('/api/v1/health')) {
-      return url.slice(0, -'/api/v1/health'.length);
-    }
-    return url;
-  }))];
+  return getBackendCandidates('').map((url) => (url === '/' ? '' : url));
+}
+
+function originOf(url) {
+  try {
+    return new URL(url, typeof window !== 'undefined' ? window.location.href : 'http://localhost').origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Only these origins ever receive the user's bearer token. */
+export function isTrustedApiUrl(url) {
+  const target = originOf(url);
+  if (!target) return false;
+  const trusted = new Set(getBackendCandidates('/').map(originOf).filter(Boolean));
+  if (typeof window !== 'undefined') trusted.add(window.location.origin);
+  return trusted.has(target);
+}
+
+// ── Session refresh (single-flight) ────────────────────────────────────────
+
+let refreshInFlight = null;
+
+/**
+ * Exchange the httpOnly refresh cookie for a new access token. Concurrent callers share
+ * one request (rotation makes the old refresh token single-use).
+ * Resolves to { access_token, user } or null.
+ */
+export function refreshSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const resp = await fetch(buildApiUrl('/api/v1/auth/refresh'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...CLIENT_HEADER },
+          body: '{}',
+        });
+        if (!resp.ok) {
+          clearSession();
+          return null;
+        }
+        const data = await resp.json();
+        if (!data.access_token) {
+          clearSession();
+          return null;
+        }
+        setSession(data.access_token, data.user ?? undefined);
+        return data;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
 }
 
 /**
- * Resilient fetch with dynamic multi-candidate fallback:
- * 1. Resolved primary base URL
- * 2. Same-origin relative path (through Vite proxy in dev, Vercel/Nginx proxy in prod -> zero CORS)
- * 3. Last known working backend
- * 4. Local dev / LAN direct host
+ * fetch() for API calls: attaches the bearer token (trusted origins only) and, on a 401,
+ * refreshes the session once and retries.
+ */
+export async function apiFetch(url, options = {}) {
+  const trusted = isTrustedApiUrl(url);
+  const build = () => {
+    const headers = { ...(options.headers || {}) };
+    const token = getAccessToken();
+    if (trusted && token) headers.Authorization = `Bearer ${token}`;
+    else delete headers.Authorization;
+    return { ...options, headers };
+  };
+
+  let response = await fetch(url, build());
+  if (response.status === 401 && trusted && !String(url).includes('/api/v1/auth/')) {
+    const refreshed = await refreshSession();
+    if (refreshed) response = await fetch(url, build());
+  }
+  return response;
+}
+
+/** Backwards-compatible alias. */
+export const fetchWithAuth = apiFetch;
+
+/**
+ * Try allow-listed candidate URLs in order (dev convenience when the backend may be
+ * reachable via proxy or direct port). Skips SPA HTML fallbacks.
  */
 export async function resilientFetch(path, options = {}) {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const candidates = getBackendCandidates(cleanPath);
   let lastErr = null;
 
-  for (const url of candidates) {
+  for (const url of getBackendCandidates(cleanPath)) {
     try {
-      const resp = await fetch(url, options);
-      if (resp) {
-        // If an API request returned HTML (static SPA rewrite fallback), discard and try next candidate
-        const contentType = resp.headers.get('content-type') || '';
-        if (contentType.includes('text/html') && !cleanPath.endsWith('.html') && !cleanPath.endsWith('.svg')) {
-          lastErr = new Error(`Endpoint ${url} returned HTML fallback instead of API response.`);
-          continue;
-        }
-        return resp;
+      const resp = await apiFetch(url, options);
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('text/html') && !cleanPath.endsWith('.html') && !cleanPath.endsWith('.svg')) {
+        lastErr = new Error(`Endpoint ${url} returned HTML fallback instead of API response.`);
+        continue;
       }
+      return resp;
     } catch (err) {
       lastErr = err;
     }
@@ -224,58 +221,126 @@ export async function resilientFetch(path, options = {}) {
   throw lastErr || new Error('Network error: unable to reach backend API');
 }
 
-let isRefreshing = false;
-let refreshSubscribers = [];
+// ── Streams (EventSource / WebSocket) ───────────────────────────────────────
 
-function subscribeTokenRefresh(cb) {
-  refreshSubscribers.push(cb);
+async function getStreamTicket() {
+  const resp = await apiFetch(buildApiUrl('/api/v1/auth/stream-ticket'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!resp.ok) throw new Error(`Stream ticket request failed (HTTP ${resp.status})`);
+  const data = await resp.json();
+  return data.ticket;
 }
 
-function onTokenRefreshed(newToken) {
-  refreshSubscribers.forEach((cb) => cb(newToken));
-  refreshSubscribers = [];
+function withTicket(url, ticket) {
+  return `${url}${url.includes('?') ? '&' : '?'}ticket=${encodeURIComponent(ticket)}`;
 }
 
 /**
- * Enhanced fetch wrapper with automatic 401 retry via Refresh Token Rotation (RTR).
+ * EventSource-like handle for an authenticated SSE stream. Assign onopen / onmessage /
+ * onerror as on a native EventSource. Reconnects with a fresh ticket (exponential backoff,
+ * max 30 s) until close() is called.
  */
-export async function fetchWithAuth(url, options = {}) {
-  const token = localStorage.getItem('glg_token');
-  const headers = { ...(options.headers || {}) };
-  if (token && token !== 'null' && token !== 'undefined' && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+export function openAuthedEventSource(path) {
+  const handle = { onopen: null, onmessage: null, onerror: null, closed: false, close: null };
+  let source = null;
+  let timer = null;
+  let attempt = 0;
 
-  let response = await fetch(url, { ...options, headers, credentials: 'include' });
+  const scheduleReconnect = () => {
+    if (handle.closed) return;
+    const delay = Math.min(30000, 1000 * 2 ** attempt);
+    attempt += 1;
+    timer = setTimeout(connect, delay);
+  };
 
-  // If 401 Unauthorized and not calling auth endpoints directly, attempt silent refresh
-  if (response.status === 401 && !url.includes('/api/v1/auth/')) {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      try {
-        const { authService } = await import('./auth');
-        const newToken = await authService.refreshToken();
-        isRefreshing = false;
-        if (newToken) {
-          onTokenRefreshed(newToken);
-          headers['Authorization'] = `Bearer ${newToken}`;
-          return fetch(url, { ...options, headers, credentials: 'include' });
-        }
-      } catch (err) {
-        isRefreshing = false;
-        throw err;
-      }
-    } else {
-      return new Promise((resolve) => {
-        subscribeTokenRefresh((newToken) => {
-          headers['Authorization'] = `Bearer ${newToken}`;
-          resolve(fetch(url, { ...options, headers, credentials: 'include' }));
-        });
-      });
+  async function connect() {
+    if (handle.closed) return;
+    try {
+      const ticket = await getStreamTicket();
+      if (handle.closed) return;
+      source = new EventSource(withTicket(buildApiUrl(path), ticket));
+      source.onopen = (e) => {
+        attempt = 0;
+        handle.onopen?.(e);
+      };
+      source.onmessage = (e) => handle.onmessage?.(e);
+      source.onerror = (e) => {
+        source?.close();
+        handle.onerror?.(e);
+        scheduleReconnect();
+      };
+    } catch (err) {
+      handle.onerror?.(err);
+      scheduleReconnect();
     }
   }
 
-  return response;
+  handle.close = () => {
+    handle.closed = true;
+    if (timer) clearTimeout(timer);
+    source?.close();
+  };
+
+  connect();
+  return handle;
+}
+
+export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
+  const cleanSubpath = subpath.startsWith('/') ? subpath : `/${subpath}`;
+
+  if (import.meta.env.VITE_WS_BASE_URL) {
+    return `${import.meta.env.VITE_WS_BASE_URL.replace(/\/+$/, '')}${cleanSubpath}`;
+  }
+
+  const apiBase = getApiBaseUrl();
+  if (apiBase && apiBase.startsWith('http')) {
+    return `${apiBase.replace(/^http/, 'ws')}${cleanSubpath}`;
+  }
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, host, port } = window.location;
+    const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
+    if (isLocalOrLanHost(hostname) && port && port !== BACKEND_PORT && protocol !== 'https:') {
+      return `${wsProto}//${hostname}:${BACKEND_PORT}${cleanSubpath}`;
+    }
+    return `${wsProto}//${host}${cleanSubpath}`;
+  }
+
+  return `ws://127.0.0.1:${BACKEND_PORT}${cleanSubpath}`;
+}
+
+/**
+ * WebSocket-like handle authenticated with a stream ticket. Assign onopen / onmessage /
+ * onerror / onclose as on a native WebSocket. Does not auto-reconnect (callers decide);
+ * each call fetches a fresh ticket.
+ */
+export function openAuthedWebSocket(subpath = '/api/v1/ws/chat') {
+  const handle = { onopen: null, onmessage: null, onerror: null, onclose: null, closed: false, socket: null };
+  handle.close = () => {
+    handle.closed = true;
+    handle.socket?.close();
+  };
+  handle.send = (data) => handle.socket?.send(data);
+
+  getStreamTicket()
+    .then((ticket) => {
+      if (handle.closed) return;
+      const ws = new WebSocket(withTicket(getWebSocketUrl(subpath), ticket));
+      handle.socket = ws;
+      ws.onopen = (e) => handle.onopen?.(e);
+      ws.onmessage = (e) => handle.onmessage?.(e);
+      ws.onerror = (e) => handle.onerror?.(e);
+      ws.onclose = (e) => handle.onclose?.(e);
+    })
+    .catch((err) => {
+      handle.onerror?.(err);
+      if (!handle.closed) handle.onclose?.({ code: 4401, reason: String(err?.message || err) });
+    });
+
+  return handle;
 }
 
 /**
@@ -300,11 +365,10 @@ async function handleResponse(response) {
  * Send a chat message to the FastAPI backend supervisor graph
  */
 export async function sendChatMessage(payload) {
-  const response = await fetch(`${API_BASE_URL}/api/chat`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -315,11 +379,10 @@ export async function sendChatMessage(payload) {
  * Generate multi-platform social media content
  */
 export async function generateContent(payload) {
-  const response = await fetch(`${API_BASE_URL}/api/content`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/content`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -330,7 +393,7 @@ export async function generateContent(payload) {
  * Upload a document (PDF, TXT, MD) to the RAG Knowledge Base with OCR
  */
 export async function uploadKnowledgeDocument(file, metadata = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const formData = new FormData();
   formData.append('file', file);
   if (metadata.project) formData.append('project', metadata.project);
@@ -338,13 +401,12 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
   if (metadata.document_type) formData.append('document_type', metadata.document_type);
 
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/knowledge/upload`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/knowledge/upload`, {
     method: 'POST',
     headers,
     body: formData,
@@ -356,15 +418,14 @@ export async function uploadKnowledgeDocument(file, metadata = {}) {
  * Fetch all indexed RAG documents from backend
  */
 export async function getKnowledgeDocuments() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/knowledge/documents`, {
     headers,
   });
   return handleResponse(response);
@@ -374,11 +435,10 @@ export async function getKnowledgeDocuments() {
  * Perform content moderation check
  */
 export async function checkModeration(text) {
-  const response = await fetch(`${API_BASE_URL}/api/moderation`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/moderation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text }),
   });
@@ -389,9 +449,8 @@ export async function checkModeration(text) {
  * Get all real-estate projects
  */
 export async function getProjects() {
-  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/projects`, {
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -401,9 +460,8 @@ export async function getProjects() {
  * Get single real-estate project by ID
  */
 export async function getProjectById(projectId) {
-  const response = await fetch(`${API_BASE_URL}/api/project/${projectId}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/project/${projectId}`, {
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -413,11 +471,10 @@ export async function getProjectById(projectId) {
  * Query Hybrid RAG Vector Search directly
  */
 export async function searchKnowledge(query, filter = {}) {
-  const response = await fetch(`${API_BASE_URL}/api/search`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/search`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ query, filter }),
   });
@@ -428,9 +485,8 @@ export async function searchKnowledge(query, filter = {}) {
  * Fetch active conversations list
  */
 export async function getConversations() {
-  const response = await fetch(buildApiUrl('/api/v1/conversations'), {
+  const response = await apiFetch(buildApiUrl('/api/v1/conversations'), {
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -440,9 +496,8 @@ export async function getConversations() {
  * Fetch full message history for a conversation (limit default 60)
  */
 export async function getConversationMessages(convId, limit = 60) {
-  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/messages?limit=${limit}`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/conversations/${convId}/messages?limit=${limit}`), {
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -452,10 +507,9 @@ export async function getConversationMessages(convId, limit = 60) {
  * Toggle human takeover state for a conversation
  */
 export async function toggleTakeover(convId) {
-  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/takeover`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/conversations/${convId}/takeover`), {
     method: 'POST',
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -465,11 +519,10 @@ export async function toggleTakeover(convId) {
  * Send manual human agent reply to customer conversation
  */
 export async function sendAgentReply(convId, text) {
-  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/reply`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/conversations/${convId}/reply`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text }),
   });
@@ -480,11 +533,10 @@ export async function sendAgentReply(convId, text) {
  * Create a new customer conversation / simulation lead
  */
 export async function createConversation(payload) {
-  const response = await fetch(buildApiUrl('/api/v1/conversations'), {
+  const response = await apiFetch(buildApiUrl('/api/v1/conversations'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -495,11 +547,10 @@ export async function createConversation(payload) {
  * Send customer message (triggers AI graph pipeline if AI is active)
  */
 export async function sendCustomerMessage(convId, text, channel = 'website') {
-  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}/message`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/conversations/${convId}/message`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ text, channel }),
   });
@@ -510,11 +561,10 @@ export async function sendCustomerMessage(convId, text, channel = 'website') {
  * Fetch executive analytics weekly report
  */
 export async function getAnalyticsReport() {
-  const response = await fetch(buildApiUrl('/api/v1/analytics/weekly-digest'), {
+  const response = await apiFetch(buildApiUrl('/api/v1/analytics/weekly-digest'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -524,10 +574,9 @@ export async function getAnalyticsReport() {
  * Fetch dynamic manager overview analytics and active campaigns
  */
 export async function getManagerOverview() {
-  const response = await fetch(buildApiUrl('/api/v1/analytics/manager-overview'), {
+  const response = await apiFetch(buildApiUrl('/api/v1/analytics/manager-overview'), {
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -537,11 +586,10 @@ export async function getManagerOverview() {
  * Update campaign status (ACTIVE / PAUSED)
  */
 export async function updateCampaignStatus(campaignId, status) {
-  const response = await fetch(buildApiUrl(`/api/v1/analytics/campaigns/${campaignId}/status`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/analytics/campaigns/${campaignId}/status`), {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ status }),
   });
@@ -553,76 +601,12 @@ export async function updateCampaignStatus(campaignId, status) {
  * Delete a conversation
  */
 export async function deleteConversation(convId) {
-  const response = await fetch(buildApiUrl(`/api/v1/conversations/${convId}`), {
+  const response = await apiFetch(buildApiUrl(`/api/v1/conversations/${convId}`), {
     method: 'DELETE',
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
-}
-
-/**
- * Get SSE stream URL for live conversation event listening
- */
-export function getConversationsStreamUrl() {
-  const baseUrl = buildApiUrl('/api/v1/conversations/stream');
-  if (typeof window !== 'undefined') {
-    try {
-      const token = localStorage.getItem('glg_token');
-      if (token && token !== 'null' && token !== 'undefined') {
-        return `${baseUrl}?token=${encodeURIComponent(token)}`;
-      }
-    } catch {
-      // Storage access fallback
-    }
-  }
-  return baseUrl;
-}
-
-export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
-  const cleanSubpath = subpath.startsWith('/') ? subpath : `/${subpath}`;
-
-  // 1. Explicit WebSocket URL override
-  if (import.meta.env.VITE_WS_BASE_URL) {
-    return `${import.meta.env.VITE_WS_BASE_URL.replace(/\/+$/, '')}${cleanSubpath}`;
-  }
-
-  // 2. Derive from resolved API base URL if explicitly set with http/https
-  const apiBase = getApiBaseUrl();
-  if (apiBase && apiBase.startsWith('http')) {
-    const wsProto = apiBase.startsWith('https') ? 'wss:' : 'ws:';
-    const cleanHost = apiBase.replace(/^https?:\/\//, '');
-    return `${wsProto}//${cleanHost}${cleanSubpath}`;
-  }
-
-  // 3. In browser environment
-  if (typeof window !== 'undefined') {
-    const { protocol, hostname, host, port } = window.location;
-    const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
-    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
-
-    const isLocalOrLan = (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      hostname.startsWith('172.') ||
-      hostname.endsWith('.local')
-    );
-
-    // If local dev running on frontend dev port (e.g. 5173), connect directly to backend port
-    if (isLocalOrLan && port && port !== backendPort && protocol !== 'https:') {
-      return `${wsProto}//${hostname}:${backendPort}${cleanSubpath}`;
-    }
-
-    // In production or reverse-proxied deployment
-    return `${wsProto}//${host}${cleanSubpath}`;
-  }
-
-  const fallbackPort = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_PORT) || '8000';
-  return `ws://127.0.0.1:${fallbackPort}${cleanSubpath}`;
 }
 
 /**
@@ -631,7 +615,6 @@ export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
 export async function getN8nTelemetry() {
   const response = await resilientFetch('/api/v1/automation/n8n/health', {
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -645,7 +628,6 @@ export async function toggleN8nWorkflow(workflowId, active) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ active }),
   });
@@ -659,7 +641,6 @@ export async function testN8nWorkflow(workflowId) {
   const response = await resilientFetch(`/api/v1/automation/n8n/workflows/${workflowId}/test`, {
     method: 'POST',
     headers: {
-      ...getAuthHeaders(),
     },
   });
   return handleResponse(response);
@@ -669,9 +650,8 @@ export async function testN8nWorkflow(workflowId) {
  * Fetch Developer System Health diagnostics
  */
 export async function getDeveloperSystemHealth() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -686,10 +666,9 @@ export async function getDeveloperSystemHealth() {
  * Simulate Webhook Payload through AI Pipeline (Developer only)
  */
 export async function simulateDeveloperWebhook(payload) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -706,10 +685,9 @@ export async function simulateDeveloperWebhook(payload) {
  * Run RAG Vector Search Benchmark (Developer only)
  */
 export async function benchmarkDeveloperRAG(payload) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -726,10 +704,9 @@ export async function benchmarkDeveloperRAG(payload) {
  * Trigger live Supabase and Pinecone database & vector sync (Developer only)
  */
 export async function syncDeveloperDatabases() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -745,10 +722,9 @@ export async function syncDeveloperDatabases() {
  * Fetch Executive Cross-Role Summary Intelligence Report
  */
 export async function getCrossRoleSummaryReport(period = '7d') {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -764,11 +740,10 @@ export async function getCrossRoleSummaryReport(period = '7d') {
  * Fetch real-time system logs from live buffer (Developer only)
  */
 export async function getDeveloperLogs(params = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const query = new URLSearchParams(params).toString();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -784,10 +759,9 @@ export async function getDeveloperLogs(params = {}) {
  * Clear live system log buffer (Developer only)
  */
 export async function clearDeveloperLogs() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -800,20 +774,12 @@ export async function clearDeveloperLogs() {
 }
 
 /**
- * Get SSE URL for live log streaming
- */
-export function getDeveloperLogsStreamUrl() {
-  return buildApiUrl('/api/v1/developer/logs/stream');
-}
-
-/**
  * Fetch Social Media KPI Analytics for Admin Command Center
  */
 export async function getSocialAnalyticsKPIs(params = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -824,7 +790,7 @@ export async function getSocialAnalyticsKPIs(params = {}) {
   } else if (typeof params === 'object' && params !== null) {
     query = new URLSearchParams(params).toString();
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/analytics/social-kpis${query ? `?${query}` : ''}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/analytics/social-kpis${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers,
   });
@@ -835,11 +801,10 @@ export async function getSocialAnalyticsKPIs(params = {}) {
  * Simulate Facebook/Instagram Comment to Private DM Lead Bridge
  */
 export async function simulateSocialCommentToDm(payload) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/social/simulator/comment-to-dm`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/social/simulator/comment-to-dm`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -850,10 +815,9 @@ export async function simulateSocialCommentToDm(payload) {
  * Run developer evaluation suites with progress streaming / HTTP fallback
  */
 export async function runDeveloperEvals(suite = 'all', sampleSize = null, background = false) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -880,10 +844,7 @@ export async function checkBackendHealth() {
     try {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 2000);
-      const resp = await fetch(ep, {
-        signal: controller.signal,
-        headers: getAuthHeaders()
-      });
+      const resp = await apiFetch(ep, { signal: controller.signal });
       clearTimeout(id);
       // Any response indicating server process is alive!
       if (resp && (resp.ok || resp.status === 401 || resp.status === 403)) {
@@ -901,10 +862,9 @@ export async function checkBackendHealth() {
  */
 export async function getLatestDeveloperEvals() {
   try {
-    const token = localStorage.getItem('glg_token');
+    const token = getAccessToken();
     const headers = {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     };
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -934,10 +894,9 @@ export async function getLatestDeveloperEvals() {
  * Fetch live evaluation engine execution status and progress
  */
 export async function getDeveloperEvalsStatus() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -954,10 +913,9 @@ export async function getDeveloperEvalsStatus() {
  */
 export async function getDeveloperEvalSuites() {
   try {
-    const token = localStorage.getItem('glg_token');
+    const token = getAccessToken();
     const headers = {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     };
     if (token && token !== 'null' && token !== 'undefined') {
       headers['Authorization'] = `Bearer ${token}`;
@@ -987,15 +945,14 @@ export async function getDeveloperEvalSuites() {
  * Create a new real-estate project
  */
 export async function createProject(projectData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/projects`, {
     method: 'POST',
     headers,
     body: JSON.stringify(projectData),
@@ -1007,14 +964,13 @@ export async function createProject(projectData) {
  * Fetch inbound email threads for review
  */
 export async function getEmailThreads() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/email/threads`, {
     headers,
   });
   return handleResponse(response);
@@ -1024,15 +980,14 @@ export async function getEmailThreads() {
  * Approve AI email draft reply and dispatch via worker
  */
 export async function approveEmailDraft(threadId, payload = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/approve`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/approve`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -1044,15 +999,14 @@ export async function approveEmailDraft(threadId, payload = {}) {
  * Reject AI email draft reply
  */
 export async function rejectEmailDraft(threadId) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/reject`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/email/threads/${threadId}/reject`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ thread_id: threadId }),
@@ -1064,15 +1018,14 @@ export async function rejectEmailDraft(threadId) {
  * Update access permission tag on a knowledge document
  */
 export async function updateKnowledgeAccess(docId, accessLevel) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/knowledge/documents/${docId}/access`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/knowledge/documents/${docId}/access`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ access_level: accessLevel }),
@@ -1084,14 +1037,13 @@ export async function updateKnowledgeAccess(docId, accessLevel) {
  * Fetch calendar events and upcoming property critical dates
  */
 export async function getCalendarEvents() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
     headers,
   });
   return handleResponse(response);
@@ -1101,16 +1053,15 @@ export async function getCalendarEvents() {
  * Fetch calendar milestones (site visits, signings, payments, handovers)
  */
 export async function getCalendarMilestones(params = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   const query = new URLSearchParams(params).toString();
   const url = `${API_BASE_URL}/api/v1/calendar/milestones${query ? `?${query}` : ''}`;
-  const response = await fetch(url, { headers });
+  const response = await apiFetch(url, { headers });
   return handleResponse(response);
 }
 
@@ -1118,15 +1069,14 @@ export async function getCalendarMilestones(params = {}) {
  * Create a new calendar milestone
  */
 export async function createCalendarMilestone(milestoneData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/calendar/milestones`, {
     method: 'POST',
     headers,
     body: JSON.stringify(milestoneData),
@@ -1138,15 +1088,14 @@ export async function createCalendarMilestone(milestoneData) {
  * Create a site tour booking
  */
 export async function createSiteTourBooking(bookingData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/automation/booking`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/automation/booking`, {
     method: 'POST',
     headers,
     body: JSON.stringify(bookingData),
@@ -1158,15 +1107,14 @@ export async function createSiteTourBooking(bookingData) {
  * Publish or schedule social media post
  */
 export async function publishSocialPost(postData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/content/publish`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/v1/content/publish`, {
     method: 'POST',
     headers,
     body: JSON.stringify(postData),
@@ -1178,16 +1126,15 @@ export async function publishSocialPost(postData) {
  * Fetch social media post history and content calendar entries
  */
 export async function getSocialPosts(params = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   const query = new URLSearchParams(params).toString();
   const url = `${API_BASE_URL}/api/v1/content/posts${query ? `?${query}` : ''}`;
-  const response = await fetch(url, { headers });
+  const response = await apiFetch(url, { headers });
   return handleResponse(response);
 }
 
@@ -1195,16 +1142,15 @@ export async function getSocialPosts(params = {}) {
  * Fetch analytics volume timeseries (inquiries, visits, bookings)
  */
 export async function getTimeSeriesAnalytics(params = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   const query = new URLSearchParams(params).toString();
   const url = `${API_BASE_URL}/api/v1/analytics/volume-timeseries${query ? `?${query}` : ''}`;
-  const response = await fetch(url, { headers });
+  const response = await apiFetch(url, { headers });
   return handleResponse(response);
 }
 // Alias for backward compatibility
@@ -1214,9 +1160,8 @@ export const getSocialKPIs = getSocialAnalyticsKPIs;
  * Fetch Multi-Tier L1/L2 and Semantic Cache Diagnostics
  */
 export async function getDeveloperCacheStats() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1229,10 +1174,9 @@ export async function getDeveloperCacheStats() {
  * Flush all L1/L2 and Semantic caches
  */
 export async function flushDeveloperCaches() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1248,10 +1192,9 @@ export async function flushDeveloperCaches() {
  * Unlock account locked out by brute-force protection (Admin/Manager only)
  */
 export async function unlockUserAccount(email) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1270,9 +1213,8 @@ export async function unlockUserAccount(email) {
  * Fetch all agent configurations from PostgreSQL/Supabase
  */
 export async function getAgentConfigs() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1285,9 +1227,8 @@ export async function getAgentConfigs() {
  * Fetch single agent configuration
  */
 export async function getAgentConfig(agentKey) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1300,10 +1241,9 @@ export async function getAgentConfig(agentKey) {
  * Save or update agent configuration directly in PostgreSQL/Supabase
  */
 export async function saveAgentConfig(configData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1320,10 +1260,9 @@ export async function saveAgentConfig(configData) {
  * Reset agent configuration to canonical system defaults
  */
 export async function resetAgentConfig(agentKey = null) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1340,9 +1279,8 @@ export async function resetAgentConfig(agentKey = null) {
  * Fetch real-time token telemetry and cost analytics (USD and BDT)
  */
 export async function getTokenUsageTelemetry() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1355,9 +1293,8 @@ export async function getTokenUsageTelemetry() {
  * Fetch fine-tuning jobs and active LoRA adapters
  */
 export async function getFineTuningJobs() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1370,10 +1307,9 @@ export async function getFineTuningJobs() {
  * Trigger a new fine-tuning job
  */
 export async function triggerFineTuningJob(payload) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1390,9 +1326,8 @@ export async function triggerFineTuningJob(payload) {
  * Generate synthetic Q&A dataset pairs
  */
 export async function generateSyntheticData(targetAgent = 'property_agent', count = 50) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1408,10 +1343,9 @@ export async function generateSyntheticData(targetAgent = 'property_agent', coun
  * Test agent prompt in interactive developer playground
  */
 export async function testAgentPlayground(payload) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1434,10 +1368,9 @@ export async function testAgentPlayground(payload) {
  * Fetch all report schedules with configured recipients and channels
  */
 export async function getReportSchedules() {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1453,10 +1386,9 @@ export async function getReportSchedules() {
  * Create or configure a new report schedule (Admin only)
  */
 export async function createReportSchedule(scheduleData) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1473,10 +1405,9 @@ export async function createReportSchedule(scheduleData) {
  * Toggle an automated schedule active/paused
  */
 export async function toggleReportSchedule(scheduleId, isActive) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1493,10 +1424,9 @@ export async function toggleReportSchedule(scheduleId, isActive) {
  * Manually trigger immediate report generation & multi-channel delivery ("Run Now")
  */
 export async function triggerReportNow(scheduleId, payload = {}) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1513,10 +1443,9 @@ export async function triggerReportNow(scheduleId, payload = {}) {
  * Fetch report execution history & channel delivery audit logs
  */
 export async function getReportHistory(limit = 20) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1532,10 +1461,9 @@ export async function getReportHistory(limit = 20) {
  * Fetch single report detail including rendered HTML preview
  */
 export async function getReportDetail(reportId) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1551,10 +1479,9 @@ export async function getReportDetail(reportId) {
  * Send an immediate test brief across Email, Telegram, or WhatsApp
  */
 export async function sendTestReport(payload) {
-  const token = localStorage.getItem('glg_token');
+  const token = getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
   };
   if (token && token !== 'null' && token !== 'undefined') {
     headers['Authorization'] = `Bearer ${token}`;
@@ -1573,80 +1500,41 @@ export async function sendTestReport(payload) {
  * ==========================================================
  */
 
-/**
- * Fetch catalog of third-party integrations with encrypted/masked status
- */
+// ── Service integrations (Developer Console) ────────────────────────────────
+// Authenticated with the user's bearer token by apiFetch (via resilientFetch).
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
 export async function getServiceIntegrations() {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   const response = await resilientFetch('/api/v1/developer/integrations', {
     method: 'GET',
-    headers,
+    headers: JSON_HEADERS,
   });
   return handleResponse(response);
 }
 
-/**
- * Save and encrypt third-party credentials in PostgreSQL
- */
 export async function saveServiceIntegration(serviceKey, credentials, isActive = true) {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
     method: 'POST',
-    headers,
+    headers: JSON_HEADERS,
     body: JSON.stringify({ credentials, is_active: isActive }),
   });
   return handleResponse(response);
 }
 
-/**
- * Perform real-time live connectivity ping test
- */
 export async function testServiceIntegration(serviceKey, credentials = null) {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}/test`, {
     method: 'POST',
-    headers,
-    body: credentials ? JSON.stringify({ credentials }) : JSON.stringify({}),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(credentials ? { credentials } : {}),
   });
   return handleResponse(response);
 }
 
-/**
- * Disconnect service and purge credentials from database
- */
 export async function deleteServiceIntegration(serviceKey) {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
     method: 'DELETE',
-    headers,
+    headers: JSON_HEADERS,
   });
   return handleResponse(response);
 }

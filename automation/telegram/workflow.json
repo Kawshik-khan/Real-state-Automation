@@ -35,7 +35,7 @@
             },
             {
               "name": "X-Automation-Secret",
-              "value": "glg-secret-key"
+              "value": "={{ $env.AUTOMATION_SHARED_SECRET }}"
             }
           ]
         },

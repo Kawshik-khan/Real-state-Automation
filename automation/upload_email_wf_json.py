@@ -1,10 +1,11 @@
 """Upload GLG Email Reply Automation Workflow to Cloud n8n using .env environment variables exclusively."""
 
+import os
 import json
 import requests
 
 MCP_URL = "https://glg-ai.app.n8n.cloud/mcp-server/http"
-AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkOTE3ZmU3Ni1kNDg0LTQ3ZGYtYmUyMy1iMmYxZjIyMzdiOGIiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImVhOWFkNTM1LTk2ZjYtNDJhYS1hZWY3LTUxZDUyZjU1ZjY3NSIsImlhdCI6MTc4NjQyNTUyMn0.xg85vsK2U_YELYHste2tX8ENVt9KQXkYspcHBBoi1E0"
+AUTH_TOKEN = os.environ["N8N_MCP_TOKEN"]  # never hardcode; rotate if previously committed
 
 headers = {
     "Authorization": f"Bearer {AUTH_TOKEN}",
@@ -55,7 +56,7 @@ const backendNode = node({
       url: '={{ $env.FASTAPI_BASE_URL || "https://realstate-automation.onrender.com" }}/api/v1/email/incoming',
       sendHeaders: true,
       specifyHeaders: 'json',
-      jsonHeaders: '={"X-Automation-Secret": "{{ $env.AUTOMATION_SHARED_SECRET || "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8" }}", "Content-Type": "application/json"}',
+      jsonHeaders: '={"X-Automation-Secret": "{{ $env.AUTOMATION_SHARED_SECRET }}", "Content-Type": "application/json"}',
       sendBody: true,
       specifyBody: 'json',
       jsonBody: '={{ JSON.stringify({ message_id: $json.id || $json.messageId, thread_id: $json.threadId, in_reply_to: $json.inReplyTo, sender_email: $json.from || $json.sender_email, sender_name: $json.sender_name || "Lead", subject: $json.subject, body_text: $json.body_text || $json.snippet, body_html: $json.body_html }) }}'
@@ -91,7 +92,7 @@ const sendEmailNode = node({
       url: '={{ $env.FASTAPI_BASE_URL || "https://realstate-automation.onrender.com" }}/api/v1/email/threads/dispatch-outbound',
       sendHeaders: true,
       specifyHeaders: 'json',
-      jsonHeaders: '={"X-Automation-Secret": "{{ $env.AUTOMATION_SHARED_SECRET || "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8" }}", "Content-Type": "application/json"}',
+      jsonHeaders: '={"X-Automation-Secret": "{{ $env.AUTOMATION_SHARED_SECRET }}", "Content-Type": "application/json"}',
       sendBody: true,
       specifyBody: 'json',
       jsonBody: '={{ JSON.stringify({ thread_id: $json.thread_id, recipient_email: $json.sender_email, subject: $json.ai_draft.subject, body: $json.ai_draft.body }) }}'
@@ -106,7 +107,7 @@ const telegramNotifyNode = node({
     name: 'Notify Agent via Telegram (.env Auth)',
     parameters: {
       method: 'POST',
-      url: '=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN || "8098076051:AAFiC-Qf4w37dRLvC40gfzJj6nrpBu8NkKU" }}/sendMessage',
+      url: '=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage',
       sendHeaders: true,
       specifyHeaders: 'json',
       jsonHeaders: '={"Content-Type": "application/json"}',

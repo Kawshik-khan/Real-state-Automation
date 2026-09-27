@@ -30,8 +30,8 @@ import {
   sendCustomerMessage, 
   createConversation, 
   deleteConversation, 
-  getConversationsStreamUrl,
-  getWebSocketUrl 
+  openAuthedEventSource,
+  openAuthedWebSocket
 } from '../services/api';
 import Pagination from '../components/ui/Pagination';
 
@@ -127,7 +127,7 @@ export default function ConversationsPage() {
   useEffect(() => {
     let ws;
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openAuthedWebSocket('/api/v1/ws/chat');
       ws.onopen = () => setSseConnected(true);
       ws.onclose = () => setSseConnected(false);
       ws.onmessage = (event) => {
@@ -155,8 +155,7 @@ export default function ConversationsPage() {
 
   // Real-time SSE Stream Listener
   useEffect(() => {
-    const streamUrl = getConversationsStreamUrl();
-    const eventSource = new EventSource(streamUrl);
+    const eventSource = openAuthedEventSource('/api/v1/conversations/stream');
 
     eventSource.onopen = () => setSseConnected(true);
 

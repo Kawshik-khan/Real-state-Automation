@@ -5,15 +5,16 @@ Handles incoming email webhooks, thread listing, AI draft review, and 1-click ap
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.agents.email_agent import email_agent
-from app.config import settings
+from app.dependencies import require_roles, require_service
 from app.models.email import (
     DraftApprovalRequest,
     EmailStatus,
     IncomingEmailPayload,
 )
+from app.models.user import UserRole
 from app.services.attachment_parser import attachment_parser
 from app.services.email_service import email_service
 from app.services.idempotency import idempotency_service
@@ -21,21 +22,16 @@ from app.services.idempotency import idempotency_service
 router = APIRouter()
 
 
-async def verify_auth(
-    x_automation_secret: Optional[str] = Header(None, alias="X-Automation-Secret"),
-    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
-):
-    """Simple auth check for n8n webhooks and dashboard requests."""
-    # Optional secret validation if secret header provided
-    if x_automation_secret and x_automation_secret != settings.automation_shared_secret:
-        raise HTTPException(status_code=403, detail="Invalid automation secret")
-    return {"tenant_id": x_tenant_id or settings.default_tenant_id}
+# Inbound mail comes from n8n (service credentials only). Thread review / approve / send is
+# a dashboard action for staff who handle customer communication.
+verify_service = require_service
+verify_staff = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT])
 
 
 @router.post("/incoming", summary="Ingest an incoming email message")
 async def incoming_email_webhook(
     payload: IncomingEmailPayload,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_service),
 ):
     """Processes an incoming customer email from n8n / mail trigger.
 
@@ -135,7 +131,7 @@ async def incoming_email_webhook(
 @router.get("/threads", summary="List email threads")
 async def list_threads(
     status: Optional[str] = Query(None, description="Filter by status: pending_approval, auto_replied, etc."),
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Returns all email threads sorted by newest first."""
     threads = email_service.list_threads(status=status)
@@ -149,7 +145,7 @@ async def list_threads(
 @router.get("/threads/{thread_id}", summary="Get email thread details")
 async def get_thread(
     thread_id: str,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Returns full message history and metadata for a specific thread."""
     thread = email_service.get_thread(thread_id)
@@ -162,7 +158,7 @@ async def get_thread(
 async def approve_draft(
     thread_id: str,
     req: Optional[DraftApprovalRequest] = None,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Approves staged AI draft response and dispatches email via n8n."""
     thread = email_service.get_thread(thread_id)
@@ -194,7 +190,7 @@ async def approve_draft(
 async def edit_and_send_draft(
     thread_id: str,
     req: DraftApprovalRequest,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Edits the AI draft response and dispatches immediately via n8n."""
     return await approve_draft(thread_id=thread_id, req=req, auth=auth)
@@ -203,7 +199,7 @@ async def edit_and_send_draft(
 @router.post("/threads/{thread_id}/reject", summary="Reject/Discard AI email draft")
 async def reject_draft(
     thread_id: str,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Marks draft as rejected so a real estate agent can write a manual reply."""
     thread = email_service.get_thread(thread_id)
@@ -222,7 +218,7 @@ async def reject_draft(
 @router.post("/threads/dispatch-outbound", summary="Dispatch outbound email reply")
 async def dispatch_outbound_email(
     body: dict,
-    auth: dict = Depends(verify_auth),
+    auth: dict = Depends(verify_staff),
 ):
     """Endpoint called by n8n or automation engine to dispatch an outbound email reply."""
     thread_id = body.get("thread_id")

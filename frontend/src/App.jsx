@@ -22,6 +22,7 @@ import EmailInboxPage from './pages/EmailInboxPage';
 import EditModulesModal from './components/dashboard/EditModulesModal';
 import QuickChatDrawer from './components/dashboard/QuickChatDrawer';
 import HexagonBackground from './components/layout/HexagonBackground';
+import RequireRole from './auth/RequireRole';
 
 const DEFAULT_MODULE_CONFIG = {
   kpis: true,
@@ -85,7 +86,7 @@ export const PATH_TO_TAB = {
 };
 
 function DashboardApp() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, initializing } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -148,6 +149,19 @@ function DashboardApp() {
       console.error('Failed to reset dashboard config:', err);
     }
   };
+
+  if (initializing) {
+    return (
+      <div
+        className="app-shell"
+        role="status"
+        aria-live="polite"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-dark)', color: 'var(--text-muted)' }}
+      >
+        Restoring your session…
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -258,22 +272,22 @@ function DashboardApp() {
               } 
             />
             <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-            <Route path="/properties" element={<PropertiesPage searchQuery={searchQuery} />} />
-            <Route path="/conversations" element={<ConversationsPage />} />
-            <Route path="/conversations/:convId" element={<ConversationsPage />} />
-            <Route path="/knowledge" element={<KnowledgePage />} />
-            <Route path="/content" element={<ContentGeneratorPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/social-analytics" element={<SocialAnalyticsPage />} />
-            <Route path="/developer" element={<DeveloperConsolePage setActiveParentTab={handleSetActiveTab} />} />
+            <Route path="/properties" element={<RequireRole tab="properties" fallbackPath={defaultRolePath}><PropertiesPage searchQuery={searchQuery} /></RequireRole>} />
+            <Route path="/conversations" element={<RequireRole tab="conversations" fallbackPath={defaultRolePath}><ConversationsPage /></RequireRole>} />
+            <Route path="/conversations/:convId" element={<RequireRole tab="conversations" fallbackPath={defaultRolePath}><ConversationsPage /></RequireRole>} />
+            <Route path="/knowledge" element={<RequireRole tab="knowledge" fallbackPath={defaultRolePath}><KnowledgePage /></RequireRole>} />
+            <Route path="/content" element={<RequireRole tab="content" fallbackPath={defaultRolePath}><ContentGeneratorPage /></RequireRole>} />
+            <Route path="/analytics" element={<RequireRole tab="analytics" fallbackPath={defaultRolePath}><AnalyticsPage /></RequireRole>} />
+            <Route path="/social-analytics" element={<RequireRole tab="social_analytics" fallbackPath={defaultRolePath}><SocialAnalyticsPage /></RequireRole>} />
+            <Route path="/developer" element={<RequireRole tab="developer_console" fallbackPath={defaultRolePath}><DeveloperConsolePage setActiveParentTab={handleSetActiveTab} /></RequireRole>} />
             <Route path="/developer-console" element={<Navigate to="/developer" replace />} />
-            <Route path="/ai-studio" element={<AgentCustomizationPage setActiveParentTab={handleSetActiveTab} />} />
+            <Route path="/ai-studio" element={<RequireRole tab="ai_customization" fallbackPath={defaultRolePath}><AgentCustomizationPage setActiveParentTab={handleSetActiveTab} /></RequireRole>} />
             <Route path="/agent-customization" element={<Navigate to="/ai-studio" replace />} />
-            <Route path="/n8n" element={<N8nMonitoringPage />} />
+            <Route path="/n8n" element={<RequireRole tab="n8n_monitoring"><N8nMonitoringPage /></RequireRole>} />
             <Route path="/n8n-monitoring" element={<Navigate to="/n8n" replace />} />
-            <Route path="/reports" element={<RoleReportsPage />} />
+            <Route path="/reports" element={<RequireRole tab="role_reports" fallbackPath={defaultRolePath}><RoleReportsPage /></RequireRole>} />
             <Route path="/role-reports" element={<Navigate to="/reports" replace />} />
-            <Route path="/inbox" element={<EmailInboxPage />} />
+            <Route path="/inbox" element={<RequireRole tab="inbox" fallbackPath={defaultRolePath}><EmailInboxPage /></RequireRole>} />
             <Route path="*" element={<Navigate to={defaultRolePath} replace />} />
           </Routes>
         </main>

@@ -37,7 +37,10 @@ services:
       - ./backend/.env
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-glg_assets}
-      - AUTOMATION_SHARED_SECRET=${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+      # Required — no insecure defaults. Generate with: openssl rand -hex 32
+      - AUTOMATION_SHARED_SECRET=${AUTOMATION_SHARED_SECRET:?set AUTOMATION_SHARED_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET (different from AUTOMATION_SHARED_SECRET)}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
@@ -114,7 +117,7 @@ services:
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DB_POSTGRESDB_DATABASE: n8n
       # Encryption key for credentials storage
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-glg-assets-n8n-encryption-key-change-in-prod}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY}
       N8N_MCP_SERVER_ENABLED: "true"
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: 168
@@ -124,7 +127,7 @@ services:
       # ── Social AI OS — required env vars ──
       FASTAPI_BASE_URL: http://backend:8000
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-glg-assets-main}
-      AUTOMATION_SHARED_SECRET: ${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+      AUTOMATION_SHARED_SECRET: ${AUTOMATION_SHARED_SECRET:?set AUTOMATION_SHARED_SECRET}
       LEAD_STORAGE: postgres
       GOOGLE_SHEETS_WEBHOOK_URL: ""
       SUPABASE_URL: ""

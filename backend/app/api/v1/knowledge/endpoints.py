@@ -1,5 +1,6 @@
 """Knowledge Services — Document upload with chunking + embedding + pgvector storage + OCR support."""
 
+import re
 import uuid
 from pathlib import Path
 
@@ -13,6 +14,18 @@ from app.services.llm import llm_service
 
 router = APIRouter()
 _knowledge_auth = require_roles([UserRole.ADMIN, UserRole.DEVELOPER])
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+_DOC_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+
+def _validated_doc_id(doc_id: str | None) -> str:
+    """doc_id becomes a filename on disk: allow only a safe character set (no path parts)."""
+    if not doc_id:
+        return f"doc_{uuid.uuid4().hex[:12]}"
+    if not _DOC_ID_RE.match(doc_id) or ".." in doc_id:
+        raise HTTPException(status_code=400, detail="doc_id may only contain letters, digits, '_', '-', '.'")
+    return doc_id
 
 
 def _extract_text_from_file(filename: str, content: bytes) -> str:
@@ -83,13 +96,15 @@ async def knowledge_upload(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
-    content = await file.read()
+    final_doc_id = _validated_doc_id(doc_id)
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit")
     text = _extract_text_from_file(file.filename, content)
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="Could not extract text from file or file is empty")
 
-    final_doc_id = doc_id or f"doc_{uuid.uuid4().hex[:12]}"
     chunks_raw = _chunk_text(text, chunk_size=500, overlap=50)
 
     if not chunks_raw:
@@ -120,7 +135,9 @@ async def knowledge_upload(
     try:
         base_dir = Path(settings.knowledge_base_dir).resolve()
         base_dir.mkdir(parents=True, exist_ok=True)
-        save_path = base_dir / f"{final_doc_id}.txt"
+        save_path = (base_dir / f"{final_doc_id}.txt").resolve()
+        if save_path.parent != base_dir:
+            raise ValueError("refusing to write outside the knowledge base directory")
         save_path.write_text(text, encoding="utf-8")
     except Exception as save_err:
         print(f"[Knowledge Persistence Warning] Could not save raw text file: {save_err}")
@@ -146,7 +163,7 @@ async def knowledge_text(
 ):
     """Upload plain text content for chunking, embedding, and indexing."""
     text = body.get("text", "").strip()
-    doc_id = body.get("doc_id", f"doc_{uuid.uuid4().hex[:12]}")
+    doc_id = _validated_doc_id(body.get("doc_id"))
     project = body.get("project")
     location = body.get("location")
     document_type = body.get("document_type")

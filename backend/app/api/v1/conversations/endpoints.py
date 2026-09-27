@@ -8,17 +8,24 @@ from datetime import datetime
 from typing import Dict, List
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.dependencies import require_automation_secret
+from app.dependencies import require_roles, require_stream_roles
+from app.models.user import UserRole
 from app.services.event_broadcaster import broadcaster
 from app.services.telegram import telegram_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Who may do what with customer conversations (PII: names, phone numbers, message history).
+_STAFF = [UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT, UserRole.DEVELOPER]
+_can_view = require_roles(_STAFF)
+_can_respond = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT])
+_can_delete = require_roles([UserRole.ADMIN, UserRole.MANAGER])
 
 # Retain strong references to background asyncio tasks to prevent premature garbage collection
 _background_tasks = set()
@@ -317,11 +324,11 @@ async def _sync_lead_to_n8n_sheets(conv: dict):
 @router.get("", summary="List active conversations")
 @router.get("/", summary="List active conversations")
 async def list_conversations(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     channel: str = "all",
     status: str = "all",
-    auth: dict = Depends(require_automation_secret),
+    current_user: dict = Depends(_can_view),
 ):
     """Returns active customer conversations from database or cache."""
     try:
@@ -432,7 +439,7 @@ async def list_conversations(
 
 @router.post("", summary="Create a new conversation / lead")
 @router.post("/", summary="Create a new conversation / lead")
-async def create_conversation(body: dict, auth: dict = Depends(require_automation_secret)):
+async def create_conversation(body: dict, current_user: dict = Depends(_can_view)):
     """Create a new conversation lead manually or via simulation."""
     conv_id = body.get("id") or f"lead_{int(asyncio.get_event_loop().time() * 1000)}"
     name = body.get("name", "New Visitor")
@@ -459,7 +466,7 @@ async def create_conversation(body: dict, auth: dict = Depends(require_automatio
 
 
 @router.delete("/{conv_id}", summary="Delete or clear a conversation")
-async def delete_conversation(conv_id: str, auth: dict = Depends(require_automation_secret)):
+async def delete_conversation(conv_id: str, current_user: dict = Depends(_can_delete)):
     """Delete a conversation from memory and database."""
     async with _conversations_lock:
         _conversations_cache.pop(conv_id, None)
@@ -482,33 +489,9 @@ async def delete_conversation(conv_id: str, auth: dict = Depends(require_automat
 
 
 @router.get("/stream", summary="SSE Real-time Conversation Event Stream")
-async def event_stream(
-    request: Request,
-    token: str | None = None,
-    x_automation_secret: str | None = Header(None, alias="X-Automation-Secret"),
-    authorization: str | None = Header(None, alias="Authorization"),
-):
+async def event_stream(request: Request, current_user: dict = Depends(require_stream_roles(_STAFF))):
     """Server-Sent Events (SSE) endpoint pushing live lead & chat events to dashboard clients."""
-    # Verify authentication for SSE stream
-    auth_secret = x_automation_secret
-    if not auth_secret and authorization and authorization.startswith("Bearer "):
-        auth_secret = authorization[7:].strip()
-    elif not auth_secret and token:
-        auth_secret = token.strip()
-
-    is_authenticated = False
-    if auth_secret:
-        if auth_secret == settings.automation_shared_secret:
-            is_authenticated = True
-        else:
-            from app.core.security import decode_access_token
-            payload = decode_access_token(auth_secret)
-            if payload and "role" in payload:
-                is_authenticated = True
-
-    if not is_authenticated:
-        raise HTTPException(status_code=401, detail="Authentication required for SSE live stream")
-
+    # Authenticated by require_stream_roles (short-lived ?ticket=).
     queue = broadcaster.subscribe(maxsize=256)
 
     async def event_generator():
@@ -541,8 +524,8 @@ async def event_stream(
 @router.get("/{conv_id}/messages", summary="Get full message history for conversation")
 async def get_conversation_messages(
     conv_id: str,
-    limit: int = 60,
-    auth: dict = Depends(require_automation_secret),
+    limit: int = Query(60, ge=1, le=500),
+    current_user: dict = Depends(_can_view),
 ):
     """Fetch chronological message history for a specific conversation from DB or memory cache."""
     messages = []
@@ -585,7 +568,7 @@ async def get_conversation_messages(
 
 
 @router.post("/{conv_id}/message", summary="Process customer message (triggers AI pipeline if active)")
-async def send_customer_message(conv_id: str, body: dict, auth: dict = Depends(require_automation_secret)):
+async def send_customer_message(conv_id: str, body: dict, current_user: dict = Depends(_can_view)):
     """Process incoming customer message. If AI is active, run through LangGraph pipeline."""
     if len(conv_id) > 120:
         raise HTTPException(status_code=400, detail="conv_id exceeds maximum allowed length")
@@ -652,7 +635,7 @@ async def send_customer_message(conv_id: str, body: dict, auth: dict = Depends(r
 
 
 @router.post("/{conv_id}/takeover", summary="Toggle AI vs Human Agent takeover")
-async def toggle_takeover(conv_id: str, auth: dict = Depends(require_automation_secret)):
+async def toggle_takeover(conv_id: str, current_user: dict = Depends(_can_respond)):
     """Toggle human takeover state for a conversation and broadcast state update."""
     conv = await async_get_or_create_conversation(conv_id)
 
@@ -693,7 +676,7 @@ async def toggle_takeover(conv_id: str, auth: dict = Depends(require_automation_
 
 
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")
-async def send_agent_reply(conv_id: str, body: dict, auth: dict = Depends(require_automation_secret)):
+async def send_agent_reply(conv_id: str, body: dict, current_user: dict = Depends(_can_respond)):
     """Post manual agent reply, broadcast message_received event, and dispatch to real social channel."""
     reply_text = body.get("text", "")
     if not reply_text:

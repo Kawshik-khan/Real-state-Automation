@@ -32,6 +32,7 @@ export default function Header({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('glg_theme') || 'light');
   const [dynamicPropertyOptions, setDynamicPropertyOptions] = useState([
     { value: 'all', label: 'All Properties' },
@@ -406,17 +407,16 @@ export default function Header({
             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
           >
-            <img 
-              src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80" 
-              alt={user?.full_name || 'Sarah Connor'}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-                if (e.target.parentElement) {
-                  e.target.parentElement.innerHTML = '<span style="font-size:0.75rem;font-weight:700;color:#0F172A">SC</span>';
-                }
-              }}
-            />
+            {avatarFailed ? (
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A' }}>SC</span>
+            ) : (
+              <img
+                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80"
+                alt={user?.full_name || 'Sarah Connor'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={() => setAvatarFailed(true)}
+              />
+            )}
           </button>
 
           {/* Profile Menu Popover */}

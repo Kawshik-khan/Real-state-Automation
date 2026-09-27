@@ -1,13 +1,16 @@
-"""Brute Force Protection & Progressive Account Lockout.
+"""Brute-force protection for the login endpoint.
 
-Defends authentication endpoints against credential stuffing and automated
-password attacks. Applies progressive response delays on repeated failures
-and locks out compromised targets for 15 minutes upon reaching 5 failures.
+Failures are counted per (email, client IP): 5 failures within 15 min lock that email for
+that IP only. The account itself is never locked, so an attacker who knows a victim's email
+cannot lock the victim out from the victim's own network. Password spraying across emails is
+bounded by the per-IP login rate limit (``AUTH_LOGIN_LIMIT``).
+
+There is deliberately no IP-wide lock: if the client IP were mis-resolved behind a proxy
+(every request appearing to come from the proxy), an IP-wide lock would lock out all users.
+
+State lives in ``resilient_store`` (Redis when configured) so limits hold across workers.
 """
 
-from __future__ import annotations
-
-import asyncio
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -15,137 +18,81 @@ from app.core.redis_client import resilient_store
 
 
 class AccountLockoutService:
-    """Manages failed authentication tracking, progressive delay, and temporary lockouts."""
-
     def __init__(self, max_failures: int = 5, lockout_duration_seconds: int = 900):
         self.max_failures = max_failures
         self.lockout_duration_seconds = lockout_duration_seconds
-        
-        # In-memory fallbacks: email -> {"count": int, "last_attempt": float, "locked_until": float}
-        self._local_records: Dict[str, Dict[str, Any]] = {}
-        self._lock = asyncio.Lock()
+        # Per-process mirror used only for the admin "locked accounts" listing.
+        self._recent_locks: Dict[str, Dict[str, Any]] = {}
 
-    def _get_key(self, email: str, ip: str) -> str:
-        return email.strip().lower()
+    @staticmethod
+    def _pair(email: str, ip: str) -> str:
+        return f"{email.strip().lower()}|{ip}"
+
+    async def _lock_remaining(self, key: str, email: str = "") -> int:
+        started = await resilient_store.get(key)
+        if not started:
+            return 0
+        started_at = float(started)
+        if email:
+            unlocked_at = await resilient_store.get(f"auth_unlocked_at:{email}")
+            if unlocked_at and float(unlocked_at) >= started_at:
+                return 0
+        return max(0, int(started_at + self.lockout_duration_seconds - time.time()))
 
     async def check_lockout(self, email: str, ip: str) -> Tuple[bool, int]:
-        """Check if account is currently locked."""
-        now = time.time()
-        key = self._get_key(email, ip)
+        """Return (is_locked, remaining_seconds) for this email from this IP."""
+        email = email.strip().lower()
+        remaining = await self._lock_remaining(f"auth_lock:{self._pair(email, ip)}", email)
+        return remaining > 0, remaining
 
-        # 1. Check in-memory store
-        record = self._local_records.get(key)
-        if record:
-            locked_until = record.get("locked_until", 0.0)
-            if locked_until > now:
-                remaining = int(locked_until - now)
-                return True, max(1, remaining)
+    async def record_failure(self, email: str, ip: str) -> Tuple[int, bool]:
+        """Record a failed login. Returns (attempts_for_pair, newly_locked)."""
+        email = email.strip().lower()
+        window = self.lockout_duration_seconds
+        now = str(time.time())
 
-        # 2. Check resilient Redis store
-        try:
-            redis_lock = await resilient_store.get(f"auth_lockout:{key}")
-            if redis_lock:
-                locked_until = float(redis_lock.get("locked_until", 0.0))
-                if locked_until > now:
-                    remaining = int(locked_until - now)
-                    return True, max(1, remaining)
-        except Exception:
-            pass
+        _, pair_attempts, _ = await resilient_store.sliding_window_increment(
+            f"auth_fail:{self._pair(email, ip)}", window, self.max_failures
+        )
 
-        return False, 0
-
-    async def record_failure(self, email: str, ip: str) -> Tuple[int, float, bool]:
-        """Record a failed login attempt."""
-        now = time.time()
-        key = self._get_key(email, ip)
-        
-        async with self._lock:
-            record = self._local_records.get(key, {"count": 0, "last_attempt": now, "locked_until": 0.0})
-            
-            # Reset counter if last attempt was older than lockout window
-            if (now - record["last_attempt"]) > self.lockout_duration_seconds:
-                record["count"] = 0
-                record["locked_until"] = 0.0
-
-            record["count"] += 1
-            record["last_attempt"] = now
-            attempts = record["count"]
-
-            is_locked = False
-            delay = 0.0
-
-            if attempts >= self.max_failures:
-                record["locked_until"] = now + self.lockout_duration_seconds
-                is_locked = True
-            elif attempts in (3, 4):
-                # Progressive delay to stall credential stuffers
-                delay = (attempts - 2) * 0.75
-
-            self._local_records[key] = record
-
-        # Sync to resilient Redis
-        try:
-            if is_locked:
-                await resilient_store.set(
-                    f"auth_lockout:{key}",
-                    {"email": email, "locked_until": now + self.lockout_duration_seconds},
-                    ttl=self.lockout_duration_seconds,
-                )
-            else:
-                await resilient_store.set(
-                    f"auth_attempts:{key}",
-                    {"count": attempts, "last_attempt": now},
-                    ttl=self.lockout_duration_seconds,
-                )
-        except Exception:
-            pass
-
-        return attempts, delay, is_locked
+        newly_locked = False
+        if pair_attempts >= self.max_failures:
+            await resilient_store.set(f"auth_lock:{self._pair(email, ip)}", now, expire_seconds=window)
+            self._recent_locks[self._pair(email, ip)] = {"email": email, "ip": ip, "locked_at": float(now),
+                                                         "failed_attempts": pair_attempts}
+            newly_locked = True
+        return pair_attempts, newly_locked
 
     async def record_success(self, email: str, ip: str) -> None:
-        """Clear failed attempts upon successful login."""
-        key = self._get_key(email, ip)
-        async with self._lock:
-            self._local_records.pop(key, None)
-
-        try:
-            await resilient_store.delete(f"auth_attempts:{key}")
-            await resilient_store.delete(f"auth_lockout:{key}")
-        except Exception:
-            pass
+        pair = self._pair(email, ip)
+        await resilient_store.reset_window(f"auth_fail:{pair}")
+        self._recent_locks.pop(pair, None)
 
     async def unlock_account(self, email: str) -> int:
-        """Unlock all records for given email (admin action)."""
-        clean_email = email.strip().lower()
-        unlocked_count = 0
-
-        async with self._lock:
-            if clean_email in self._local_records:
-                self._local_records.pop(clean_email, None)
-                unlocked_count += 1
-
-        try:
-            await resilient_store.delete(f"auth_attempts:{clean_email}")
-            await resilient_store.delete(f"auth_lockout:{clean_email}")
-        except Exception:
-            pass
-
-        return unlocked_count
+        """Admin action: clear every IP lock for this email (across workers via the store)."""
+        email = email.strip().lower()
+        await resilient_store.set(f"auth_unlocked_at:{email}", str(time.time()),
+                                  expire_seconds=self.lockout_duration_seconds)
+        cleared = [k for k, v in self._recent_locks.items() if v["email"] == email]
+        for key in cleared:
+            self._recent_locks.pop(key, None)
+            await resilient_store.reset_window(f"auth_fail:{key}")
+        return len(cleared)
 
     def get_locked_accounts(self) -> List[Dict[str, Any]]:
-        """List active locked accounts for developer/admin view."""
+        """Locks recorded by this worker (for the admin/developer view)."""
         now = time.time()
         locked = []
-        for key, rec in self._local_records.items():
-            locked_until = rec.get("locked_until", 0.0)
-            if locked_until > now:
+        for rec in self._recent_locks.values():
+            remaining = int(rec["locked_at"] + self.lockout_duration_seconds - now)
+            if remaining > 0:
                 locked.append({
-                    "email": key,
-                    "remaining_seconds": int(locked_until - now),
-                    "failed_attempts": rec.get("count", 0),
+                    "email": rec["email"],
+                    "ip": rec["ip"],
+                    "remaining_seconds": remaining,
+                    "failed_attempts": rec["failed_attempts"],
                 })
         return locked
 
 
-# Singleton instance
 account_lockout = AccountLockoutService()
