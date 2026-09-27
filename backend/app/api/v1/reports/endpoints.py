@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reports", tags=["Scheduled Reports & Executive Delivery"])
 
-_admin_or_manager = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER])
-_admin_only = require_roles([UserRole.ADMIN, UserRole.DEVELOPER])
+_admin_or_manager = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER, UserRole.SERVICE])
+_admin_only = require_roles([UserRole.ADMIN, UserRole.DEVELOPER, UserRole.SERVICE])
 
 
 @router.get("/schedules", response_model=List[Dict[str, Any]], summary="List all report schedules")

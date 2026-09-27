@@ -1,14 +1,14 @@
-import pytest
-import jwt
-from typing import Any
 import time
 
+import jwt
+import pytest
+
+from app.config import settings
 from app.core.security import (
-    decode_access_token,
     create_access_token,
     create_refresh_token,
+    decode_access_token,
 )
-from app.config import settings
 
 SECRET_KEY = settings.jwt_secret or settings.automation_shared_secret
 ALGORITHM = "HS256"
@@ -57,10 +57,11 @@ def test_decode_access_token_alg_mismatch():
     wrong_alg_token = jwt.encode(payload, SECRET_KEY, algorithm="HS384")
     assert decode_access_token(wrong_alg_token) is None
 
-def test_decode_access_token_type_differentiation():
+@pytest.mark.asyncio
+async def test_decode_access_token_type_differentiation():
     """Verify decode_access_token decodes both access and refresh tokens, but preserves type."""
     access_token = create_access_token({"sub": "usr-123"})
-    refresh_token = create_refresh_token({"sub": "usr-123"})
+    refresh_token = await create_refresh_token({"sub": "usr-123"})
 
     access_payload = decode_access_token(access_token)
     assert access_payload is not None
