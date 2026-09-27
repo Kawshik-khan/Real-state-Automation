@@ -7,8 +7,6 @@ Pillar 1 of the Enterprise AI Governance Architecture:
 - Intercepts foreign legacy token contamination, unverified pricing claims, and guarantee liabilities.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class PolicyEvaluationResult(BaseModel):
     """Encapsulates the deterministic decision of the Policy Engine."""
+
     is_allowed: bool = True
     action: str = "allow"  # allow | sanitize | block | fallback
     sanitized_text: Optional[str] = None
@@ -36,7 +35,7 @@ class PolicyEngine:
 
     def evaluate_inbound_message(self, message: str) -> PolicyEvaluationResult:
         """Evaluates customer input for prompt injection, jailbreaks, and PII.
-        
+
         Runs prior to LLM or agent nodes in the orchestration graph.
         """
         if not message or not message.strip():
@@ -70,7 +69,7 @@ class PolicyEngine:
         active_project_id: Optional[str] = None,
     ) -> PolicyEvaluationResult:
         """Evaluates generated LLM response before delivery to the customer.
-        
+
         Verifies:
         1. Absence of foreign legacy tokens (Mumbai, Bandra, Aadhaar, PAN, +91).
         2. Pricing consistency with canonical repository records.
@@ -86,8 +85,8 @@ class PolicyEngine:
             logger.critical("[PolicyEngine] CRITICAL LEAK BLOCKED in outbound response")
             safe_fallback = (
                 "Our client services team is at your service. Please contact our Banani head office for direct assistance."
-                if is_english else
-                "আমাদের ক্লায়েন্ট সার্ভিস টিম আপনার সেবায় নিয়োজিত। বিস্তারিত তথ্যের জন্য আমাদের বনানী প্রধান কার্যালয়ে যোগাযোগের অনুরোধ করছি।"
+                if is_english
+                else "আমাদের ক্লায়েন্ট সার্ভিস টিম আপনার সেবায় নিয়োজিত। বিস্তারিত তথ্যের জন্য আমাদের বনানী প্রধান কার্যালয়ে যোগাযোগের অনুরোধ করছি।"
             )
             return PolicyEvaluationResult(
                 is_allowed=False,
@@ -106,14 +105,14 @@ class PolicyEngine:
         if not grounding_res.is_grounded:
             violation_reasons = [v.message for v in grounding_res.violations]
             logger.warning(f"[PolicyEngine] Outbound grounding violations: {violation_reasons}")
-            
+
             # Use sanitized reply if available, otherwise safe fallback
             sanitized = grounding_res.sanitized_reply
             if not sanitized:
                 sanitized = (
                     "This information is currently being verified by our sales desk. Please contact our advisory team for accurate specifications."
-                    if is_english else
-                    "এই তথ্যটি বর্তমানে আমাদের সেলস টিম দ্বারা যাচাই করা হচ্ছে। সঠিক তথ্যের জন্য সরাসরি আমাদের অ্যাডভাইজরি টিমে যোগাযোগ করার অনুরোধ করছি।"
+                    if is_english
+                    else "এই তথ্যটি বর্তমানে আমাদের সেলস টিম দ্বারা যাচাই করা হচ্ছে। সঠিক তথ্যের জন্য সরাসরি আমাদের অ্যাডভাইজরি টিমে যোগাযোগ করার অনুরোধ করছি।"
                 )
 
             return PolicyEvaluationResult(
