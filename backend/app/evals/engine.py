@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,9 +22,33 @@ from app.evals.judges import GroundednessJudge, SafetyComplianceJudge
 from app.evals.metrics import calculate_classification_metrics, calculate_latency_percentiles, verify_numeric_exactness
 
 PKG_DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
-BENCHMARKS_DIR = Path(__file__).resolve().parent.parent.parent.parent / ".benchmarks"
+
+
+def _resolve_benchmarks_dir() -> Path:
+    """Locate the `.benchmarks` root without escaping the deployed app directory.
+
+    Layouts: `<repo>/backend/app/evals/engine.py` locally, `/app/app/evals/engine.py`
+    in Docker. A fixed `parents[3]` resolves to `/` in the container, which the
+    non-root `appuser` cannot write to, so only existing directories are taken
+    from above the backend root and the backend root is the default.
+    """
+    override = os.getenv("EVAL_BENCHMARKS_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    here = Path(__file__).resolve()
+    backend_root = here.parents[2]
+    repo_root = here.parents[3]
+    for root in (repo_root, backend_root):
+        candidate = root / ".benchmarks"
+        if root != Path(root.anchor) and candidate.is_dir():
+            return candidate
+    return backend_root / ".benchmarks"
+
+
+BENCHMARKS_DIR = _resolve_benchmarks_dir()
 DATASETS_DIR = BENCHMARKS_DIR / "datasets"
 REPORTS_DIR = BENCHMARKS_DIR / "reports"
+FALLBACK_REPORTS_DIR = Path(tempfile.gettempdir()) / "glg-benchmarks" / "reports"
 
 
 class EvaluationEngine:
@@ -32,6 +58,7 @@ class EvaluationEngine:
         self._latest_report: Optional[dict[str, Any]] = None
         self._is_running: bool = False
         self._current_progress: Optional[dict[str, Any]] = None
+        self._reports_dir: Path = REPORTS_DIR
 
     @property
     def is_running(self) -> bool:
@@ -40,6 +67,18 @@ class EvaluationEngine:
     @property
     def current_progress(self) -> Optional[dict[str, Any]]:
         return self._current_progress
+
+    def _ensure_reports_dir(self) -> Path:
+        """Create the reports directory, falling back to a temp dir if it is not writable."""
+        for candidate in (REPORTS_DIR, FALLBACK_REPORTS_DIR):
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                if os.access(candidate, os.W_OK):
+                    self._reports_dir = candidate
+                    return candidate
+            except OSError as e:
+                print(f"[EvaluationEngine] Reports dir {candidate} unavailable: {e}")
+        raise PermissionError(f"No writable reports directory (tried {REPORTS_DIR}, {FALLBACK_REPORTS_DIR})")
 
     def _load_dataset(self, filename: str) -> list[dict[str, Any]]:
         search_dirs = [
@@ -111,7 +150,7 @@ class EvaluationEngine:
         on_progress: Optional[Callable[[dict[str, Any]], None]] = None,
     ) -> dict[str, Any]:
         """Run requested benchmark suite(s) with live progress notifications."""
-        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        reports_dir = self._ensure_reports_dir()
         start_time = time.time()
         run_id = f"eval_{int(start_time)}"
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -227,7 +266,7 @@ class EvaluationEngine:
                 )
 
             # If running a targeted suite, merge previously passed suites from latest_report.json
-            latest_file = REPORTS_DIR / "latest_report.json"
+            latest_file = reports_dir / "latest_report.json"
             if suite_name != "all" and latest_file.exists():
                 try:
                     with open(latest_file, "r", encoding="utf-8") as f:
@@ -277,8 +316,8 @@ class EvaluationEngine:
             results["total_duration_sec"] = results["summary"]["total_duration_sec"]
 
             # Save report to persistence
-            report_file = REPORTS_DIR / f"{run_id}.json"
-            latest_file = REPORTS_DIR / "latest_report.json"
+            report_file = reports_dir / f"{run_id}.json"
+            latest_file = reports_dir / "latest_report.json"
             try:
                 with open(report_file, "w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2)
@@ -786,6 +825,7 @@ class EvaluationEngine:
             return self._latest_report
 
         search_paths = [
+            self._reports_dir / "latest_report.json",
             REPORTS_DIR / "latest_report.json",
             Path.cwd() / ".benchmarks" / "reports" / "latest_report.json",
             Path(__file__).resolve().parent / "latest_report_baseline.json",
