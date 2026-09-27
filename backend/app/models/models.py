@@ -17,11 +17,15 @@ from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
+    Numeric,
     String,
     Text,
 )
@@ -160,6 +164,20 @@ class AdCampaignRecord(Base):
     tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    # Platform identity (migration 0008). Rows without external_id are manual/seed rows.
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ad_account_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    objective: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    budget_amount: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    budget_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="manual")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ux_ad_campaigns_platform_external", "platform", "external_id", unique=True),
+    )
 
 
 class SocialPostRecord(Base):
@@ -182,6 +200,105 @@ class SocialPostRecord(Base):
     created_by: Mapped[str] = mapped_column(String(128), default="ai-content-engine")
     tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    # Platform-synced post metrics (migration 0008)
+    external_post_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    permalink: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    views: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    reach: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    saves: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metrics_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="content_engine")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    __table_args__ = (
+        Index("ux_social_posts_platform_external", "platform", "external_post_id", unique=True),
+    )
+
+
+class AdAccountRecord(Base):
+    """Connected ad account on Meta, Google Ads or TikTok."""
+    __tablename__ = "ad_accounts"
+    id: Mapped[str] = mapped_column(String(160), primary_key=True)  # '<platform>:<external_account_id>'
+    platform: Mapped[str] = mapped_column(String(32), nullable=False)
+    external_account_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AdCampaignDailyMetricRecord(Base):
+    """Per-campaign, per-day additive metrics synced from the ad platform."""
+    __tablename__ = "ad_campaign_daily_metrics"
+    platform: Mapped[str] = mapped_column(String(32), primary_key=True)
+    external_campaign_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    metric_date: Mapped[datetime] = mapped_column(Date, primary_key=True)
+    channel: Mapped[str] = mapped_column(String(32), primary_key=True, default="all")
+    ad_account_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    impressions: Mapped[int] = mapped_column(BigInteger, default=0)
+    reach: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    clicks: Mapped[int] = mapped_column(BigInteger, default=0)
+    link_clicks: Mapped[int] = mapped_column(BigInteger, default=0)
+    engagements: Mapped[int] = mapped_column(BigInteger, default=0)
+    spend: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    leads: Mapped[int] = mapped_column(Integer, default=0)
+    messaging_conversations: Mapped[int] = mapped_column(Integer, default=0)
+    conversions: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    video_views: Mapped[int] = mapped_column(BigInteger, default=0)
+    video_completions: Mapped[int] = mapped_column(BigInteger, default=0)
+    raw: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AdCampaignPeriodReachRecord(Base):
+    """De-duplicated reach for a rolling window (reach is not additive across days).
+
+    external_campaign_id == '__account__' stores account-level reach for the window.
+    """
+    __tablename__ = "ad_campaign_period_reach"
+    platform: Mapped[str] = mapped_column(String(32), primary_key=True)
+    external_campaign_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    window_days: Mapped[int] = mapped_column(Integer, primary_key=True)
+    since_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    until_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    reach: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AdSyncRunRecord(Base):
+    """Audit trail of each ad platform sync (powers the 'last synced' badge)."""
+    __tablename__ = "ad_sync_runs"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    platform: Mapped[str] = mapped_column(String(32), nullable=False)
+    ad_account_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    trigger: Mapped[str] = mapped_column(String(32), default="schedule")
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    since_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    until_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    campaigns_upserted: Mapped[int] = mapped_column(Integer, default=0)
+    metric_rows_upserted: Mapped[int] = mapped_column(Integer, default=0)
+    posts_upserted: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets-main")
+
+
+class FxRateRecord(Base):
+    """Conversion rate of an ad account currency into BDT (reporting currency)."""
+    __tablename__ = "fx_rates"
+    currency: Mapped[str] = mapped_column(String(8), primary_key=True)
+    rate_to_bdt: Mapped[float] = mapped_column(Numeric(14, 6), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), default="manual")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
