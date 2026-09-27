@@ -221,12 +221,11 @@ class TestAnalytics:
         assert "engineering_infrastructure" in data["summary"]
 
     def test_social_kpi_analytics(self):
+        # Without Supabase the endpoint must say so rather than serve seed numbers
+        # (synced-data behaviour is covered in test_social_kpi_dynamic.py).
         response = client.get("/api/v1/analytics/social-kpis?period=30d&platform=all", headers=self.headers)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "kpis" in data
-        assert "platforms" in data
-        assert "campaigns" in data
-        assert "ai_recommendations" in data
-        assert data["kpis"]["total_leads_generated"] > 0
+        assert data["data_source"] == "unconfigured"
+        assert "kpis" not in data

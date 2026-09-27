@@ -9,116 +9,37 @@ import Card from '../ui/Card';
 import CustomDropdown from '../ui/CustomDropdown';
 import { 
   Share2, 
-  TrendingUp, 
   ChevronRight, 
   Sparkles
 } from 'lucide-react';
 import { getSocialAnalyticsKPIs } from '../../services/api';
 
-const DEFAULT_CHANNELS = [
-  { 
-    id: 'whatsapp', 
-    name: 'WhatsApp Business', 
-    shortName: 'WhatsApp',
-    value: 244, 
-    color: '#25D366', 
-    cpl: '$8.40', 
-    conversion: '34.2%', 
-    trend: '+28%'
-  },
-  { 
-    id: 'facebook', 
-    name: 'Facebook & Meta Ads', 
-    shortName: 'Facebook Ads',
-    value: 180, 
-    color: '#1877F2', 
-    cpl: '$13.60', 
-    conversion: '21.4%', 
-    trend: '+18%'
-  },
-  { 
-    id: 'instagram', 
-    name: 'Instagram Reels & DMs', 
-    shortName: 'Instagram Reels',
-    value: 128, 
-    color: '#E1306C', 
-    cpl: '$13.80', 
-    conversion: '26.5%', 
-    trend: '+32%'
-  },
-  { 
-    id: 'website', 
-    name: 'Website AI Live Chat', 
-    shortName: 'Website Chat',
-    value: 58, 
-    color: '#059669', 
-    cpl: '$0.00', 
-    conversion: '19.8%', 
-    trend: '+14%'
-  },
-  { 
-    id: 'youtube', 
-    name: 'YouTube Virtual Tours', 
-    shortName: 'YouTube Tours',
-    value: 32, 
-    color: '#FF0000', 
-    cpl: '$23.30', 
-    conversion: '38.4%', 
-    trend: '+45%'
-  }
-];
+const formatCpl = (value) => (typeof value === 'number' ? `৳${Math.round(value).toLocaleString('en-IN')}` : '—');
 
 export default function ChannelAttributionDonut({ onNavigateSocial }) {
   const [period, setPeriod] = useState('30d');
-  const [channels, setChannels] = useState(DEFAULT_CHANNELS);
+  const [channels, setChannels] = useState([]);
+  const [status, setStatus] = useState('loading'); // loading | ready | empty | error
   const [activeHover, setActiveHover] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  // Period multiplier for proportional scaling
-  const periodMultiplier = {
-    '7d': 0.3,
-    '30d': 1.0,
-    '90d': 2.8
-  }[period] || 1.0;
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
-      setLoading(true);
+      setStatus('loading');
       try {
         const res = await getSocialAnalyticsKPIs({ period });
-        if (isMounted && res && res.success && res.platforms && res.platforms.length > 0) {
-          const mapped = DEFAULT_CHANNELS.map(def => {
-            const found = res.platforms.find(p => p.id?.toLowerCase() === def.id);
-            if (found) {
-              return {
-                ...def,
-                value: Math.max(1, Math.round(found.leads || def.value * periodMultiplier)),
-                cpl: found.cpl ? `$${found.cpl}` : def.cpl,
-                trend: found.trend || def.trend
-              };
-            }
-            return {
-              ...def,
-              value: Math.max(1, Math.round(def.value * periodMultiplier))
-            };
-          });
-          setChannels(mapped);
-        } else if (isMounted) {
-          setChannels(DEFAULT_CHANNELS.map(c => ({
-            ...c,
-            value: Math.max(1, Math.round(c.value * periodMultiplier))
-          })));
-        }
-      } catch (err) {
+        if (!isMounted) return;
+        const rows = (res?.data_source === 'live' ? res.platforms || [] : [])
+          .filter((p) => (p.leads || 0) > 0)
+          .map((p) => ({ id: p.id, name: p.name, shortName: p.name, value: p.leads, color: p.color, cpl: formatCpl(p.cpl_bdt) }))
+          .sort((a, b) => b.value - a.value);
+        setChannels(rows);
+        setStatus(rows.length ? 'ready' : 'empty');
+      } catch {
         if (isMounted) {
-          setChannels(DEFAULT_CHANNELS.map(c => ({
-            ...c,
-            value: Math.max(1, Math.round(c.value * periodMultiplier))
-          })));
+          setChannels([]);
+          setStatus('error');
         }
-      } finally {
-        if (isMounted) setLoading(false);
       }
     }
 
@@ -127,8 +48,8 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
   }, [period]);
 
   const totalLeads = channels.reduce((sum, c) => sum + (c.value || 0), 0);
-  const topChannel = [...channels].sort((a, b) => (b.value || 0) - (a.value || 0))[0] || channels[0];
-  const topShare = totalLeads > 0 ? Math.round((topChannel.value / totalLeads) * 100) : 38;
+  const topChannel = channels[0];
+  const topShare = topChannel && totalLeads > 0 ? Math.round((topChannel.value / totalLeads) * 100) : 0;
 
   // Active slice display metrics
   const activeShare = (activeHover && totalLeads > 0)
@@ -138,7 +59,7 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
   const periodOptions = [
     { value: '7d', label: 'Last 7 Days' },
     { value: '30d', label: 'Last 30 Days' },
-    { value: '90d', label: 'Quarterly (90d)' }
+    { value: '90d', label: 'Last 90 Days' }
   ];
 
   return (
@@ -174,7 +95,7 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
             </h3>
           </div>
           <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Inbound inquiries across WhatsApp, Meta, Instagram & Web
+            Ad leads by channel, synced from Meta, Google Ads & TikTok
           </p>
         </div>
 
@@ -283,7 +204,7 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
                 marginTop: '3px',
                 fontWeight: 500
               }}>
-                CPL {activeHover.cpl} • {activeHover.conversion}
+                CPL {activeHover.cpl}
               </div>
             </>
           ) : (
@@ -310,7 +231,7 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
                 color: 'var(--text-muted)',
                 marginTop: '2px'
               }}>
-                Across 5 Channels
+                {channels.length ? `Across ${channels.length} channel${channels.length === 1 ? '' : 's'}` : status === 'loading' ? 'Loading…' : status === 'error' ? 'Could not load' : 'No synced ad leads'}
               </div>
             </>
           )}
@@ -429,7 +350,7 @@ export default function ChannelAttributionDonut({ onNavigateSocial }) {
             alignItems: 'center',
             gap: '4px'
           }}>
-            <Sparkles size={11} /> Top: {topChannel.name.split(' ')[0]} ({topShare}%)
+            <Sparkles size={11} /> {topChannel ? `Top: ${topChannel.name} (${topShare}%)` : 'No leads in this period'}
           </span>
         </div>
 

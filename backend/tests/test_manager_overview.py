@@ -1,78 +1,64 @@
-"""Automated integration tests for Manager Overview Dashboard API endpoints."""
+"""Manager overview endpoint: same synced numbers as /social-kpis plus tours and approvals."""
+
+from datetime import timedelta
 
 import pytest
+from ads_fakes import FakeAdsRepository
 from fastapi.testclient import TestClient
+
+import app.api.v1.analytics.endpoints as analytics_endpoints
+from app.core.security import create_access_token
 from app.main import app
-from app.config import settings
+from app.services.ads.sync_service import reporting_today
 
 client = TestClient(app)
-HEADERS = {"X-Automation-Secret": settings.automation_shared_secret}
+URL = "/api/v1/analytics/manager-overview"
+HEADERS = {"Authorization": "Bearer " + create_access_token({
+    "sub": "manager@glgassets.com", "email": "manager@glgassets.com", "role": "manager", "tenant_id": "glg-assets-test"})}
 
 
-class TestManagerOverviewEndpoints:
-    def test_get_manager_overview_success(self):
-        """GET /api/v1/analytics/manager-overview returns valid 200 and complete KPI structure."""
-        response = client.get("/api/v1/analytics/manager-overview", headers=HEADERS)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "kpis" in data
-        assert "campaigns" in data
+@pytest.fixture
+def repo(monkeypatch):
+    fake = FakeAdsRepository()
+    monkeypatch.setattr(analytics_endpoints, "get_ads_repository", lambda: fake)
+    return fake
 
-        kpis = data["kpis"]
-        # Verify all 6 KPI cards are present with formatted & numeric data
-        assert "total_ad_spend" in kpis
-        assert "total_ad_spend_num" in kpis
-        assert "ad_spend_trend" in kpis
-        assert len(kpis["ad_spend_trend"]) == 6
 
-        assert "total_reach" in kpis
-        assert "total_impressions" in kpis
+def test_unconfigured():
+    body = client.get(URL, headers=HEADERS).json()
+    assert body["data_source"] == "unconfigured"
 
-        assert "messages_received" in kpis
-        assert "cost_per_message" in kpis
 
-        assert "ai_response_rate" in kpis
-        assert "avg_ai_response_time" in kpis
+def test_empty_database_has_no_invented_defaults(repo):
+    body = client.get(URL, headers=HEADERS).json()
+    assert body["data_source"] == "empty"
+    k = body["kpis"]
+    # Old implementation defaulted to 5 pending posts, 32 tours, 142 conversations and 96.8% answered.
+    assert k["pending_social_posts"] == 0
+    assert k["confirmed_tours"] == 0
+    assert k["ai_response_rate_pct"] is None
+    assert k["total_ad_spend_bdt"] == 0 and body["campaigns"] == []
+    assert len(k["leads_vs_tours"]) == 4
 
-        assert "qualified_leads" in kpis
-        assert "confirmed_tours" in kpis
-        assert "tour_conversion_rate" in kpis
-        assert "leads_vs_tours_trend" in kpis
-        assert len(kpis["leads_vs_tours_trend"]) == 4
 
-        assert "pending_social_posts_count" in kpis
-
-    def test_campaigns_list_structure(self):
-        """GET /api/v1/analytics/manager-overview returns campaigns with real-time operational fields."""
-        response = client.get("/api/v1/analytics/manager-overview", headers=HEADERS)
-        assert response.status_code == 200
-        data = response.json()
-        campaigns = data["campaigns"]
-        assert isinstance(campaigns, list)
-        assert len(campaigns) >= 4
-
-        for cmp in campaigns:
-            assert "id" in cmp
-            assert "name" in cmp
-            assert "platform" in cmp
-            assert "spent" in cmp
-            assert "reach" in cmp
-            assert "messages" in cmp
-            assert "leads" in cmp
-            assert "cpl" in cmp
-            assert "status" in cmp
-            assert cmp["status"] in ["ACTIVE", "PAUSED", "OPTIMIZING"]
-
-    def test_update_campaign_status(self):
-        """PATCH /api/v1/analytics/campaigns/{id}/status toggles campaign state."""
-        response = client.patch(
-            "/api/v1/analytics/campaigns/cmp-004/status",
-            json={"status": "ACTIVE"},
-            headers=HEADERS
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["campaign_id"] == "cmp-004"
-        assert data["status"] == "ACTIVE"
+def test_tours_pending_posts_and_ai_sla_come_from_tables(repo):
+    today = reporting_today()
+    repo.pending_posts = 3
+    repo.bookings = [
+        {"id": "b1", "status": "confirmed", "tour_date": (today - timedelta(days=2)).isoformat()},
+        {"id": "b2", "status": "pending", "tour_date": (today - timedelta(days=2)).isoformat()},
+        {"id": "b3", "status": "completed", "tour_date": (today - timedelta(days=60)).isoformat()},
+    ]
+    repo.milestones = [{"id": "m1", "status": "confirmed", "milestone_date": (today - timedelta(days=1)).isoformat()}]
+    start = f"{(today - timedelta(days=1)).isoformat()}T09:00:00+00:00"
+    repo.conversations = [{"conversation_id": "x", "channel": "whatsapp", "created_at": start}]
+    repo.messages = [
+        {"conversation_id": "x", "sender": "user", "created_at": start},
+        {"conversation_id": "x", "sender": "ai", "created_at": start.replace("09:00:00", "09:00:02")},
+    ]
+    k = client.get(URL, headers=HEADERS).json()["kpis"]
+    assert k["pending_social_posts"] == 3
+    assert k["confirmed_tours"] == 2  # confirmed booking + tour milestone; pending/old excluded
+    assert k["ai_response_rate_pct"] == 100.0
+    assert k["ai_median_first_reply_seconds"] == 2.0
+    assert k["ai_inbound_conversations"] == 1

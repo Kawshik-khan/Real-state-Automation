@@ -1,5 +1,7 @@
 """Social Channel Services — Facebook & Instagram Auto-Comment to Private DM Lead Bridge."""
 
+import asyncio
+import json
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -7,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from app.agents.social_bridge_agent import social_bridge_agent
 from app.config import settings
 from app.dependencies import require_automation_secret as _auth
+from app.services.ads.meta_leads import ingest_leadgen, verify_signature
 from app.services.meta_social import meta_social_service
 from app.services.telegram import telegram_service
 
@@ -214,14 +217,32 @@ async def verify_meta_webhook(
     return Response(content="Verification failed", status_code=403)
 
 
+# Strong references to lead-ingestion tasks so they are not garbage-collected.
+_lead_tasks: set = set()
+
+
 @router.post("/facebook/webhook", summary="Live Meta Facebook Webhook Event Handler")
-async def facebook_webhook_event(body: dict):
-    """Ingests live Meta Webhook events for Facebook Page feed comments and messages."""
+async def facebook_webhook_event(request: Request):
+    """Ingests live Meta Webhook events: Page feed comments and Lead Ads (leadgen)."""
+    raw_body = await request.body()
+    if not verify_signature(raw_body, request.headers.get("X-Hub-Signature-256"), settings.facebook_app_secret):
+        return Response(content="Invalid signature", status_code=403)
+    try:
+        body = json.loads(raw_body or b"{}")
+    except ValueError:
+        return Response(content="Invalid JSON", status_code=400)
+
     entries = body.get("entry", [])
     for entry in entries:
         changes = entry.get("changes", [])
         for change in changes:
             val = change.get("value", {})
+            if change.get("field") == "leadgen" and val.get("leadgen_id"):
+                # Respond to Meta immediately; fetch the lead's answers in the background.
+                task = asyncio.create_task(ingest_leadgen(str(val["leadgen_id"])))
+                _lead_tasks.add(task)
+                task.add_done_callback(_lead_tasks.discard)
+                continue
             item = val.get("item")
             verb = val.get("verb")
             if item == "comment" and verb == "add":
