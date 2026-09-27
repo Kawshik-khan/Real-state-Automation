@@ -8,11 +8,11 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import secrets
 from typing import Any, Dict, Optional
 
 from app.config import settings
+
 
 # Derive master 256-bit encryption key using PBKDF2
 def _get_master_key() -> bytes:

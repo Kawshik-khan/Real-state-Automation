@@ -14,7 +14,6 @@ import asyncio
 import logging
 import os
 import time
-
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
@@ -57,8 +56,6 @@ from app.dependencies import require_roles
 from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -73,8 +70,8 @@ async def lifespan(app: FastAPI):
             await init_db()
             logger.info("[startup] Supabase/PostgreSQL schema initialized successfully (pgvector & tables verified).")
             from app.core.token_store import token_store
-            from app.services.user_service import user_service
             from app.services.integration_service import integration_service
+            from app.services.user_service import user_service
             await token_store.cleanup_expired_tokens()
             await user_service.seed_default_users()
             await integration_service.warm_cache()

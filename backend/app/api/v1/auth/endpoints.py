@@ -1,6 +1,5 @@
 """Auth endpoints for login, user verification, and user management."""
 
-from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -9,7 +8,6 @@ from app.core.rate_limiter import AUTH_LOGIN_LIMIT, limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
-    hash_password,
     revoke_refresh_token,
     verify_and_rotate_refresh_token,
     verify_password,
@@ -25,10 +23,9 @@ from app.models.user import (
     UserResponse,
     UserRole,
 )
+from app.services.user_service import user_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
-from app.services.user_service import user_service
 
 # S-03: Resilient in-memory users cache backed by PostgreSQL `auth_users` table
 USERS_DB: dict[str, UserInDB] = user_service.in_memory_users

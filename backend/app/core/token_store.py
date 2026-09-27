@@ -8,13 +8,13 @@ Architecture:
 """
 
 import asyncio
-from datetime import datetime, timezone
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, select
 
 from app.core.redis_client import resilient_store
 from app.database import async_session_factory

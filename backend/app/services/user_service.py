@@ -6,12 +6,12 @@ Maintains a synchronized in-memory fallback for local offline testing and high a
 """
 
 import asyncio
-from datetime import datetime, timezone
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from sqlalchemy import desc, select
+from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.database import async_session_factory

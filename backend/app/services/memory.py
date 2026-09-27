@@ -25,6 +25,7 @@ class ConversationMemory:
             # Cold cache hydration from PostgreSQL MessageRecord
             try:
                 from sqlalchemy import asc, select
+
                 from app.database import async_session_factory
                 from app.models.models import MessageRecord
 

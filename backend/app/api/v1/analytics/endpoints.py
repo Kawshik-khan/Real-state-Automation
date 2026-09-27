@@ -1,4 +1,5 @@
 """Analytics Services — Workstreams 09-11."""
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends
@@ -7,6 +8,8 @@ from sqlalchemy import func, select
 from app.database import async_session_factory
 from app.dependencies import require_automation_secret as _auth
 from app.models.models import ConversationRecord, KnowledgeDocumentRecord, MessageRecord, ProjectRecord
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -217,12 +220,11 @@ async def get_social_kpi_analytics(
     auth: dict = Depends(_auth)
 ):
     """Provides comprehensive multi-channel social media KPIs, campaign metrics, platform breakdowns, and drilldown data dynamically from live database."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
+
     from app.services.supabase_db import supabase_db
 
     now = datetime.now(timezone.utc)
-    days_map = {"24h": 1, "7d": 7, "30d": 30, "90d": 90, "quarterly": 90, "1y": 365}
-    days = days_map.get(period.lower(), 30)
     multiplier_fallback = {
         "24h": 0.08,
         "7d": 0.3,
@@ -264,9 +266,10 @@ async def get_social_kpi_analytics(
     # Tier B: SQLAlchemy Async Session (if local DB running)
     if not raw_campaigns or not raw_posts:
         try:
+            from sqlalchemy import desc, select
+
             from app.database import async_session_factory, is_db_reachable
             from app.models.models import AdCampaignRecord, SocialPostRecord
-            from sqlalchemy import desc, select
 
             if is_db_reachable():
                 async with async_session_factory() as session:
@@ -557,7 +560,6 @@ async def get_social_kpi_analytics(
 
     # 9. Dynamic AI Recommendations derived from live performers
     top_channel = max(platforms_breakdown, key=lambda x: float(str(x["ctr"]).replace("%", "") or 0)) if platforms_breakdown else {"name": "Instagram & Reels", "ctr": "6.2%", "cpl": 13.85}
-    lowest_cpl_channel = min([p for p in platforms_breakdown if p["cpl"] > 0], key=lambda x: x["cpl"], default={"name": "Facebook & Meta Ads", "cpl": 13.62})
 
     ai_recommendations = [
         {
@@ -671,15 +673,14 @@ async def get_volume_timeseries(
 @router.get("/manager-overview", summary="Manager Dashboard Real-Time Intelligence & Campaign Telemetry")
 async def get_manager_overview(auth: dict = Depends(_auth)):
     """Fetches real-time operational aggregates and campaigns for Manager Dashboard from database."""
-    from datetime import datetime
     from sqlalchemy import desc, func, select
+
     from app.database import async_session_factory, is_db_reachable
     from app.models.models import (
         AdCampaignRecord,
         BookingRecord,
         CalendarMilestoneRecord,
         ConversationRecord,
-        MessageRecord,
         SocialPostRecord,
     )
 
@@ -982,6 +983,7 @@ async def get_manager_overview(auth: dict = Depends(_auth)):
 async def update_campaign_status(campaign_id: str, body: dict, auth: dict = Depends(_auth)):
     """Allows manager to toggle or update campaign active/paused status in real-time."""
     from sqlalchemy import select
+
     from app.database import async_session_factory, is_db_reachable
     from app.models.models import AdCampaignRecord
 
