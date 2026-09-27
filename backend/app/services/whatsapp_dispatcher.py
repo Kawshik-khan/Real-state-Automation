@@ -8,8 +8,7 @@ simulated delivery with audit logging.
 import logging
 import os
 import re
-from typing import Any, Dict
-
+from typing import Any, Dict, Optional
 import httpx
 
 from app.config import settings

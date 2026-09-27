@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.database import async_session_factory, is_db_reachable
 from app.models.models import GeneratedReportRecord, ReportScheduleRecord

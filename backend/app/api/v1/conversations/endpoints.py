@@ -1,10 +1,10 @@
 """Conversations API & SSE Event Stream Endpoints."""
 
 import asyncio
+from datetime import datetime, timezone
 import json
 import logging
 import os
-from datetime import datetime
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -63,7 +63,6 @@ async def async_get_or_create_conversation(conv_id: str, channel: str = "website
     # Hydrate from database if present
     try:
         from sqlalchemy import select
-
         from app.database import async_session_factory
         from app.models.models import ConversationRecord, UserRecord
 
@@ -412,7 +411,6 @@ async def delete_conversation(conv_id: str):
 
     try:
         from sqlalchemy import delete
-
         from app.database import async_session_factory
         from app.models.models import ConversationRecord, MessageRecord
         async with async_session_factory() as session:
@@ -573,7 +571,6 @@ async def toggle_takeover(conv_id: str):
     # Persist to database
     try:
         from sqlalchemy import update
-
         from app.database import async_session_factory
         from app.models.models import ConversationRecord
 

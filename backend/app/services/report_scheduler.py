@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from app.persistence.report_store import report_store
 from app.services.email_service import email_service
