@@ -1,4 +1,5 @@
 """Import all 22 modular workflows into local n8n instance via REST API."""
+import os
 import json, requests, time
 from pathlib import Path
 
@@ -11,7 +12,7 @@ session.headers.update({"Content-Type": "application/json"})
 def login():
     r = session.post(f"{BASE}/rest/login", json={
         "emailOrLdapLoginId": "admin@glgassets.local",
-        "password": "Admin123!"
+        "password": os.environ["N8N_ADMIN_PASSWORD"]
     })
     if r.status_code != 200:
         print(f"LOGIN FAILED: {r.status_code} {r.text[:200]}")

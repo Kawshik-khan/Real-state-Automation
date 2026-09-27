@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from app.core.safe_expression import evaluate_condition
 from app.persistence.ai_control_plane_store import ai_control_plane_store
 from app.repositories.property_repository import PropertyRepository
 from app.services.ai_control_plane.event_broadcaster import ai_event_broadcaster
@@ -1471,11 +1472,10 @@ class AIControlPlaneService:
         return res
 
     async def simulate_policy(self, expression: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Safely evaluate pythonic boolean condition expression against runtime context."""
-        safe_names = {k: v for k, v in context.items() if not k.startswith("__")}
+        """Evaluate a boolean condition expression against runtime context (AST allow-list, no eval)."""
+        safe_names = {k: v for k, v in context.items() if not k.startswith("_")}
         try:
-            # Safe eval with restricted builtins
-            triggered = bool(eval(expression, {"__builtins__": None}, safe_names))
+            triggered = evaluate_condition(expression, safe_names)
             return {
                 "success": True,
                 "expression": expression,

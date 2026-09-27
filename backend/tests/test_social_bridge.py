@@ -65,7 +65,7 @@ class TestSocialEndpoints:
             "author_name": "Tanvir Hasan",
             "platform": "facebook"
         }
-        response = client.post("/api/v1/social/simulator/comment-to-dm", json=payload)
+        response = client.post("/api/v1/social/simulator/comment-to-dm", json=payload, headers=_dev_headers())
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -102,3 +102,9 @@ class TestSocialEndpoints:
         data = response.json()
         assert data["success"] is True
         assert data["platform"] == "instagram"
+
+
+def _dev_headers():
+    from app.config import settings
+    from app.core.security import create_access_token
+    return {"Authorization": "Bearer " + create_access_token({"sub": "usr-test-developer", "email": "developer@glgassets.com", "role": "developer", "tenant_id": settings.default_tenant_id})}

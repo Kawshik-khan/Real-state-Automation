@@ -1,19 +1,11 @@
-import { resilientFetch, fetchWithAuth } from './api';
+import { openAuthedEventSource, resilientFetch } from './api';
 
-const AUTOMATION_SECRET = import.meta.env.VITE_AUTOMATION_SECRET || '3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8';
-
+/**
+ * Only request-specific headers are set here. The user's bearer token is attached by the
+ * shared transport (api.js#apiFetch) — the browser never sends a service secret.
+ */
 function getAuthHeaders(isJson = false) {
-  const token = localStorage.getItem('glg_token');
-  const headers = {
-    'X-Automation-Secret': AUTOMATION_SECRET,
-  };
-  if (isJson) {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (token && token !== 'null' && token !== 'undefined') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
+  return isJson ? { 'Content-Type': 'application/json' } : {};
 }
 
 async function handleResponse(resp) {
@@ -630,27 +622,18 @@ export async function recommendAiModel(payload) {
 // ── 16. Real-Time SSE Stream ──
 
 export function connectAiEventSource(onEvent, onError) {
-  const token = localStorage.getItem('glg_token');
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
-  const url = `/api/v1/ai-control/events/stream${query}`;
-
-  try {
-    const es = new EventSource(url);
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (onEvent) onEvent(data);
-      } catch (err) {
-        console.debug('SSE parse error:', err);
-      }
-    };
-    es.onerror = (err) => {
-      if (onError) onError(err);
-      es.close();
-    };
-    return es;
-  } catch (err) {
+  // Authenticated with a short-lived stream ticket; reconnects automatically until closed.
+  const es = openAuthedEventSource('/api/v1/ai-control/events/stream');
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (onEvent) onEvent(data);
+    } catch (err) {
+      console.debug('SSE parse error:', err);
+    }
+  };
+  es.onerror = (err) => {
     if (onError) onError(err);
-    return null;
-  }
+  };
+  return es;
 }

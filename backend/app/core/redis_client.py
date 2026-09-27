@@ -48,12 +48,29 @@ class InMemoryStore:
                 retry_after = max(1, int(oldest + window_seconds - now))
                 return False, current_count, retry_after
 
+    _PURGE_EVERY = 1000
+
+    def _purge_expired_locked(self) -> None:
+        """Drop expired keys and empty windows (expiry is otherwise lazy, on read)."""
+        now = time.time()
+        for k in [k for k, (_, exp) in self._key_values.items() if exp < now]:
+            del self._key_values[k]
+        for k in [k for k, ts in self._sliding_windows.items() if not ts or ts[-1] < now - 86400]:
+            del self._sliding_windows[k]
+
     async def set(self, key: str, value: Any, expire_seconds: Optional[int] = None) -> bool:
         """Store key-value with optional TTL."""
         async with self._lock:
             expire_at = time.time() + expire_seconds if expire_seconds else float("inf")
             self._key_values[key] = (value, expire_at)
+            self._writes = getattr(self, "_writes", 0) + 1
+            if self._writes % self._PURGE_EVERY == 0:
+                self._purge_expired_locked()
             return True
+
+    async def reset_window(self, key: str) -> None:
+        async with self._lock:
+            self._sliding_windows.pop(key, None)
 
     async def get(self, key: str) -> Optional[Any]:
         """Retrieve key value if not expired."""
@@ -197,6 +214,18 @@ class ResilientRedisClient:
             return True
         except Exception:
             return await self._in_memory.delete(key)
+
+
+    async def reset_window(self, key: str) -> None:
+        """Clear a sliding-window counter created by ``sliding_window_increment``."""
+        if not self._has_initialized:
+            await self.initialize()
+        await self._in_memory.reset_window(key)
+        if self._is_redis_available and self._redis:
+            try:
+                await self._redis.delete(f"rl:{key}")
+            except Exception as err:
+                logger.warning(f"[ResilientStore] Redis reset_window failed ({err}).")
 
 
 # Global singleton instance

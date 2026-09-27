@@ -1,185 +1,259 @@
-"""Security utilities: Password hashing and JWT token handling."""
+"""Security utilities: password hashing and JWT access/refresh token handling.
 
+Token model
+-----------
+* Every login creates a session id (``sid``) shared by the access token and the
+  refresh-token chain rotated from it.
+* Access tokens (``type=access``, 15 min) are the only tokens accepted on protected
+  routes. Refresh tokens (``type=refresh``, 7 days) are only accepted by ``/auth/refresh``.
+* Revocation state lives in ``resilient_store`` (Redis when ``REDIS_URL`` is set, else
+  per-process memory) so logout / replay detection is shared across workers:
+    - ``auth:session_revoked:{sid}``   logout or replay kills the session (access + refresh)
+    - ``auth:refresh_active:{jti}``    refresh token issued and not yet rotated
+    - ``auth:refresh_used:{jti}``      rotated refresh token (re-use => replay attack)
+    - ``auth:user_revoked_before:{sub}`` tokens issued before this epoch are invalid
+"""
+
+import base64
 import hashlib
 import hmac
 import time
+import uuid
 from typing import Any, Dict, Optional, Tuple
 
+import bcrypt
+import jwt
+
 from app.config import settings
+from app.core.redis_client import resilient_store
 
-# JWT settings
-SECRET_KEY = settings.jwt_secret or settings.automation_shared_secret
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "access_token_expire_minutes", 15)  # 15 minutes
-REFRESH_TOKEN_EXPIRE_DAYS = getattr(settings, "refresh_token_expire_days", 7)       # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "access_token_expire_minutes", 15)
+REFRESH_TOKEN_EXPIRE_DAYS = getattr(settings, "refresh_token_expire_days", 7)
+MIN_JWT_SECRET_LENGTH = 32
 
-# In-memory registry for active & revoked refresh tokens (backed by resilient store)
-_active_refresh_tokens: Dict[str, Dict[str, Any]] = {}  # jti -> {sub, role, created_at, expires_at}
-_revoked_refresh_tokens: set = set()                     # set of revoked jti strings
+
+def _load_signing_key() -> str:
+    """JWT signing key must be its own secret — never the automation/service secret."""
+    key = (settings.jwt_secret or "").strip()
+    if len(key) < MIN_JWT_SECRET_LENGTH:
+        raise RuntimeError(
+            f"JWT_SECRET must be set to a random value of at least {MIN_JWT_SECRET_LENGTH} characters "
+            "(e.g. `openssl rand -hex 32`)."
+        )
+    if settings.automation_shared_secret and hmac.compare_digest(key, settings.automation_shared_secret):
+        raise RuntimeError("JWT_SECRET must differ from AUTOMATION_SHARED_SECRET.")
+    return key
+
+
+SECRET_KEY = _load_signing_key()
+
+
+# ── Password hashing ─────────────────────────────────────────────────────────
+
+_BCRYPT_PREFIXES = ("$2a$", "$2b$", "$2y$")
+
+
+def _bcrypt_input(password: str) -> bytes:
+    # bcrypt only reads the first 72 bytes; pre-hash so long passwords are not truncated.
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+
+
+def _legacy_hash(password: str) -> str:
+    salt = settings.password_hash_salt
+    return hmac.new(salt.encode("utf-8"), password.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def hash_password(password: str) -> str:
-    """Hash a plain text password using HMAC SHA256 with salt."""
-    salt = settings.password_hash_salt
-    return hmac.new(salt.encode('utf-8'), password.encode('utf-8'), hashlib.sha256).hexdigest()
+    """Hash a password with bcrypt (per-hash random salt, adaptive cost)."""
+    return bcrypt.hashpw(_bcrypt_input(password), bcrypt.gensalt(rounds=12)).decode("ascii")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify plain password against hashed password."""
-    return hash_password(plain_password) == hashed_password
+    """Constant-time verification of bcrypt hashes and legacy HMAC hashes."""
+    if not hashed_password:
+        return False
+    if hashed_password.startswith(_BCRYPT_PREFIXES):
+        try:
+            return bcrypt.checkpw(_bcrypt_input(plain_password), hashed_password.encode("ascii"))
+        except ValueError:
+            return False
+    return hmac.compare_digest(_legacy_hash(plain_password), hashed_password)
+
+
+def password_needs_rehash(hashed_password: str) -> bool:
+    """True for legacy (pre-bcrypt) hashes that should be upgraded on next login."""
+    return not (hashed_password or "").startswith(_BCRYPT_PREFIXES)
+
+
+# ── JWT creation / decoding ──────────────────────────────────────────────────
+
+def _encode(payload: Dict[str, Any]) -> str:
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _decode(token: str, expected_type: str) -> Optional[Dict[str, Any]]:
+    """Verify signature + expiry and require the expected token ``type``."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]},
+        )
+    except jwt.PyJWTError:
+        return None
+    if payload.get("type") != expected_type or not payload.get("sid"):
+        return None
+    return payload
 
 
 def create_access_token(data: Dict[str, Any], expires_delta_minutes: Optional[int] = None) -> str:
-    """Create a signed short-lived JWT access token (default 15 minutes)."""
-    try:
-        import jwt
-        to_encode = data.copy()
-        expire = time.time() + ((expires_delta_minutes or ACCESS_TOKEN_EXPIRE_MINUTES) * 60)
-        to_encode.update({"exp": expire, "type": "access"})
-        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    except ImportError:
-        import base64
-        import json
-        payload = data.copy()
-        payload["exp"] = int(time.time() + ((expires_delta_minutes or ACCESS_TOKEN_EXPIRE_MINUTES) * 60))
-        payload["type"] = "access"
-        encoded_bytes = base64.urlsafe_b64encode(json.dumps(payload).encode())
-        sig = hmac.new(SECRET_KEY.encode(), encoded_bytes, hashlib.sha256).hexdigest()
-        return f"{encoded_bytes.decode()}.{sig}"
+    """Create a short-lived access token (default 15 minutes)."""
+    now = int(time.time())
+    payload = {k: v for k, v in data.items() if k not in ("type", "exp", "iat", "jti")}
+    payload.setdefault("sid", str(uuid.uuid4()))
+    payload.update({
+        "iat": now,
+        "exp": now + (expires_delta_minutes or ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
+        "jti": str(uuid.uuid4()),
+        "type": "access",
+    })
+    return _encode(payload)
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and verify access token."""
-    try:
-        import jwt
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except Exception:
-        try:
-            import base64
-            import json
-            parts = token.split(".")
-            if len(parts) != 2:
-                return None
-            payload_b64, sig = parts
-            expected_sig = hmac.new(SECRET_KEY.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(sig, expected_sig):
-                return None
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode()).decode())
-            if payload.get("exp", 0) < time.time():
-                return None
-            return payload
-        except Exception:
-            return None
-
-
-def create_refresh_token(data: Dict[str, Any], expires_delta_days: Optional[int] = None) -> str:
-    """Create a cryptographically signed refresh token (7 days) with unique jti identifier."""
-    import uuid
-    jti = str(uuid.uuid4())
-    sub = data.get("sub", "unknown")
-    role = data.get("role", "agent")
-    expires_at = time.time() + ((expires_delta_days or REFRESH_TOKEN_EXPIRE_DAYS) * 86400)
-
-    payload = {
-        "sub": sub,
-        "role": role,
-        "email": data.get("email", ""),
-        "type": "refresh",
-        "jti": jti,
-        "exp": expires_at,
-    }
-
-    # Record in active tokens registry
-    _active_refresh_tokens[jti] = {
-        "sub": sub,
-        "role": role,
-        "email": data.get("email", ""),
-        "expires_at": expires_at,
-    }
-
-    try:
-        import jwt
-        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    except ImportError:
-        import base64
-        import json
-        payload_copy = payload.copy()
-        payload_copy["exp"] = int(expires_at)
-        encoded_bytes = base64.urlsafe_b64encode(json.dumps(payload_copy).encode())
-        sig = hmac.new(SECRET_KEY.encode(), encoded_bytes, hashlib.sha256).hexdigest()
-        return f"{encoded_bytes.decode()}.{sig}"
+    """Stateless check (signature, expiry, type=access). Does NOT consult revocation state;
+    use ``validate_access_token`` for authorization decisions."""
+    return _decode(token, "access")
 
 
 def decode_refresh_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and verify refresh token."""
+    return _decode(token, "refresh")
+
+
+async def _is_revoked(payload: Dict[str, Any]) -> bool:
+    if await resilient_store.get(f"auth:session_revoked:{payload['sid']}"):
+        return True
+    revoked_before = await resilient_store.get(f"auth:user_revoked_before:{payload['sub']}")
+    if revoked_before and int(payload.get("iat", 0)) <= int(float(revoked_before)):
+        return True
+    return False
+
+
+async def validate_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """Full access-token check including logout / replay revocation."""
     payload = decode_access_token(token)
-    if payload and payload.get("type") == "refresh":
-        return payload
-    return None
+    if not payload or await _is_revoked(payload):
+        return None
+    return payload
 
 
-def verify_and_rotate_refresh_token(old_token: str) -> Tuple[bool, Optional[str], Optional[str], Optional[Dict[str, Any]], str]:
-    """Execute Refresh Token Rotation (RTR).
-    
-    If the provided token was previously used (replayed), revokes all sessions for that user.
-    On success, issues a fresh 15-minute access token and rotated 7-day refresh token.
+STREAM_TICKET_TTL_SECONDS = 60
+
+
+def create_stream_ticket(user: Dict[str, Any]) -> str:
+    """Short-lived token for EventSource/WebSocket URLs, which cannot carry an
+    Authorization header. Scoped (type=stream) so it is useless on normal API routes, and
+    brief so a copy leaked into a proxy log expires almost immediately."""
+    now = int(time.time())
+    return _encode({
+        "sub": user["sub"],
+        "email": user.get("email"),
+        "role": user.get("role"),
+        "tenant_id": user.get("tenant_id") or settings.default_tenant_id,
+        "sid": user["sid"],
+        "type": "stream",
+        "iat": now,
+        "exp": now + STREAM_TICKET_TTL_SECONDS,
+        "jti": str(uuid.uuid4()),
+    })
+
+
+async def validate_stream_ticket(token: str) -> Optional[Dict[str, Any]]:
+    payload = _decode(token, "stream")
+    if not payload or await _is_revoked(payload):
+        return None
+    return payload
+
+
+async def create_refresh_token(data: Dict[str, Any], expires_delta_days: Optional[int] = None) -> str:
+    """Create a refresh token bound to the session ``sid`` and register it as active."""
+    now = int(time.time())
+    lifetime = (expires_delta_days or REFRESH_TOKEN_EXPIRE_DAYS) * 86400
+    jti = str(uuid.uuid4())
+    payload = {
+        "sub": data.get("sub", "unknown"),
+        "email": data.get("email", ""),
+        "role": data.get("role", "agent"),
+        "tenant_id": data.get("tenant_id") or settings.default_tenant_id,
+        "sid": data.get("sid") or str(uuid.uuid4()),
+        "type": "refresh",
+        "jti": jti,
+        "iat": now,
+        "exp": now + lifetime,
+    }
+    await resilient_store.set(f"auth:refresh_active:{jti}", "1", expire_seconds=lifetime)
+    return _encode(payload)
+
+
+async def revoke_session(sid: str) -> None:
+    lifetime = REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    await resilient_store.set(f"auth:session_revoked:{sid}", "1", expire_seconds=lifetime)
+
+
+async def verify_and_rotate_refresh_token(
+    old_token: str,
+) -> Tuple[bool, Optional[str], Optional[str], Optional[Dict[str, Any]], str]:
+    """Refresh Token Rotation (RTR) with replay detection.
+
     Returns (is_valid, new_access_token, new_refresh_token, user_payload, message).
     """
     payload = decode_refresh_token(old_token)
     if not payload:
         return False, None, None, None, "Invalid or expired refresh token."
+    if await _is_revoked(payload):
+        return False, None, None, None, "Session has been revoked."
 
-    jti = payload.get("jti")
-    sub = payload.get("sub")
+    jti = payload["jti"]
+    lifetime = max(1, int(payload["exp"]) - int(time.time()))
 
-    # 1. Replay attack detection
-    if jti in _revoked_refresh_tokens:
-        # Revoke all tokens for this user family
-        revoke_all_user_tokens(sub)
-        return False, None, None, None, "Security breach: Replayed refresh token detected. All sessions revoked."
+    # Replay: a rotated token presented again => kill the whole session family.
+    if await resilient_store.get(f"auth:refresh_used:{jti}"):
+        await revoke_session(payload["sid"])
+        return False, None, None, None, "Security breach: Replayed refresh token detected. Session revoked."
 
-    # 2. Check active token presence
-    if jti not in _active_refresh_tokens:
+    if not await resilient_store.get(f"auth:refresh_active:{jti}"):
         return False, None, None, None, "Refresh token expired or unrecognized."
 
-    # 3. Rotate: Revoke the old jti immediately
-    _active_refresh_tokens.pop(jti, None)
-    _revoked_refresh_tokens.add(jti)
+    await resilient_store.delete(f"auth:refresh_active:{jti}")
+    await resilient_store.set(f"auth:refresh_used:{jti}", "1", expire_seconds=lifetime)
 
-    # 4. Generate new tokens
     user_data = {
-        "sub": sub,
-        "role": payload.get("role", "agent"),
+        "sub": payload["sub"],
         "email": payload.get("email", ""),
+        "role": payload.get("role", "agent"),
+        "tenant_id": payload.get("tenant_id") or settings.default_tenant_id,
+        "sid": payload["sid"],
     }
     new_access_token = create_access_token(user_data)
-    new_refresh_token = create_refresh_token(user_data)
-
+    new_refresh_token = await create_refresh_token(user_data)
     return True, new_access_token, new_refresh_token, user_data, "Token rotated successfully."
 
 
-def revoke_refresh_token(token: str) -> bool:
-    """Revoke a single refresh token."""
+async def revoke_refresh_token(token: str) -> bool:
+    """Logout: revoke the session the refresh token belongs to (also kills its access tokens)."""
     payload = decode_refresh_token(token)
-    if payload:
-        jti = payload.get("jti")
-        if jti:
-            _active_refresh_tokens.pop(jti, None)
-            _revoked_refresh_tokens.add(jti)
-            return True
-    return False
+    if not payload:
+        return False
+    await resilient_store.delete(f"auth:refresh_active:{payload['jti']}")
+    await revoke_session(payload["sid"])
+    return True
 
 
-def revoke_all_user_tokens(user_id: str) -> int:
-    """Revoke all active refresh tokens for a user (e.g. after password change or security breach)."""
-    revoked_count = 0
-    jtis_to_remove = [
-        jti for jti, info in _active_refresh_tokens.items() if info.get("sub") == user_id
-    ]
-    for jti in jtis_to_remove:
-        _active_refresh_tokens.pop(jti, None)
-        _revoked_refresh_tokens.add(jti)
-        revoked_count += 1
-    return revoked_count
-
+async def revoke_all_user_tokens(user_id: str) -> None:
+    """Invalidate every token issued to a user so far (e.g. password change, compromise)."""
+    lifetime = REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    await resilient_store.set(f"auth:user_revoked_before:{user_id}", str(int(time.time())), expire_seconds=lifetime)

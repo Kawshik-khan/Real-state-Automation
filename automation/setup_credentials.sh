@@ -7,7 +7,7 @@ N8N_URL="http://localhost:5678"
 # Login and capture the auth cookie value
 LOGIN_RESP=$(curl -s -c - -X POST "$N8N_URL/rest/login" \
   -H "Content-Type: application/json" \
-  -d '{"emailOrLdapLoginId":"admin@glgassets.local","password":"Admin123!"}')
+  -d '{"emailOrLdapLoginId":"admin@glgassets.local","password":"'"${N8N_ADMIN_PASSWORD:?set N8N_ADMIN_PASSWORD}"'"}')
 AUTH_TOKEN=$(echo "$LOGIN_RESP" | grep n8n-auth | awk '{print $NF}')
 echo "✅ Logged in (token: ${AUTH_TOKEN:0:20}...)"
 
@@ -21,7 +21,7 @@ CRED_RESP=$(curl -s -X POST "$N8N_URL/rest/credentials" \
     "type": "httpHeaderAuth",
     "data": {
       "name": "X-Automation-Secret",
-      "value": "3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8"
+      "value": "'"${AUTOMATION_SHARED_SECRET:?set AUTOMATION_SHARED_SECRET}"'"
     }
   }')
 echo "  $CRED_RESP" | head -c 500

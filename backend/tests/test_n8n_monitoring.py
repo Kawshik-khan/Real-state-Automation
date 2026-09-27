@@ -2,14 +2,17 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from app.config import settings
+from app.core.security import create_access_token
 from app.main import app
 
 client = TestClient(app)
+DEV_HEADERS = {"Authorization": "Bearer " + create_access_token({"sub": "usr-test-developer", "email": "developer@glgassets.com", "role": "developer", "tenant_id": settings.default_tenant_id})}
 
 
 def test_n8n_health_telemetry_endpoint():
     """Test GET /api/v1/automation/n8n/health returns complete telemetry metrics."""
-    response = client.get("/api/v1/automation/n8n/health")
+    response = client.get("/api/v1/automation/n8n/health", headers=DEV_HEADERS)
     assert response.status_code == 200
     data = response.json()
 
@@ -37,17 +40,17 @@ def test_n8n_toggle_workflow():
     wf_id = "wf-tg-001"
 
     # Disable workflow
-    resp = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/toggle", json={"active": False})
+    resp = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/toggle", json={"active": False}, headers=DEV_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["active"] is False
 
     # Verify status updated in health query
-    health_resp = client.get("/api/v1/automation/n8n/health")
+    health_resp = client.get("/api/v1/automation/n8n/health", headers=DEV_HEADERS)
     tg_wf = next(wf for wf in health_resp.json()["workflows"] if wf["id"] == wf_id)
     assert tg_wf["active"] is False
 
     # Re-enable workflow
-    resp2 = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/toggle", json={"active": True})
+    resp2 = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/toggle", json={"active": True}, headers=DEV_HEADERS)
     assert resp2.status_code == 200
     assert resp2.json()["active"] is True
 
@@ -56,7 +59,7 @@ def test_n8n_test_workflow_ping():
     """Test POST /api/v1/automation/n8n/workflows/{id}/test executes node latency ping."""
     wf_id = "wf-em-002"
 
-    resp = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/test")
+    resp = client.post(f"/api/v1/automation/n8n/workflows/{wf_id}/test", headers=DEV_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
 

@@ -53,8 +53,8 @@ import {
   getN8nTelemetry,
   getDeveloperLogs,
   clearDeveloperLogs,
-  getDeveloperLogsStreamUrl,
-  getWebSocketUrl,
+  openAuthedEventSource,
+  openAuthedWebSocket,
   runDeveloperEvals,
   getLatestDeveloperEvals,
   getDeveloperEvalSuites,
@@ -144,7 +144,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
     // Connect to live SSE log stream
     let eventSource = null;
     try {
-      eventSource = new EventSource(getDeveloperLogsStreamUrl());
+      eventSource = openAuthedEventSource('/api/v1/developer/logs/stream');
       
       eventSource.onopen = () => {
         setSseConnected(true);
@@ -181,11 +181,12 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
   useEffect(() => {
     let ws = null;
     let reconnectTimeout = null;
+    let disposed = false;
 
     const connectWS = () => {
+      if (disposed) return;
       try {
-        const wsUrl = getWebSocketUrl();
-        ws = new WebSocket(wsUrl);
+        ws = openAuthedWebSocket('/api/v1/ws/chat');
 
         ws.onopen = () => {
           console.debug('[WS] Connected to live event stream for AI Evals');
@@ -211,7 +212,8 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         };
 
         ws.onclose = () => {
-          reconnectTimeout = setTimeout(connectWS, 5000);
+          // close events arrive asynchronously; don't reconnect after unmount
+          if (!disposed) reconnectTimeout = setTimeout(connectWS, 5000);
         };
       } catch (err) {
         console.warn('WebSocket connection not available:', err);
@@ -221,6 +223,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
     connectWS();
 
     return () => {
+      disposed = true;
       if (ws) ws.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
@@ -3139,7 +3142,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FileCode size={18} color="var(--accent-coral)" /> Request Constructor
               </h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Headers: X-Automation-Secret &amp; Bearer JWT</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Headers: Bearer JWT</span>
             </div>
 
             {/* Endpoint Selector */}

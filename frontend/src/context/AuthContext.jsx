@@ -1,54 +1,50 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/auth';
+import { getAccessToken, getSessionUser, onSessionChange } from '../services/session';
 import { useIdleTimer } from '../hooks/useIdleTimer';
 import IdleSessionModal from '../components/common/IdleSessionModal';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => authService.getUser());
-  const [token, setToken] = useState(() => authService.getToken());
+  const [user, setUser] = useState(() => getSessionUser());
+  const [token, setToken] = useState(() => getAccessToken());
   const [loading, setLoading] = useState(false);
+  // Nothing is treated as authenticated until the server confirms the session.
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    // Validate session against backend on app launch
-    if (token) {
-      setLoading(true);
-      authService.getMe()
-        .then((userData) => {
-          if (userData) {
-            setUser(userData);
-          } else {
-            setToken(null);
-            setUser(null);
-          }
-        })
-        .catch(() => {
-          setToken(null);
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    }
+    // Keep React state in sync with the in-memory session (e.g. background refresh failure).
+    const unsubscribe = onSessionChange(({ token: t, user: u }) => {
+      setToken(t);
+      setUser(u);
+    });
+
+    let cancelled = false;
+    authService
+      .restoreSession()
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) setInitializing(false);
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const logout = useCallback((reason = 'user') => {
-    if (reason === 'inactivity') {
-      try {
+    try {
+      if (reason === 'inactivity') {
         sessionStorage.setItem('session_logout_reason', 'inactivity');
-      } catch {
-        // Ignore storage errors
-      }
-    } else {
-      try {
+      } else {
         sessionStorage.removeItem('session_logout_reason');
-      } catch {
-        // Ignore storage errors
       }
+    } catch {
+      // Ignore storage errors
     }
-
     authService.logout();
-    setToken(null);
-    setUser(null);
   }, []);
 
   const login = async (email, password) => {
@@ -60,26 +56,26 @@ export function AuthProvider({ children }) {
       } catch {
         // Ignore storage errors
       }
-      setToken(data.access_token);
-      setUser(data.user);
       return data;
     } finally {
       setLoading(false);
     }
   };
 
-  const hasRole = (allowedRoles) => {
-    if (!user) return false;
-    if (Array.isArray(allowedRoles)) {
-      return allowedRoles.includes(user.role);
-    }
-    return user.role === allowedRoles;
-  };
+  const hasRole = useCallback(
+    (allowedRoles) => {
+      if (!user) return false;
+      return Array.isArray(allowedRoles) ? allowedRoles.includes(user.role) : user.role === allowedRoles;
+    },
+    [user]
+  );
 
   // Idle Session Inactivity Timer & Grace Warning Hook (15m idle / 60s warning)
   const handleIdleLogout = useCallback((reason) => {
     logout(reason || 'inactivity');
   }, [logout]);
+
+  const isAuthenticated = !initializing && !!token && !!user;
 
   const {
     isWarningOpen,
@@ -90,17 +86,18 @@ export function AuthProvider({ children }) {
     onIdle: handleIdleLogout,
     idleTimeoutMs: 15 * 60 * 1000, // 15 minutes
     promptBeforeMs: 60 * 1000,      // 60-second grace warning
-    enabled: !!token && !!user,
+    enabled: isAuthenticated,
   });
 
   const value = {
     user,
     token,
     loading,
+    initializing,
     login,
     logout,
     hasRole,
-    isAuthenticated: !!token && !!user,
+    isAuthenticated,
     role: user?.role || 'guest',
     resetIdleTimer,
   };
@@ -109,7 +106,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={value}>
       {children}
       <IdleSessionModal
-        isOpen={isWarningOpen && !!token && !!user}
+        isOpen={isWarningOpen && isAuthenticated}
         remainingSeconds={remainingSeconds}
         onStayLoggedIn={resetIdleTimer}
         onLogout={confirmLogout}
@@ -125,4 +122,3 @@ export function useAuth() {
   }
   return context;
 }
-

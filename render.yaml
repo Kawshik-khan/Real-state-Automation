@@ -6,7 +6,7 @@ services:
     region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python -W ignore -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: APP_NAME
@@ -14,9 +14,34 @@ services:
       - key: DEBUG
         value: "false"
       - key: PYTHONWARNINGS
-        value: "ignore"
+        value: "ignore::DeprecationWarning"
+      # Explicit dashboard origin: required for cookie-based session refresh.
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://glg-realestate-frontend.onrender.com"
+      # Frontend and API are different sites (onrender.com is a public suffix), so the
+      # refresh cookie must be SameSite=None (sent cross-site, Secure). Browsers that block
+      # third-party cookies (Safari) will require a fresh login after reload; serving the
+      # dashboard and API from one origin removes that limitation (then use "lax").
+      - key: REFRESH_COOKIE_SAMESITE
+        value: "none"
+      # Client IP resolution behind Render's proxy. VERIFY after deploy with
+      # GET /api/v1/auth/client-ip-diagnostics (admin): resolved_client_ip must be your
+      # real public IP, otherwise login rate limits are shared by all users.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      # Independent random value (openssl rand -hex 32); must differ from the automation secret.
+      - key: JWT_SECRET
+        sync: false
+      # Shared revocation / lockout / rate-limit state across instances (recommended).
+      - key: REDIS_URL
+        sync: false
+      # Webhook authenticity (endpoints fail closed until these are set).
+      - key: FACEBOOK_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
@@ -80,5 +105,4 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://glg-realestate-backend.onrender.com
-      - key: VITE_AUTOMATION_SECRET
-        sync: false
+      # No service secret in the frontend: the dashboard authenticates with the user's JWT.

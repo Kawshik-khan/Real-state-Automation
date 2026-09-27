@@ -63,26 +63,27 @@ def test_get_rate_limit_identity_automation_secret():
     assert identity == "system:automation"
 
 
-def test_get_rate_limit_identity_client_ip_and_forwarded():
-    """Verify identity extraction from client IP and X-Forwarded-For."""
-    # Direct IP
-    scope1 = {
-        "type": "http",
-        "method": "GET",
-        "path": "/test",
-        "headers": [],
-        "client": ("203.0.113.195", 12345),
-    }
-    req1 = Request(scope1)
-    assert get_rate_limit_identity(req1) == "ip:203.0.113.195"
+def test_get_rate_limit_identity_client_ip_and_forwarded(monkeypatch):
+    """Identity uses the socket peer unless a trusted proxy hop count is configured;
+    a client-supplied X-Forwarded-For entry can never choose its own bucket."""
+    from app.config import settings as _settings
 
-    # Forwarded IP behind proxy
-    scope2 = {
-        "type": "http",
-        "method": "GET",
-        "path": "/test",
-        "headers": [(b"x-forwarded-for", b"198.51.100.42, 10.0.0.1")],
-        "client": ("10.0.0.1", 12345),
-    }
-    req2 = Request(scope2)
-    assert get_rate_limit_identity(req2) == "ip:198.51.100.42"
+    def req(headers, peer):
+        return Request({"type": "http", "method": "GET", "path": "/test",
+                        "headers": headers, "client": (peer, 12345)})
+
+    # No trusted proxies: header ignored entirely
+    monkeypatch.setattr(_settings, "trusted_proxy_hops", 0)
+    assert get_rate_limit_identity(req([], "203.0.113.195")) == "ip:203.0.113.195"
+    spoofed = [(b"x-forwarded-for", b"1.2.3.4")]
+    assert get_rate_limit_identity(req(spoofed, "203.0.113.195")) == "ip:203.0.113.195"
+
+    # One trusted proxy (e.g. Render): use the entry the proxy appended (right-most),
+    # not the attacker-controlled left-most value.
+    monkeypatch.setattr(_settings, "trusted_proxy_hops", 1)
+    chain = [(b"x-forwarded-for", b"1.2.3.4, 198.51.100.42")]
+    assert get_rate_limit_identity(req(chain, "10.0.0.1")) == "ip:198.51.100.42"
+
+    # Garbage in the trusted slot falls back to the peer address
+    bad = [(b"x-forwarded-for", b"not-an-ip")]
+    assert get_rate_limit_identity(req(bad, "10.0.0.1")) == "ip:10.0.0.1"

@@ -10,7 +10,13 @@ from app.services.report_scheduler import report_scheduler
 from app.services.whatsapp_dispatcher import clean_phone_number, whatsapp_dispatcher
 
 client = TestClient(app)
-AUTH_HEADERS = {"X-Automation-Secret": settings.automation_shared_secret}
+# Report management is an admin/manager action: authenticate as a user, not the service secret.
+from app.core.security import create_access_token  # noqa: E402
+
+AUTH_HEADERS = {"Authorization": "Bearer " + create_access_token({
+    "sub": "usr-admin-001", "email": "admin@glgassets.com", "role": "admin",
+    "tenant_id": settings.default_tenant_id,
+})}
 
 
 class TestReportBuilderAndFormatters:

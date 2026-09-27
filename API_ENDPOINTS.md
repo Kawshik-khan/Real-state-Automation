@@ -10,7 +10,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 | Header | Type | Description |
 | :--- | :--- | :--- |
-| `X-Automation-Secret` | `string` | Shared secret key for verifying incoming requests (`3322af281a2b117d0694f8ff14c7c13c4115759904b6d3884f39b59ab51f3aa8`). |
+| `X-Automation-Secret` | `string` | Shared secret key for verifying incoming requests (server-to-server only; value comes from the `AUTOMATION_SHARED_SECRET` env var — never embed it in clients or docs). |
 | `X-Tenant-Id` | `string` | *(Optional)* Tenant scoping identifier (Default: `glg-assets-main`). |
 | `Authorization` | `string` | *(Optional)* `Bearer <token>` for user dashboard authentication (`/api/v1/auth/*`). |
 

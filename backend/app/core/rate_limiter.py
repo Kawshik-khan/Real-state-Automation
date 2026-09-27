@@ -7,7 +7,6 @@ Provides tiered limits based on caller identity:
 """
 
 import os
-import re
 import sys
 from typing import Tuple
 
@@ -16,7 +15,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
-from app.config import settings
+from app.core.client_ip import get_client_ip
 from app.core.redis_client import resilient_store
 from app.core.security import decode_access_token
 
@@ -46,23 +45,12 @@ def get_rate_limit_identity(request: Request) -> str:
                 return f"user:{payload['sub']}:{role}"
 
     # 2. Check X-Automation-Secret
-    automation_secret = request.headers.get("X-Automation-Secret") or request.headers.get("x-automation-secret")
-    if automation_secret and automation_secret == settings.automation_shared_secret:
+    from app.dependencies import is_valid_automation_secret
+    if is_valid_automation_secret(request.headers.get("X-Automation-Secret")):
         return "system:automation"
 
-    # 3. Resolve Client IP safely
-    forwarded = request.headers.get("X-Forwarded-For") or request.headers.get("x-forwarded-for")
-    if forwarded:
-        # First IP in chain is the original client IP
-        client_ip = forwarded.split(",")[0].strip()
-        # Basic IPv4 / IPv6 format sanity check
-        if re.match(r"^[\da-fA-F\.\:]+$", client_ip):
-            return f"ip:{client_ip}"
-
-    if request.client and request.client.host:
-        return f"ip:{request.client.host}"
-
-    return "ip:127.0.0.1"
+    # 3. Client IP (X-Forwarded-For only trusted for configured proxy hops)
+    return f"ip:{get_client_ip(request)}"
 
 
 def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

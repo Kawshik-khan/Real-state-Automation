@@ -4,9 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
+from app.core.security import create_access_token
 
 client = TestClient(app)
-HEADERS = {"X-Automation-Secret": settings.automation_shared_secret}
+# Conversations hold customer PII: staff users only (the service secret is not a user).
+HEADERS = {"Authorization": "Bearer " + create_access_token({"sub": "usr-test-manager", "email": "manager@glgassets.com", "role": "manager", "tenant_id": settings.default_tenant_id})}
 
 
 class TestConversationsEndpoints:

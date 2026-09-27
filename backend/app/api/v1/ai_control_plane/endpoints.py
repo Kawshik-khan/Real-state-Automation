@@ -26,7 +26,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from app.dependencies import require_roles
+from app.dependencies import require_roles, require_stream_roles
 from app.models.user import UserRole
 from app.persistence.ai_control_plane_store import ai_control_plane_store
 from app.schemas.ai_control_plane import (
@@ -635,7 +635,7 @@ async def list_audit_logs(
 @router.get("/events/stream", summary="Server-Sent Events (SSE) live telemetry stream")
 async def stream_control_plane_events(
     request: Request,
-    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+    current_user: dict = Depends(require_stream_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
 ):
     """Client event stream sending real-time AI runs, job progress, and alerts."""
     queue = await ai_event_broadcaster.subscribe()

@@ -28,14 +28,27 @@ class Settings(BaseSettings):
 
     # Security
     automation_shared_secret: str = "change-me-to-a-random-secret"
-    jwt_secret: Optional[str] = None  # Falls back to automation_shared_secret if unset
+    jwt_secret: Optional[str] = None  # REQUIRED: independent random value (>= 32 chars), never the automation secret
+    # Number of reverse proxies in front of the app that append to X-Forwarded-For
+    # (Render = 1). 0 ignores the header and uses the socket peer address.
+    trusted_proxy_hops: int = 0
+    # Header the edge proxy overwrites with the client IP (e.g. "CF-Connecting-IP"); takes
+    # precedence over trusted_proxy_hops. Leave unset unless the proxy guarantees it.
+    client_ip_header: Optional[str] = None
     password_hash_salt: str = "glg_assets_salt_2026"
     api_key: Optional[str] = None
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    # CORS — comma-separated origins; "*" for development
-    cors_origins: str = "*"
+    # CORS — comma-separated explicit origins (the dashboard's origin in production).
+    # "*" disables credentialed requests, which breaks cookie-based session refresh.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    # Refresh-token cookie. Use "lax" when the dashboard and API share a site (recommended:
+    # same-origin via reverse proxy). Use "none" only for cross-site deployments (requires HTTPS;
+    # browsers that block third-party cookies will then need a fresh login on reload).
+    refresh_cookie_samesite: str = "lax"
+    refresh_cookie_secure: Optional[bool] = None  # None = secure when the request is HTTPS
 
     # Defaults
     default_tenant_id: str = "glg-assets-main"
@@ -73,7 +86,8 @@ class Settings(BaseSettings):
     default_slack_channel: str = "#leads"
     default_telegram_chat_id: Optional[str] = None
     telegram_bot_token: Optional[str] = None
-    whatsapp_verify_token: Optional[str] = None
+    whatsapp_verify_token: Optional[str] = None  # Meta webhook subscription token (no default: fail closed)
+    telegram_webhook_secret: Optional[str] = None  # sent to setWebhook; Telegram echoes it back on every update
 
     # Meta / Facebook / Instagram Graph API Settings
     facebook_page_id: Optional[str] = None

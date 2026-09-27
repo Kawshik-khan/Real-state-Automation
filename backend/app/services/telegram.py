@@ -52,15 +52,21 @@ class TelegramService:
             print(f"[TelegramService] Error sending message to {chat_id}: {err}")
             return {"success": False, "error": str(err)}
 
-    async def set_webhook(self, webhook_url: str) -> dict:
-        """Register public webhook URL with Telegram Bot API."""
+    async def set_webhook(self, webhook_url: str, secret_token: str | None = None) -> dict:
+        """Register public webhook URL with Telegram Bot API.
+
+        ``secret_token`` is echoed back by Telegram in X-Telegram-Bot-Api-Secret-Token on
+        every update, letting the webhook reject forged requests."""
         if not self.is_configured():
             return {"success": False, "error": "TELEGRAM_BOT_TOKEN missing"}
 
         url = f"{self.base_url}/setWebhook"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(url, json={"url": webhook_url})
+                payload = {"url": webhook_url}
+                if secret_token:
+                    payload["secret_token"] = secret_token
+                resp = await client.post(url, json=payload)
                 return resp.json()
         except Exception as err:
             return {"success": False, "error": str(err)}

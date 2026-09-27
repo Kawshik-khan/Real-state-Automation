@@ -7,16 +7,24 @@ import logging
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
+from app.dependencies import require_roles, require_stream_roles
+from app.models.user import UserRole
 from app.services.event_broadcaster import broadcaster
 from app.services.telegram import telegram_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Who may do what with customer conversations (PII: names, phone numbers, message history).
+_STAFF = [UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT, UserRole.DEVELOPER]
+_can_view = require_roles(_STAFF)
+_can_respond = require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT])
+_can_delete = require_roles([UserRole.ADMIN, UserRole.MANAGER])
 
 # Runtime conversation cache (hydrated from database on first API call)
 IN_MEMORY_CONVERSATIONS = []
@@ -284,10 +292,11 @@ async def _sync_lead_to_n8n_sheets(conv: dict):
 @router.get("", summary="List active conversations")
 @router.get("/", summary="List active conversations")
 async def list_conversations(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     channel: str = "all",
-    status: str = "all"
+    status: str = "all",
+    current_user: dict = Depends(_can_view),
 ):
     """Returns active customer conversations from database or cache."""
     try:
@@ -377,7 +386,7 @@ async def list_conversations(
 
 @router.post("", summary="Create a new conversation / lead")
 @router.post("/", summary="Create a new conversation / lead")
-async def create_conversation(body: dict):
+async def create_conversation(body: dict, current_user: dict = Depends(_can_view)):
     """Create a new conversation lead manually or via simulation."""
     conv_id = body.get("id") or f"lead_{int(asyncio.get_event_loop().time() * 1000)}"
     name = body.get("name", "New Visitor")
@@ -404,7 +413,7 @@ async def create_conversation(body: dict):
 
 
 @router.delete("/{conv_id}", summary="Delete or clear a conversation")
-async def delete_conversation(conv_id: str):
+async def delete_conversation(conv_id: str, current_user: dict = Depends(_can_delete)):
     """Delete a conversation from memory and database."""
     global IN_MEMORY_CONVERSATIONS
     IN_MEMORY_CONVERSATIONS = [c for c in IN_MEMORY_CONVERSATIONS if c["id"] != conv_id]
@@ -425,7 +434,7 @@ async def delete_conversation(conv_id: str):
 
 
 @router.get("/stream", summary="SSE Real-time Conversation Event Stream")
-async def event_stream(request: Request):
+async def event_stream(request: Request, current_user: dict = Depends(require_stream_roles(_STAFF))):
     """Server-Sent Events (SSE) endpoint pushing live lead & chat events to dashboard clients."""
     queue = broadcaster.subscribe()
 
@@ -457,7 +466,11 @@ async def event_stream(request: Request):
 
 
 @router.get("/{conv_id}/messages", summary="Get full message history for conversation")
-async def get_conversation_messages(conv_id: str, limit: int = 60):
+async def get_conversation_messages(
+    conv_id: str,
+    limit: int = Query(60, ge=1, le=500),
+    current_user: dict = Depends(_can_view),
+):
     """Fetch chronological message history for a specific conversation from DB or memory cache."""
     messages = []
     try:
@@ -498,7 +511,7 @@ async def get_conversation_messages(conv_id: str, limit: int = 60):
 
 
 @router.post("/{conv_id}/message", summary="Process customer message (triggers AI pipeline if active)")
-async def send_customer_message(conv_id: str, body: dict):
+async def send_customer_message(conv_id: str, body: dict, current_user: dict = Depends(_can_view)):
     """Process incoming customer message. If AI is active, run through LangGraph pipeline."""
     text = body.get("text") or body.get("message", "")
     channel = body.get("channel", "website")
@@ -561,7 +574,7 @@ async def send_customer_message(conv_id: str, body: dict):
 
 
 @router.post("/{conv_id}/takeover", summary="Toggle AI vs Human Agent takeover")
-async def toggle_takeover(conv_id: str):
+async def toggle_takeover(conv_id: str, current_user: dict = Depends(_can_respond)):
     """Toggle human takeover state for a conversation and broadcast state update."""
     conv = await async_get_or_create_conversation(conv_id)
 
@@ -601,7 +614,7 @@ async def toggle_takeover(conv_id: str):
 
 
 @router.post("/{conv_id}/reply", summary="Post manual human agent reply")
-async def send_agent_reply(conv_id: str, body: dict):
+async def send_agent_reply(conv_id: str, body: dict, current_user: dict = Depends(_can_respond)):
     """Post manual agent reply, broadcast message_received event, and dispatch to real social channel."""
     reply_text = body.get("text", "")
     if not reply_text:
