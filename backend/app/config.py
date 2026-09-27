@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     # Redis / Distributed Cache
     redis_url: Optional[str] = None
 
-    # Security
+    # Security — no usable defaults: the app refuses to start without JWT_SECRET, and service
+    # (automation) auth stays disabled until AUTOMATION_SHARED_SECRET is set to a private value.
     automation_shared_secret: str = "change-me-to-a-random-secret"
     jwt_secret: Optional[str] = None  # REQUIRED: independent random value (>= 32 chars), never the automation secret
     # Number of reverse proxies in front of the app that append to X-Forwarded-For
@@ -35,14 +36,26 @@ class Settings(BaseSettings):
     # Header the edge proxy overwrites with the client IP (e.g. "CF-Connecting-IP"); takes
     # precedence over trusted_proxy_hops. Leave unset unless the proxy guarantees it.
     client_ip_header: Optional[str] = None
+    # Only used to verify legacy (pre-bcrypt) password hashes; keep the historical default.
     password_hash_salt: str = "glg_assets_salt_2026"
+    # Dedicated key for the integrations credential vault (app/core/crypto.py). When unset, the
+    # legacy derivation from JWT/automation secrets is used — rotating those secrets would then
+    # make stored credentials unreadable, so set this before rotating.
+    credentials_encryption_key: Optional[str] = None
+    # Create the demo accounts (admin@glgassets.com / admin123, ...) on startup. Development and
+    # tests only — never enable on an internet-facing deployment.
+    seed_demo_users: bool = False
     api_key: Optional[str] = None
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
     # CORS — comma-separated explicit origins (the dashboard's origin in production).
     # "*" disables credentialed requests, which breaks cookie-based session refresh.
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    # Optional full-match regex for origins that cannot be listed (e.g. Vercel preview URLs).
+    # Keep it anchored to your own project; a broad pattern lets any site make credentialed
+    # requests. No default.
+    cors_origin_regex: Optional[str] = None
 
     # Refresh-token cookie. Use "lax" when the dashboard and API share a site (recommended:
     # same-origin via reverse proxy). Use "none" only for cross-site deployments (requires HTTPS;
@@ -75,7 +88,7 @@ class Settings(BaseSettings):
     vector_store_provider: str = "auto"  # "auto", "pinecone", "pgvector"
     pinecone_api_key: Optional[str] = None
     pinecone_index_name: str = "real-state-automation"
-    pinecone_host: Optional[str] = "https://real-state-automation-o25ptb6.svc.aped-4627-b74a.pinecone.io"
+    pinecone_host: Optional[str] = None
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
@@ -113,9 +126,14 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        """Parse CORS_ORIGINS into a list; handles '*' for development."""
-        if self.cors_origins == "*":
-            return ["*"]
+        """Parse CORS_ORIGINS into a list. Prevents raw wildcard '*' with allow_credentials=True."""
+        if not self.cors_origins or self.cors_origins.strip() == "*":
+            return [
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:3000",
+            ]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     model_config = SettingsConfigDict(

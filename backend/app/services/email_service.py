@@ -28,6 +28,13 @@ class EmailService:
         # Message deduplication index keyed by message_id -> thread_id
         self._message_to_thread: Dict[str, str] = {}
 
+    def _get_gmail_credentials(self) -> tuple[Optional[str], Optional[str]]:
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("gmail")
+        user_email = (creds.get("user_email") if creds else None) or settings.gmail_user_email
+        app_password = (creds.get("app_password") if creds else None) or settings.gmail_app_password
+        return user_email, app_password
+
     def get_or_create_thread(self, payload: IncomingEmailPayload) -> EmailThreadSchema:
         """Finds existing thread via in_reply_to, thread_id, or sender+subject match."""
         target_thread_id = payload.thread_id
@@ -174,15 +181,16 @@ class EmailService:
 
         # Real Gmail SMTP dispatch if credentials available and recipient is a real email address
         is_dummy_test_domain = any(domain in thread.customer_email.lower() for domain in ["@example.com", "@test.com", "@domain.com", "@localhost"])
+        gmail_user, gmail_pass = self._get_gmail_credentials()
 
-        if not sent_successfully and not is_dummy_test_domain and settings.gmail_user_email and settings.gmail_app_password:
+        if not sent_successfully and not is_dummy_test_domain and gmail_user and gmail_pass:
             try:
                 import smtplib
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
 
                 msg = MIMEMultipart("alternative")
-                msg["From"] = f"GLG Assets Real Estate <{settings.gmail_user_email}>"
+                msg["From"] = f"GLG Assets Real Estate <{gmail_user}>"
                 msg["To"] = thread.customer_email
                 msg["Subject"] = reply_subject or f"Re: {thread.subject}"
                 if in_reply_to_header:
@@ -196,8 +204,8 @@ class EmailService:
 
                 with smtplib.SMTP("smtp.gmail.com", 587) as server:
                     server.starttls()
-                    server.login(settings.gmail_user_email, settings.gmail_app_password)
-                    server.sendmail(settings.gmail_user_email, [thread.customer_email], msg.as_string())
+                    server.login(gmail_user, gmail_pass)
+                    server.sendmail(gmail_user, [thread.customer_email], msg.as_string())
 
                 sent_successfully = True
                 n8n_response_data = {"channel": "gmail_smtp", "status": "sent"}
@@ -293,14 +301,15 @@ class EmailService:
 
         # 1. Real Gmail SMTP dispatch if configured
         is_dummy_test_domain = any(domain in to_email.lower() for domain in ["@example.com", "@test.com", "@domain.com", "@localhost"])
-        if not is_dummy_test_domain and settings.gmail_user_email and settings.gmail_app_password:
+        gmail_user, gmail_pass = self._get_gmail_credentials()
+        if not is_dummy_test_domain and gmail_user and gmail_pass:
             try:
                 import smtplib
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
 
                 msg = MIMEMultipart("alternative")
-                msg["From"] = f"GLG Assets Real Estate <{settings.gmail_user_email}>"
+                msg["From"] = f"GLG Assets Real Estate <{gmail_user}>"
                 msg["To"] = to_email
                 msg["Subject"] = subject
 
@@ -311,8 +320,8 @@ class EmailService:
 
                 with smtplib.SMTP("smtp.gmail.com", 587) as server:
                     server.starttls()
-                    server.login(settings.gmail_user_email, settings.gmail_app_password)
-                    server.sendmail(settings.gmail_user_email, [to_email], msg.as_string())
+                    server.login(gmail_user, gmail_pass)
+                    server.sendmail(gmail_user, [to_email], msg.as_string())
 
                 sent_successfully = True
                 channel = "gmail_smtp"

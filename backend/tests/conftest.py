@@ -28,6 +28,8 @@ _CI_DEFAULTS = {
     "GMAIL_USER_EMAIL": "",
     "GMAIL_APP_PASSWORD": "",
     "TESTING": "true",
+    # Demo accounts (public passwords) are opt-in; the test suite logs in with them.
+    "SEED_DEMO_USERS": "true",
 }
 
 for key, value in _CI_DEFAULTS.items():

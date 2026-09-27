@@ -1494,3 +1494,48 @@ export async function sendTestReport(payload) {
   return handleResponse(response);
 }
 
+/**
+ * ==========================================================
+ * DEVELOPER SERVICE CONNECTIONS & SECRETS MANAGEMENT API (S-04)
+ * ==========================================================
+ */
+
+// ── Service integrations (Developer Console) ────────────────────────────────
+// Authenticated with the user's bearer token by apiFetch (via resilientFetch).
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+export async function getServiceIntegrations() {
+  const response = await resilientFetch('/api/v1/developer/integrations', {
+    method: 'GET',
+    headers: JSON_HEADERS,
+  });
+  return handleResponse(response);
+}
+
+export async function saveServiceIntegration(serviceKey, credentials, isActive = true) {
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ credentials, is_active: isActive }),
+  });
+  return handleResponse(response);
+}
+
+export async function testServiceIntegration(serviceKey, credentials = null) {
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}/test`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(credentials ? { credentials } : {}),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteServiceIntegration(serviceKey) {
+  const response = await resilientFetch(`/api/v1/developer/integrations/${encodeURIComponent(serviceKey)}`, {
+    method: 'DELETE',
+    headers: JSON_HEADERS,
+  });
+  return handleResponse(response);
+}
+

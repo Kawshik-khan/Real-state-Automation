@@ -312,3 +312,78 @@ def test_knowledge_doc_id_cannot_escape_base_dir(doc_id):
         data={"doc_id": doc_id},
     )
     assert resp.status_code == 400
+
+
+# ── Merge of main into PR #9: decisions pinned ─────────────────────────────
+
+def test_merge_public_default_jwt_secret_is_rejected(monkeypatch):
+    monkeypatch.setattr(settings, "jwt_secret", "glg_assets_default_jwt_secret_key_2026_minimum_32_chars")
+    with pytest.raises(RuntimeError, match="publicly known"):
+        security._load_signing_key()
+
+
+def test_merge_public_default_automation_secret_is_disabled(monkeypatch):
+    from app.dependencies import is_valid_automation_secret
+
+    monkeypatch.setattr(settings, "automation_shared_secret", "glg_assets_default_shared_secret_2026")
+    assert is_valid_automation_secret("glg_assets_default_shared_secret_2026") is False
+
+
+async def test_merge_demo_users_absent_unless_opted_in(monkeypatch):
+    from app.services.user_service import UserService
+
+    monkeypatch.setattr(settings, "seed_demo_users", False)
+    service = UserService()
+    assert service.in_memory_users == {}
+    # Database is unreachable in tests, so this exercises the in-memory fallback path.
+    assert await service.get_user_by_email("admin@glgassets.com") is None
+    await service.seed_default_users()  # must be a no-op
+    assert service.in_memory_users == {}
+
+
+async def test_merge_revoke_all_only_invalidates_earlier_tokens():
+    """main's token store treated any revoke-all as permanent, locking users out of every
+    future session. The cut-off must only apply to tokens issued before it."""
+    from app.core.token_store import token_store
+
+    user = f"usr-cutoff-{time.time()}"
+    await token_store.revoke_all_user_tokens(user, reason="test")
+    cutoff = await token_store.get_user_revoked_cutoff(user)
+    assert cutoff is not None
+    assert await token_store.is_token_revoked("old-jti", user_id=user, issued_at=cutoff - 10) is True
+    assert await token_store.is_token_revoked("new-jti", user_id=user, issued_at=cutoff + 10) is False
+
+
+def test_merge_cors_rejects_foreign_origins():
+    preflight = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"}
+    evil = client.options("/api/v1/auth/refresh", headers={"Origin": "https://evil.example", **preflight})
+    assert evil.headers.get("access-control-allow-origin") is None
+    local = client.options("/api/v1/auth/refresh", headers={"Origin": "http://localhost:5173", **preflight})
+    assert local.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_merge_deployed_cors_regex_is_project_scoped():
+    import pathlib
+    import re
+
+    import yaml
+
+    render = yaml.safe_load((pathlib.Path(__file__).resolve().parents[2] / "render.yaml").read_text())
+    env = {e["key"]: e.get("value") for e in render["services"][0]["envVars"]}
+    pattern = re.compile(env["CORS_ORIGIN_REGEX"])
+    assert pattern.fullmatch("https://real-state-automation-git-feature-x-kawshik-khans-projects.vercel.app")
+    for origin in ("https://evil.vercel.app",
+                   "https://attacker-kawshik-khans-projects.vercel.app",
+                   "https://real-state-automation-kawshik-khans-projects.vercel.app.evil.com",
+                   "http://real-state-automation-kawshik-khans-projects.vercel.app"):
+        assert not pattern.fullmatch(origin), origin
+
+
+def test_merge_credential_vault_survives_secret_rotation(monkeypatch):
+    from app.core import crypto
+
+    monkeypatch.setattr(settings, "credentials_encryption_key", "vault-key-for-tests-0123456789abcdef")
+    sealed = crypto.encrypt_data({"api_key": "gsk_test"})
+    monkeypatch.setattr(settings, "jwt_secret", "rotated-jwt-secret-value-0123456789abcdef")
+    monkeypatch.setattr(settings, "automation_shared_secret", "rotated-automation-secret-0123456789")
+    assert crypto.decrypt_data(sealed) == {"api_key": "gsk_test"}

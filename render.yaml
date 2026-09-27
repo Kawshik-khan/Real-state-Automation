@@ -15,9 +15,16 @@ services:
         value: "false"
       - key: PYTHONWARNINGS
         value: "ignore::DeprecationWarning"
-      # Explicit dashboard origin: required for cookie-based session refresh.
+      # Explicit dashboard origins: required for cookie-based session refresh.
       - key: CORS_ORIGINS
         value: "https://glg-realestate-frontend.onrender.com"
+      # This project's Vercel deployments only (production alias, branch previews, per-deploy
+      # URLs), all under the kawshik-khans-projects team scope. Never widen to *.vercel.app.
+      - key: CORS_ORIGIN_REGEX
+        value: "^https://real-state-automation(-git-[a-z0-9-]+|-[a-z0-9]+)?-kawshik-khans-projects\\.vercel\\.app$"
+      # Credential vault key, independent of JWT/automation secrets (openssl rand -hex 32).
+      - key: CREDENTIALS_ENCRYPTION_KEY
+        sync: false
       # Frontend and API are different sites (onrender.com is a public suffix), so the
       # refresh cookie must be SameSite=None (sent cross-site, Secure). Browsers that block
       # third-party cookies (Safari) will require a fresh login after reload; serving the

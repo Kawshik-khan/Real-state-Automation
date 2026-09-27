@@ -233,20 +233,26 @@ class PineconeVectorStore:
         self._index = None
 
     def get_index(self):
-        if self._index is not None:
-            return self._index
-        api_key = settings.pinecone_api_key
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("pinecone")
+        api_key = (creds.get("api_key") if creds else None) or settings.pinecone_api_key
+        host = (creds.get("host") if creds else None) or settings.pinecone_host or None
+        index_name = (creds.get("index_name") if creds else None) or settings.pinecone_index_name or "real-state-automation"
+
         if not api_key:
             return None
+
+        if self._index is not None and getattr(self, "_current_api_key", None) == api_key:
+            return self._index
+
         try:
             from pinecone import Pinecone
             pc = Pinecone(api_key=api_key)
-            host = settings.pinecone_host or None
-            index_name = settings.pinecone_index_name or "real-state-automation"
             if host:
                 self._index = pc.Index(host=host)
             else:
                 self._index = pc.Index(name=index_name)
+            self._current_api_key = api_key
             return self._index
         except Exception as e:
             print(f"[PineconeVectorStore] Connection Warning: {e}")
@@ -396,7 +402,10 @@ class UnifiedVectorStore:
         provider = (settings.vector_store_provider or "auto").lower()
         if provider == "pinecone":
             return True
-        if provider == "auto" and settings.pinecone_api_key:
+        from app.services.integration_service import integration_service
+        creds = integration_service.get_cached_credentials("pinecone")
+        has_key = bool(creds.get("api_key")) if creds else bool(settings.pinecone_api_key)
+        if provider == "auto" and has_key:
             return True
         return False
 

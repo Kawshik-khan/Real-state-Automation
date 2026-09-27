@@ -14,7 +14,6 @@ import asyncio
 import logging
 import os
 import time
-import warnings
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
@@ -57,10 +56,6 @@ from app.dependencies import require_roles
 from app.models.user import UserRole
 from app.services.log_streamer import log_streamer, setup_live_logging
 
-# Silence third-party deprecation noise only; runtime/user warnings stay visible to on-call.
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
-
 logger = logging.getLogger(__name__)
 
 
@@ -74,6 +69,12 @@ async def lifespan(app: FastAPI):
         if is_connected:
             await init_db()
             logger.info("[startup] Supabase/PostgreSQL schema initialized successfully (pgvector & tables verified).")
+            from app.core.token_store import token_store
+            from app.services.integration_service import integration_service
+            from app.services.user_service import user_service
+            await token_store.cleanup_expired_tokens()
+            await user_service.seed_default_users()
+            await integration_service.warm_cache()
         else:
             supa_health = supabase_db.check_health()
             if supa_health.get("configured"):
@@ -129,7 +130,10 @@ _cors_origins = settings.allowed_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    # Credentialed (cookie) requests only for explicitly listed origins, never with "*".
+    # Anchored regex for origins that cannot be listed (e.g. this project's Vercel previews);
+    # unset by default.
+    allow_origin_regex=settings.cors_origin_regex or None,
+    # Credentialed (cookie) requests only for explicitly allowed origins, never with "*".
     allow_credentials="*" not in _cors_origins,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "X-Automation-Secret", "X-GLG-Client"],

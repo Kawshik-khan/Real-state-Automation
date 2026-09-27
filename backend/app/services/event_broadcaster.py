@@ -10,9 +10,9 @@ class EventBroadcaster:
     def __init__(self):
         self._subscribers: List[asyncio.Queue] = []
 
-    def subscribe(self) -> asyncio.Queue:
-        """Register a new SSE client listener queue."""
-        queue: asyncio.Queue = asyncio.Queue()
+    def subscribe(self, maxsize: int = 256) -> asyncio.Queue:
+        """Register a new SSE client listener queue with bounded capacity."""
+        queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
         self._subscribers.append(queue)
         return queue
 
@@ -30,6 +30,13 @@ class EventBroadcaster:
         for queue in list(self._subscribers):
             try:
                 queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                # Evict oldest message to prevent unbounded memory growth on slow consumers
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(payload)
+                except Exception:
+                    pass
             except Exception:
                 pass
 

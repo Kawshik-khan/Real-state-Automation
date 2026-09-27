@@ -722,4 +722,74 @@ async def test_agent_playground(
     }
 
 
+# ---------------------------------------------------------
+# S-04: Service Connections & Secrets Management Hub Endpoints
+# ---------------------------------------------------------
+
+@router.get("/integrations", summary="List all third-party service connections and encrypted credentials status")
+async def list_service_integrations(
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Retrieve catalog of service integrations with masked credentials and real-time connectivity status."""
+    from app.services.integration_service import integration_service
+    integrations = await integration_service.get_all_integrations()
+    return {
+        "success": True,
+        "count": len(integrations),
+        "integrations": integrations,
+    }
+
+
+@router.post("/integrations/{service_key}", summary="Save and encrypt third-party service credentials")
+async def save_service_integration(
+    service_key: str,
+    body: Dict[str, Any],
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Encrypt and store credentials for a service in PostgreSQL system_integrations table."""
+    from app.services.integration_service import integration_service
+    credentials = body.get("credentials") or body
+    is_active = body.get("is_active", True)
+    updated_by = current_user.get("email", "developer")
+
+    result = await integration_service.save_integration(
+        service_key=service_key,
+        credentials=credentials,
+        is_active=is_active,
+        updated_by=updated_by,
+    )
+    return result
+
+
+@router.post("/integrations/{service_key}/test", summary="Test live third-party service connectivity")
+async def test_service_integration(
+    service_key: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Perform real-time network handshake ping to verify credential authenticity."""
+    from app.services.integration_service import integration_service
+    custom_credentials = body.get("credentials") if body else None
+    result = await integration_service.test_connection(
+        service_key=service_key,
+        custom_credentials=custom_credentials,
+    )
+    return result
+
+
+@router.delete("/integrations/{service_key}", summary="Disconnect service and clear database credentials")
+async def delete_service_integration(
+    service_key: str,
+    current_user: dict = Depends(require_roles([UserRole.DEVELOPER, UserRole.ADMIN])),
+) -> Dict[str, Any]:
+    """Remove database credentials for a service, reverting to environment fallback."""
+    from app.services.integration_service import integration_service
+    success = await integration_service.delete_integration(service_key)
+    return {
+        "success": success,
+        "service_key": service_key,
+        "message": f"Service '{service_key}' credentials removed from database.",
+    }
+
+
 

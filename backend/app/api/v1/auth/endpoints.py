@@ -1,7 +1,6 @@
 """Auth endpoints for login, user verification, and user management."""
 
 import uuid
-from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -17,7 +16,6 @@ from app.core.security import (
     create_refresh_token,
     create_stream_ticket,
     hash_password,
-    password_needs_rehash,
     revoke_refresh_token,
     verify_and_rotate_refresh_token,
     verify_password,
@@ -33,62 +31,12 @@ from app.models.user import (
     UserResponse,
     UserRole,
 )
+from app.services.user_service import user_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-# In-memory demo user database seeded with Admin, Manager, Agent, Viewer
-USERS_DB: dict[str, UserInDB] = {
-    "admin@glgassets.com": UserInDB(
-        id="usr-admin-001",
-        email="admin@glgassets.com",
-        full_name="Alex Mercer (Admin)",
-        role=UserRole.ADMIN,
-        tenant_id="glg-default",
-        is_active=True,
-        hashed_password=hash_password("admin123"),
-        created_at=datetime.utcnow().isoformat(),
-    ),
-    "manager@glgassets.com": UserInDB(
-        id="usr-manager-002",
-        email="manager@glgassets.com",
-        full_name="Sarah Connor (Manager)",
-        role=UserRole.MANAGER,
-        tenant_id="glg-default",
-        is_active=True,
-        hashed_password=hash_password("manager123"),
-        created_at=datetime.utcnow().isoformat(),
-    ),
-    "agent@glgassets.com": UserInDB(
-        id="usr-agent-003",
-        email="agent@glgassets.com",
-        full_name="Rahul Sharma (Agent)",
-        role=UserRole.AGENT,
-        tenant_id="glg-default",
-        is_active=True,
-        hashed_password=hash_password("agent123"),
-        created_at=datetime.utcnow().isoformat(),
-    ),
-    "developer@glgassets.com": UserInDB(
-        id="usr-dev-005",
-        email="developer@glgassets.com",
-        full_name="Alex Chen (Dev Lead)",
-        role=UserRole.DEVELOPER,
-        tenant_id="glg-default",
-        is_active=True,
-        hashed_password=hash_password("dev123"),
-        created_at=datetime.utcnow().isoformat(),
-    ),
-    "viewer@glgassets.com": UserInDB(
-        id="usr-viewer-004",
-        email="viewer@glgassets.com",
-        full_name="Guest Stakeholder (Viewer)",
-        role=UserRole.VIEWER,
-        tenant_id="glg-default",
-        is_active=True,
-        hashed_password=hash_password("viewer123"),
-        created_at=datetime.utcnow().isoformat(),
-    ),
-}
+# S-03: Resilient in-memory users cache backed by PostgreSQL `auth_users` table
+USERS_DB: dict[str, UserInDB] = user_service.in_memory_users
 
 _DUMMY_HASH = hash_password("timing-equalisation-dummy-password")
 
@@ -150,7 +98,7 @@ async def login(request: Request, response: Response, req: LoginRequest):
             headers={"Retry-After": str(remaining_secs)},
         )
 
-    user_db = USERS_DB.get(email_clean)
+    user_db = await user_service.get_user_by_email(email_clean)
     # Always run one bcrypt check (dummy hash for unknown users) so response timing does not
     # reveal which emails exist; bcrypt is CPU-bound, so keep it off the event loop.
     password_ok = await run_in_threadpool(
@@ -181,9 +129,6 @@ async def login(request: Request, response: Response, req: LoginRequest):
 
     # Clear failed attempt counter on success
     await account_lockout.record_success(email_clean, client_ip)
-
-    if password_needs_rehash(user_db.hashed_password):
-        user_db.hashed_password = await run_in_threadpool(hash_password, req.password)
 
     token_data = {
         "sub": user_db.id,
@@ -247,7 +192,7 @@ async def refresh_access_token(
     _set_refresh_cookie(request, response, new_refresh)
 
     user_email = user_payload.get("email") if user_payload else None
-    user_db = USERS_DB.get(user_email) if user_email else None
+    user_db = await user_service.get_user_by_email(user_email) if user_email else None
     user_resp = None
     if user_db:
         user_resp = UserResponse(
@@ -318,7 +263,7 @@ async def issue_stream_ticket(request: Request, current_user: dict = Depends(get
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Return currently authenticated user profile."""
     email = current_user.get("email")
-    user_db = USERS_DB.get(email) if email else None
+    user_db = await user_service.get_user_by_email(email) if email else None
     if not user_db:
         raise HTTPException(status_code=404, detail="User profile not found")
 
@@ -336,18 +281,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 @router.get("/users", response_model=List[UserResponse])
 async def list_users(current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER]))):
     """List all registered platform users (Admin, Manager & Developer)."""
-    return [
-        UserResponse(
-            id=u.id,
-            email=u.email,
-            full_name=u.full_name,
-            role=u.role,
-            tenant_id=u.tenant_id,
-            is_active=u.is_active,
-            created_at=u.created_at,
-        )
-        for u in USERS_DB.values()
-    ]
+    return await user_service.list_all_users()
 
 
 @router.post("/register", response_model=UserResponse)
@@ -356,32 +290,7 @@ async def register_user(
     current_user: dict = Depends(require_roles([UserRole.ADMIN])),
 ):
     """Create a new system user (Admin only)."""
-    email_clean = new_user.email.strip().lower()
-    if email_clean in USERS_DB:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
-
-    usr_id = f"usr-{len(USERS_DB) + 1:03d}"
-    user_db = UserInDB(
-        id=usr_id,
-        email=email_clean,
-        full_name=new_user.full_name,
-        role=new_user.role,
-        tenant_id=new_user.tenant_id,
-        is_active=new_user.is_active,
-        hashed_password=hash_password(new_user.password),
-        created_at=datetime.utcnow().isoformat(),
-    )
-    USERS_DB[email_clean] = user_db
-
-    return UserResponse(
-        id=user_db.id,
-        email=user_db.email,
-        full_name=user_db.full_name,
-        role=user_db.role,
-        tenant_id=user_db.tenant_id,
-        is_active=user_db.is_active,
-        created_at=user_db.created_at,
-    )
+    return await user_service.create_user(new_user)
 
 
 @router.post("/unlock", summary="Unlock account locked by brute force defense")

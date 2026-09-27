@@ -120,8 +120,10 @@ def _fetch_unseen_messages_sync(gmail_user: str, gmail_pass: str):
 
 async def poll_gmail_inbox_once() -> int:
     """Polls Gmail IMAP once for unread emails and processes customer inquiries async."""
-    gmail_user = settings.gmail_user_email
-    gmail_pass = settings.gmail_app_password
+    from app.services.integration_service import integration_service
+    creds = integration_service.get_cached_credentials("gmail")
+    gmail_user = (creds.get("user_email") if creds else None) or settings.gmail_user_email
+    gmail_pass = (creds.get("app_password") if creds else None) or settings.gmail_app_password
 
     if not gmail_user or not gmail_pass:
         return 0

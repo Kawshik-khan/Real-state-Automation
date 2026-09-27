@@ -36,6 +36,7 @@ _COMPROMISED_SECRET_SHA256 = frozenset({
     "92809ab604c9377285fbbcf82c4f30db65f107ecfd7217c7e62c17a2b3be7633",  # change-me-in-production
     "9201e5edc595d098d7f361fcd749fef48fed760e44a248b710b9d3e64a0f58f8",  # glg-secret-key
     "cd935fe500727d9837af49bc623886c6a43e234456badc0852451a0c0566ed64",  # value previously committed to git / frontend bundle
+    "e29e0c710e26ea5410482c75e679513f40c0e8c65edd39fac3efc9296aa90174",  # glg_assets_default_shared_secret_2026 (former config default)
 })
 
 
@@ -151,6 +152,8 @@ def require_roles(allowed_roles: List[Union[UserRole, str]], allow_service: bool
     must never stand in for an admin/developer user.
     """
     allowed_str_roles = [r.value if isinstance(r, UserRole) else str(r) for r in allowed_roles]
+    # Listing UserRole.SERVICE is equivalent to allow_service=True.
+    allow_service = allow_service or SERVICE_ROLE in allowed_str_roles
 
     async def role_checker(current_user: dict = Depends(get_current_user)):
         if current_user.get("is_service"):

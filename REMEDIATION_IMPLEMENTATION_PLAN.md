@@ -411,3 +411,40 @@ time as the backend secret rotation.
   ~3k lines per run). Tests should use a temp data dir.
 - `platform-api/` still unreviewed; same `change-me-in-production` / `CORS *` defaults.
 - n8n in `docker-compose.yml` runs with `N8N_AUTH_ENABLED=false` on a published port.
+
+---
+
+## Merge of `main` into PR #9
+
+`main` gained a parallel auth redesign (durable PostgreSQL token store, database-backed users,
+encrypted integration vault) while this branch was in review. Resolved by keeping all of
+`main`'s features and this branch's security invariants on top:
+
+| Area | Resolution |
+|---|---|
+| Token lifecycle | `main`'s memory → Redis → PostgreSQL `token_store` for refresh tokens; this branch's typed tokens, session (`sid`) revocation, tenant preservation and stream tickets on top. Session revocations are written to `revoked_tokens` (`token_type="session"`); per-request checks read memory/Redis only. |
+| Bug fixed in `main` | `token_store.is_token_revoked` treated any revoke-all as permanent, so after a replay detection or password reset **every future session** of that user was rejected (until restart, or 7 days in Redis). The cut-off now applies only to tokens issued before it. |
+| Passwords | `main`'s scheme (bcrypt of the raw password, 72-byte truncation) kept for compatibility with stored users; implemented on `bcrypt` directly. |
+| Secrets | `main` added hardcoded defaults for `JWT_SECRET` / `AUTOMATION_SHARED_SECRET`. Removed; the app refuses to start with a missing or publicly known JWT key, and the old defaults are denylisted. |
+| CORS | `main` defaulted to allowing every origin (`^https?://.*`) with credentials — any site could read a logged-in user's refreshed tokens. Now: explicit origins, no regex by default; `render.yaml` sets a pattern limited to this project's Vercel deployments. |
+| Demo users | `main` created `admin@glgassets.com` / `admin123` etc. both in the database **and** as an in-memory fallback used whenever the database has no matching row. Both now only when `SEED_DEMO_USERS=true` (tests/dev). |
+| Credential vault | Its key was derived from the JWT/automation secrets, so rotating them (required above) would silently make every stored integration credential unreadable. New `CREDENTIALS_ENCRYPTION_KEY`; decrypt failures are now logged. |
+| Conversations | `main`'s bounded O(1) cache and bounded SSE queues kept (partly addresses F12); per-role access instead of "any authenticated caller". |
+| Tests | `main`'s edge-case test asserting refresh tokens decode as access tokens (finding F3) updated to the fixed contract. 7 regression tests pin the decisions above. Backend 271 passed, frontend 46 passed, ruff 0 findings. |
+
+### Additional deployment steps from the merge
+- **`CREDENTIALS_ENCRYPTION_KEY`**: set it (`openssl rand -hex 32`). If integration credentials
+  were already saved under `main`, they were encrypted with the legacy derived key: rotating
+  `JWT_SECRET`/`AUTOMATION_SHARED_SECRET` or setting this key makes them unreadable (now logged
+  as `[crypto] Failed to decrypt`). Re-enter them in Developer Console → Integrations after
+  deploying.
+- **Admin account**: with demo seeding off, production has no default users and `/auth/register`
+  itself requires an admin. Bootstrap one **before** relying on the deploy:
+  `cd backend && python -m scripts.create_admin --email you@company.com --name "Your Name"`
+  (password prompted, or from `ADMIN_PASSWORD`; min 12 chars). Then delete the old demo rows if
+  `main` already seeded them: `DELETE FROM auth_users WHERE email IN ('admin@glgassets.com', 'manager@glgassets.com', 'agent@glgassets.com', 'developer@glgassets.com', 'viewer@glgassets.com');` (exact demo addresses only; check none is a real account first)
+- **CORS**: if the production dashboard is served from a domain the Vercel pattern does not
+  cover (e.g. `real-state-automation.vercel.app` or a custom domain), add it to `CORS_ORIGINS`.
+- **Residual risk (SUSPECTED):** any suffix pattern on `vercel.app` depends on nobody else being
+  able to register a project name ending in `-kawshik-khans-projects`. A custom domain for the
+  dashboard removes that dependency.

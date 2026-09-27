@@ -123,6 +123,56 @@ CREATE TABLE IF NOT EXISTS logs (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
 
+-- Table 10: auth_users (Persistent Staff Identity & Role-Based Access Control - S-03)
+CREATE TABLE IF NOT EXISTS auth_users (
+    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    email VARCHAR(256) UNIQUE NOT NULL,
+    full_name VARCHAR(256) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'agent', -- 'admin', 'developer', 'manager', 'agent', 'viewer', 'service'
+    password_hash VARCHAR(256) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    tenant_id VARCHAR(128) NOT NULL DEFAULT 'glg-default',
+    last_login_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 11: active_refresh_tokens (Distributed Session Tracking & Cross-Worker Token Store - S-07)
+CREATE TABLE IF NOT EXISTS active_refresh_tokens (
+    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    user_id VARCHAR(36) NOT NULL,
+    jti VARCHAR(64) UNIQUE NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 12: revoked_tokens (Instant Session Invalidation & Distributed Token Revocation - S-07)
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    jti VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(36),
+    reason VARCHAR(128) DEFAULT 'logout',
+    revoked_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Table 13: system_integrations (Dynamic Encrypted Secrets Management Vault - S-04)
+CREATE TABLE IF NOT EXISTS system_integrations (
+    service_key VARCHAR(64) PRIMARY KEY,
+    display_name VARCHAR(128) NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    encrypted_credentials TEXT NOT NULL,
+    masked_preview JSONB NOT NULL DEFAULT '{}'::jsonb,
+    last_status VARCHAR(32) DEFAULT 'not_tested',
+    last_latency_ms FLOAT,
+    last_tested_at TIMESTAMPTZ,
+    last_error TEXT,
+    updated_by VARCHAR(128) DEFAULT 'developer',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
 -- ----------------------------------------------------------------------------
 -- 3. PERFORMANCE & VECTOR SEARCH INDEXES
 -- ----------------------------------------------------------------------------
@@ -156,6 +206,14 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_project ON knowledge_chunks(proj
 CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_location ON knowledge_chunks(location);
 CREATE INDEX IF NOT EXISTS idx_media_project_id ON media(project_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics(date);
+CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+CREATE INDEX IF NOT EXISTS idx_auth_users_role ON auth_users(role);
+CREATE INDEX IF NOT EXISTS idx_auth_users_tenant_id ON auth_users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_active_refresh_tokens_jti ON active_refresh_tokens(jti);
+CREATE INDEX IF NOT EXISTS idx_active_refresh_tokens_user_id ON active_refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_active_refresh_tokens_expires_at ON active_refresh_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_jti ON revoked_tokens(jti);
+CREATE INDEX IF NOT EXISTS idx_system_integrations_category ON system_integrations(category);
 
 -- Auto-update tsvector trigger for hybrid search
 CREATE OR REPLACE FUNCTION update_chunk_content_tsv()
@@ -864,6 +922,20 @@ CREATE POLICY "Allow service insert leads" ON public.leads FOR ALL USING (true);
 CREATE POLICY "Allow authenticated read inventory_units" ON public.inventory_units FOR SELECT USING (true);
 CREATE POLICY "Allow service insert inventory_units" ON public.inventory_units FOR ALL USING (true);
 
+-- RLS for Authentication, Session & Secrets Management Tables (S-02, S-03, S-04, S-07)
+ALTER TABLE public.auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.active_refresh_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.revoked_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_integrations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow service_role full access auth_users" ON public.auth_users FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Allow authenticated read auth_users" ON public.auth_users FOR SELECT USING (true);
+
+CREATE POLICY "Allow service_role full access active_refresh_tokens" ON public.active_refresh_tokens FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Allow service_role full access revoked_tokens" ON public.revoked_tokens FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Allow service_role full access system_integrations" ON public.system_integrations FOR ALL USING (auth.role() = 'service_role');
+
 -- ----------------------------------------------------------------------------
 -- 13. CANONICAL SEED DATA (AI CONTROL PLANE & AGENTS)
 -- ----------------------------------------------------------------------------
@@ -925,12 +997,152 @@ ON CONFLICT (agent_key) DO UPDATE SET
     model = EXCLUDED.model,
     system_prompt = EXCLUDED.system_prompt;
 
+-- Seed Canonical Luxury Projects (Active 2026 Portfolio)
+INSERT INTO projects (project_id, name, location, price, price_val, bedrooms, description, features)
+VALUES
+(
+    'proj_gulshan_luxe',
+    'GLG Gulshan Heights',
+    'Gulshan 2, Dhaka, Bangladesh',
+    '95 Lakhs BDT (৳9,500,000)',
+    9500000,
+    3,
+    'Exclusive 3 BHK luxury apartment in Gulshan 2 with modern architectural design, private balconies, and round-the-clock security.',
+    '{
+        "status": "active",
+        "amenities": ["Rooftop Infinity Pool", "Three-Tier 24/7 Security", "Smart Automation", "Gym", "Elevator", "Backup Generator", "Dedicated Parking"],
+        "handover": "December 2026",
+        "bathrooms": 3,
+        "size_sqft": 1850,
+        "images": ["https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800"],
+        "brochure_url": "https://example.com/brochures/gulshan_heights.pdf",
+        "area": "Gulshan 2",
+        "city": "Dhaka"
+    }'::jsonb
+),
+(
+    'proj_gulshan_palace',
+    'GLG Grand Residency',
+    'Gulshan 1, Dhaka, Bangladesh',
+    '85 Lakhs BDT (৳8,500,000)',
+    8500000,
+    2,
+    'Elegant 2 BHK apartment near Gulshan Lake, in close proximity to premier international schools and diplomatic zones.',
+    '{
+        "status": "active",
+        "amenities": ["Lake View", "24/7 Security", "Backup Generator", "Intercom Facility"],
+        "handover": "June 2027",
+        "bathrooms": 2,
+        "size_sqft": null,
+        "images": ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800"],
+        "brochure_url": "https://example.com/brochures/grand_residency.pdf",
+        "area": "Gulshan 1",
+        "city": "Dhaka"
+    }'::jsonb
+),
+(
+    'proj_banani_crest',
+    'GLG Banani Crest',
+    'Banani, Dhaka, Bangladesh',
+    '1.2 Crore BDT (৳12,000,000)',
+    12000000,
+    3,
+    'Contemporary 3 BHK luxury residence located on prime Banani Road, featuring premium finishes and an executive rooftop terrace.',
+    '{
+        "status": "active",
+        "amenities": ["Infinity Pool", "Concierge Service", "Underground Parking", "Fitness Center", "Three-Tier Security"],
+        "handover": "December 2026",
+        "bathrooms": 3,
+        "size_sqft": 2100,
+        "images": ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800"],
+        "brochure_url": "https://example.com/brochures/banani_crest.pdf",
+        "area": "Banani",
+        "city": "Dhaka"
+    }'::jsonb
+),
+(
+    'proj_sky_tower_banani',
+    'GLG Sky Tower',
+    'Road 11, Block D, Banani, Dhaka, Bangladesh',
+    '1.85 Crore BDT (৳18,500,000)',
+    18500000,
+    4,
+    'Iconic architectural sky villa offering 360-degree panoramic views of Dhaka skyline, duplex penthouses, and private elevator lobbies.',
+    '{
+        "status": "active",
+        "amenities": ["Private Rooftop Helipad Access", "Duplex Lounge", "Smart Valet Parking", "Sky Spa & Sauna", "Bespoke Italian Kitchen"],
+        "handover": "Q2 2027",
+        "bathrooms": 4,
+        "size_sqft": 3200,
+        "images": ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800"],
+        "brochure_url": "https://example.com/brochures/sky_tower.pdf",
+        "area": "Banani",
+        "city": "Dhaka"
+    }'::jsonb
+),
+(
+    'proj_baridhara_luxe',
+    'GLG Luxe Heights',
+    'Baridhara Diplomatic Zone, Dhaka, Bangladesh',
+    '1.8 Crore BDT (৳18,000,000)',
+    18000000,
+    4,
+    'Ultra-private residential sanctuary in Baridhara diplomatic enclave with high-security biometric perimeters and imported marble craftsmanship.',
+    '{
+        "status": "active",
+        "amenities": ["Diplomatic Enclave Security", "Diplomatic Shuttle Service", "Indoor Olympic Heated Pool", "Automated Ambient Lighting", "Private Butler Quarter"],
+        "handover": "Q4 2027",
+        "bathrooms": 4,
+        "size_sqft": 2900,
+        "images": ["https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800"],
+        "brochure_url": "https://example.com/brochures/luxe_heights.pdf",
+        "area": "Baridhara",
+        "city": "Dhaka"
+    }'::jsonb
+)
+ON CONFLICT (project_id) DO UPDATE SET
+    name = EXCLUDED.name,
+    location = EXCLUDED.location,
+    price = EXCLUDED.price,
+    price_val = EXCLUDED.price_val,
+    bedrooms = EXCLUDED.bedrooms,
+    description = EXCLUDED.description,
+    features = EXCLUDED.features;
+
+-- Seed Default Staff Authentication Accounts (Bcrypt 12-round Hashes)
+INSERT INTO public.auth_users (id, email, full_name, role, password_hash, is_active, tenant_id)
+VALUES
+('usr-admin-001', 'admin@glgassets.com', 'Alex Mercer (Admin)', 'admin', '$2b$12$32zlI3kTf6cdD5mcza.1MOfvsEiQ9qL0mQYw64zFXcQqsO2YKHYRW', true, 'glg-default'),
+('usr-manager-002', 'manager@glgassets.com', 'Sarah Connor (Manager)', 'manager', '$2b$12$L94ecAsOADvYl3so8vPn7ewLdPI01tGGFm2zYmT3pvTiJyFnZtU3a', true, 'glg-default'),
+('usr-agent-003', 'agent@glgassets.com', 'Rahul Sharma (Agent)', 'agent', '$2b$12$3mQSF/t28zdWJXlBYJWzhOr1jfjgLPPenzOdbHC2oKdGulgcodb4W', true, 'glg-default'),
+('usr-dev-005', 'developer@glgassets.com', 'Alex Chen (Dev Lead)', 'developer', '$2b$12$h4HITrq98/4ZrumU88/06.Uwt5bEU.atkNwVN7yoD//PBIAKgK2Ei', true, 'glg-default'),
+('usr-viewer-004', 'viewer@glgassets.com', 'Guest Stakeholder (Viewer)', 'viewer', '$2b$12$zQIogUckjv40KH2.m.mV0Om0bS.9AVto1O7E0BINSabQhm/v.Jk82', true, 'glg-default')
+ON CONFLICT (email) DO UPDATE SET
+    role = EXCLUDED.role,
+    password_hash = EXCLUDED.password_hash,
+    is_active = EXCLUDED.is_active;
+
+-- Seed Default Integration Catalog Records
+INSERT INTO public.system_integrations (service_key, display_name, category, is_active, encrypted_credentials, masked_preview, last_status)
+VALUES
+('groq', 'GroqCloud (LLM Engine)', 'ai', true, '', '{"api_key": "gsk_...****"}'::jsonb, 'not_tested'),
+('pinecone', 'Pinecone (Vector Database)', 'vector_db', true, '', '{"api_key": "pcsk_...****"}'::jsonb, 'not_tested'),
+('telegram', 'Telegram Bot Alerts', 'notifications', true, '', '{"bot_token": "...****"}'::jsonb, 'not_tested'),
+('gmail', 'Google Gmail (SMTP & IMAP)', 'communication', true, '', '{"user_email": "team@glgassets.com"}'::jsonb, 'not_tested'),
+('langsmith', 'LangSmith (Observability)', 'observability', true, '', '{"api_key": "lsv2_...****"}'::jsonb, 'not_tested'),
+('whatsapp', 'Meta / WhatsApp Cloud API', 'communication', true, '', '{"phone_number_id": "10023456789..."}'::jsonb, 'not_tested')
+ON CONFLICT (service_key) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    category = EXCLUDED.category;
+
 -- ----------------------------------------------------------------------------
 -- SUCCESS VERIFICATION QUERY
 -- ----------------------------------------------------------------------------
 SELECT 
     'Supabase Database Initialized Successfully!' AS status,
     (SELECT COUNT(*) FROM projects) AS total_projects,
+    (SELECT COUNT(*) FROM auth_users) AS total_staff_users,
+    (SELECT COUNT(*) FROM system_integrations) AS total_integrations,
     (SELECT COUNT(*) FROM ad_campaigns) AS total_campaigns,
     (SELECT COUNT(*) FROM calendar_milestones) AS total_milestones,
     (SELECT COUNT(*) FROM knowledge_documents) AS total_documents,

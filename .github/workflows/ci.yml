@@ -35,7 +35,8 @@ jobs:
       - name: Verify imports resolve
         env:
           AUTOMATION_SHARED_SECRET: "ci-test-secret"
-          JWT_SECRET: "ci-jwt-secret-must-be-at-least-32-characters"
+          JWT_SECRET: "test-jwt-secret-key-for-ci-minimum-32-chars-long"
+          PASSWORD_HASH_SALT: "glg_assets_salt_2026"
           DATABASE_URL: "postgresql+asyncpg://localhost:5432/test"
         run: |
           pip install -e ".[test]"
@@ -52,6 +53,7 @@ jobs:
       AUTOMATION_SHARED_SECRET: "test-ci-secret-key"
       JWT_SECRET: "test-jwt-secret-key-for-ci-minimum-32-chars-long"
       PASSWORD_HASH_SALT: "glg_assets_salt_2026"
+      SEED_DEMO_USERS: "true"
       DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/glg_assets_test"
       DEFAULT_TENANT_ID: "glg-assets-test"
       CORS_ORIGINS: "*"
@@ -141,7 +143,8 @@ jobs:
         run: |
           docker run -d --name ci-test \
             -e AUTOMATION_SHARED_SECRET=ci-test \
-            -e JWT_SECRET=ci-jwt-secret-must-be-at-least-32-characters \
+            -e JWT_SECRET=test-jwt-secret-key-for-ci-minimum-32-chars-long \
+            -e PASSWORD_HASH_SALT=glg_assets_salt_2026 \
             -e DATABASE_URL=postgresql+asyncpg://localhost:5432/test \
             -p 8000:8000 \
             glg-backend-ci:${{ github.sha }}
