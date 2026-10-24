@@ -8,8 +8,9 @@ generates executive AI insights, and renders responsive multi-channel formats:
 """
 
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, timezone
+from typing import Any, Dict
+
 from sqlalchemy import func, select
 
 from app.database import async_session_factory, is_db_reachable
@@ -17,9 +18,6 @@ from app.models.models import (
     AdCampaignRecord,
     BookingRecord,
     ConversationRecord,
-    KnowledgeDocumentRecord,
-    MessageRecord,
-    ProjectRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -182,7 +180,6 @@ class ReportBuilder:
         res_rate = metrics["ai_resolution_rate"]
         inquiries = metrics["total_inquiries"]
         site_visits = metrics["site_visits_booked"]
-        hot_leads = metrics["hot_leads_count"]
         pending_review = metrics["manager_operations"]["pending_review_emails"]
 
         channels_html = ""

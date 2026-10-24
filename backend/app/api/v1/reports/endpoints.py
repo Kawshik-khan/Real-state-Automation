@@ -6,20 +6,15 @@ dispatching test alerts across Email, Telegram, and WhatsApp, and reviewing deli
 
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import (
-    get_current_user,
     require_automation_secret,
     require_roles,
 )
 from app.models.report import (
-    DeliveryChannel,
-    GeneratedReportResponse,
     ReportScheduleCreate,
-    ReportScheduleResponse,
-    ReportScheduleUpdate,
     ReportTriggerRequest,
     TestDispatchRequest,
 )
