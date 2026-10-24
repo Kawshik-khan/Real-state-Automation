@@ -222,5 +222,21 @@
     "location": "Gulshan 2, Dhaka",
     "document_type": "Security Spec",
     "chunk_count": 1
+  },
+  "doc_17bc02866e9d": {
+    "doc_id": "doc_17bc02866e9d",
+    "filename": "text_upload.txt",
+    "project": "GLG Banani Heights",
+    "location": "Banani, Dhaka",
+    "document_type": "Penthouse Spec",
+    "chunk_count": 1
+  },
+  "doc_36e282cd9ada": {
+    "doc_id": "doc_36e282cd9ada",
+    "filename": "text_upload.txt",
+    "project": "GLG Gulshan Avenue",
+    "location": "Gulshan 2, Dhaka",
+    "document_type": "Security Spec",
+    "chunk_count": 1
   }
 }
