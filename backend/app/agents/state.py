@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import timezone
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -46,7 +47,7 @@ class BeliefRevision(BaseModel):
     old_value: Any = None
     new_value: Any = None
     reason: str = ""
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class UserBeliefState(BaseModel):
@@ -119,5 +120,5 @@ class AIState(BaseModel):
     output_built: bool = False
 
     # Metadata
-    started_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    started_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     messages_used: int = 0

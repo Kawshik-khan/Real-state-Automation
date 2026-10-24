@@ -67,10 +67,10 @@ class Settings(BaseSettings):
 
     # Notification defaults & Tokens
     default_email_recipient: str = "team@glgassets.com"
-    n8n_email_webhook_url: Optional[str] = "https://glg-ai.app.n8n.cloud/webhook/glg-email-webhook"
-    n8n_api_url: str = "https://glg-ai.app.n8n.cloud/api/v1"
-    n8n_webhook_base_url: Optional[str] = "https://glg-ai.app.n8n.cloud"
-    n8n_api_key: Optional[str] = None
+    _email_webhook_url: Optional[str] = "https://glg-ai.app..cloud/webhook/glg-email-webhook"
+    _api_url: str = "https://glg-ai.app..cloud/api/v1"
+    _webhook_base_url: Optional[str] = "https://glg-ai.app..cloud"
+    _api_key: Optional[str] = None
     default_slack_channel: str = "#leads"
     default_telegram_chat_id: Optional[str] = None
     telegram_bot_token: Optional[str] = None

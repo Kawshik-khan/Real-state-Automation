@@ -14,7 +14,7 @@ class UserRole(str, Enum):
     MANAGER = "manager"
     AGENT = "agent"
     VIEWER = "viewer"
-    SERVICE = "service"  # Machine-to-machine (automation secret, n8n, webhooks)
+    SERVICE = "service"  # Machine-to-machine (automation secret, , webhooks)
 
 
 class UserBase(BaseModel):

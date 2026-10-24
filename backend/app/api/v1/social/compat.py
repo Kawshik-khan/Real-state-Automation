@@ -1,7 +1,7 @@
 """
-n8n → Social channel compatibility adapter.
+ → Social channel compatibility adapter.
 
-Maps n8n workflow URL paths (e.g. /social/whatsapp/send) to the
+Maps  workflow URL paths (e.g. /social/whatsapp/send) to the
 actual social endpoint routes.
 """
 from fastapi import APIRouter, Depends
@@ -11,7 +11,7 @@ from app.dependencies import require_automation_secret as _auth
 router = APIRouter()
 
 # ── WhatsApp ──
-@router.post("/whatsapp/send", summary="[n8n compat] WhatsApp send")
+@router.post("/whatsapp/send", summary="[ compat] WhatsApp send")
 async def compat_wa_send(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -20,7 +20,7 @@ async def compat_wa_send(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/whatsapp/validate", summary="[n8n compat] WhatsApp number validate")
+@router.post("/whatsapp/validate", summary="[ compat] WhatsApp number validate")
 async def compat_wa_validate(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -29,7 +29,7 @@ async def compat_wa_validate(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/whatsapp/template", summary="[n8n compat] WhatsApp template")
+@router.post("/whatsapp/template", summary="[ compat] WhatsApp template")
 async def compat_wa_template(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -39,7 +39,7 @@ async def compat_wa_template(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Facebook ──
-@router.post("/facebook/validate", summary="[n8n compat] Facebook token validate")
+@router.post("/facebook/validate", summary="[ compat] Facebook token validate")
 async def compat_fb_validate(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -48,7 +48,7 @@ async def compat_fb_validate(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/facebook/comment", summary="[n8n compat] Facebook comment")
+@router.post("/facebook/comment", summary="[ compat] Facebook comment")
 async def compat_fb_comment(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -57,7 +57,7 @@ async def compat_fb_comment(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/facebook/carousel", summary="[n8n compat] Facebook carousel")
+@router.post("/facebook/carousel", summary="[ compat] Facebook carousel")
 async def compat_fb_carousel(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -65,7 +65,7 @@ async def compat_fb_carousel(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/facebook/hide", summary="[n8n compat] Facebook hide comment")
+@router.post("/facebook/hide", summary="[ compat] Facebook hide comment")
 async def compat_fb_hide(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -74,7 +74,7 @@ async def compat_fb_hide(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Instagram ──
-@router.post("/instagram/send", summary="[n8n compat] Instagram DM send")
+@router.post("/instagram/send", summary="[ compat] Instagram DM send")
 async def compat_ig_send(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -83,7 +83,7 @@ async def compat_ig_send(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/instagram/validate", summary="[n8n compat] Instagram validate")
+@router.post("/instagram/validate", summary="[ compat] Instagram validate")
 async def compat_ig_validate(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -92,7 +92,7 @@ async def compat_ig_validate(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/instagram/album", summary="[n8n compat] Instagram album post")
+@router.post("/instagram/album", summary="[ compat] Instagram album post")
 async def compat_ig_album(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -101,7 +101,7 @@ async def compat_ig_album(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Moderation compat ──
-@router.post("/flag", summary="[n8n compat] Flag content")
+@router.post("/flag", summary="[ compat] Flag content")
 async def compat_flag(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -112,7 +112,7 @@ async def compat_flag(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Knowledge compat ──
-@router.post("/ocr", summary="[n8n compat] OCR processing")
+@router.post("/ocr", summary="[ compat] OCR processing")
 async def compat_ocr(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -121,7 +121,7 @@ async def compat_ocr(body: dict, auth: dict = Depends(_auth)):
         "tenantId": auth["tenant_id"],
     }
 
-@router.post("/embed", summary="[n8n compat] Embed content")
+@router.post("/embed", summary="[ compat] Embed content")
 async def compat_embed(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,

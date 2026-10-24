@@ -123,11 +123,11 @@ async def create_milestone(body: dict, auth: dict = Depends(_auth)):
     status = body.get("status", "scheduled")
     tenant_id = auth["tenant_id"]
 
-    milestone_date_str = body.get("milestone_date") or body.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    milestone_date_str = body.get("milestone_date") or body.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     try:
         milestone_date = datetime.strptime(milestone_date_str, "%Y-%m-%d")
     except Exception:
-        milestone_date = datetime.utcnow()
+        milestone_date = datetime.now(timezone.utc)
 
     new_id = f"cm-{uuid4().hex[:8]}"
 

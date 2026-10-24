@@ -123,9 +123,9 @@ async def publish_social_post(body: dict, auth: dict = Depends(_auth)):
         try:
             scheduled_at = datetime.fromisoformat(scheduled_at_str.replace("Z", "+00:00"))
         except Exception:
-            scheduled_at = datetime.utcnow()
+            scheduled_at = datetime.now(timezone.utc)
 
-    published_at = datetime.utcnow() if status == "published" else None
+    published_at = datetime.now(timezone.utc) if status == "published" else None
     post_id = f"post_{uuid4().hex[:12]}"
 
     try:

@@ -1,4 +1,5 @@
-"""Automation endpoints consumed by n8n workflows.
+from datetime import timezone
+"""Automation endpoints consumed by  workflows.
 
 All endpoints require X-Automation-Secret and X-Tenant-Id headers.
 """
@@ -32,20 +33,20 @@ async def create_booking(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Receives a booking request from the Booking Calendar n8n workflow.
+    """Receives a booking request from the Booking Calendar  workflow.
 
     Expected body fields: name, email, phone, propertyId, tourDate, tourTime, message, source, tenantId
     """
     tenant_id = auth["tenant_id"]
 
-    ref_code = f"BK-{datetime.utcnow().strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp()) % 10000}"
-    tour_date_str = body.get("tourDate", datetime.utcnow().strftime("%Y-%m-%d"))
+    ref_code = f"BK-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(datetime.now(timezone.utc).timestamp()) % 10000}"
+    tour_date_str = body.get("tourDate", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     try:
         tour_date = datetime.strptime(tour_date_str, "%Y-%m-%d")
     except Exception:
-        tour_date = datetime.utcnow()
+        tour_date = datetime.now(timezone.utc)
 
-    booking_id = f"book-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    booking_id = f"book-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     try:
         from app.database import async_session_factory, is_db_reachable
         from app.models.models import BookingRecord
@@ -192,7 +193,7 @@ async def classify_lead(
 async def daily_digest(
     auth: dict = Depends(verify_auth),
 ):
-    """Returns a daily summary of system activity for the Daily Digest n8n workflow.
+    """Returns a daily summary of system activity for the Daily Digest  workflow.
 
     Replace with real DB aggregation queries in production.
     """
@@ -224,7 +225,7 @@ async def ingest_logs(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Accepts log entries from n8n workflows for centralized logging."""
+    """Accepts log entries from  workflows for centralized logging."""
     # TODO: Write to structured log store / DB
     return {"success": True, "logged": True, "tenantId": auth["tenant_id"]}
 
@@ -247,7 +248,7 @@ async def chat_message(
     message = body.get("message", "")
     channel = body.get("channel", "unknown")
     user_id = body.get("userId", "unknown")
-    session_id = body.get("sessionId") or body.get("conversationId") or f"session-{datetime.utcnow().timestamp()}"
+    session_id = body.get("sessionId") or body.get("conversationId") or f"session-{datetime.now(timezone.utc).timestamp()}"
 
     try:
         from app.agents.graph import ai_graph
@@ -338,33 +339,6 @@ async def record_idempotency(
 
 
 # ==========================================================
-#  N8N WORKFLOW & NODE HEALTH MONITORING
+#   WORKFLOW & NODE HEALTH MONITORING
 # ==========================================================
-
-@router.get("/n8n/health", summary="Get n8n workflow execution status, node health, and latency metrics")
-async def get_n8n_monitoring_health():
-    """Returns telemetry metrics for all n8n workflows, node health, latencies, and node processing errors."""
-    from app.services.n8n_monitoring import N8nMonitoringService
-    return await N8nMonitoringService.get_system_telemetry()
-
-
-@router.post("/n8n/workflows/{workflow_id}/toggle", summary="Enable or disable an n8n workflow")
-async def toggle_n8n_workflow(workflow_id: str, body: dict):
-    """Toggles active state of an n8n workflow."""
-    from app.services.n8n_monitoring import N8nMonitoringService
-    active = body.get("active", True)
-    try:
-        return await N8nMonitoringService.toggle_workflow(workflow_id, active)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.post("/n8n/workflows/{workflow_id}/test", summary="Run a latency ping test on an n8n workflow and its nodes")
-async def test_n8n_workflow(workflow_id: str):
-    """Executes a real-time latency ping test across all nodes in the workflow."""
-    from app.services.n8n_monitoring import N8nMonitoringService
-    try:
-        return await N8nMonitoringService.test_workflow(workflow_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
 

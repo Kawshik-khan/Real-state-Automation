@@ -25,7 +25,7 @@ async def verify_auth(
     x_automation_secret: Optional[str] = Header(None, alias="X-Automation-Secret"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
 ):
-    """Simple auth check for n8n webhooks and dashboard requests."""
+    """Simple auth check for  webhooks and dashboard requests."""
     # Optional secret validation if secret header provided
     if x_automation_secret and x_automation_secret != settings.automation_shared_secret:
         raise HTTPException(status_code=403, detail="Invalid automation secret")
@@ -37,7 +37,7 @@ async def incoming_email_webhook(
     payload: IncomingEmailPayload,
     auth: dict = Depends(verify_auth),
 ):
-    """Processes an incoming customer email from n8n / mail trigger.
+    """Processes an incoming customer email from  / mail trigger.
 
     Extracts text from attachments, performs deduplication, fetches thread history,
     runs EmailAgent RAG generation, and dispatches reply or stages draft for approval.
@@ -105,7 +105,7 @@ async def incoming_email_webhook(
     dispatch_result = None
     # 8. Auto-send if eligible
     if action == "AUTO_SEND":
-        dispatch_result = await email_service.dispatch_reply_via_n8n(
+        dispatch_result = await email_service.dispatch_reply_via_(
             thread_id=thread.thread_id,
             reply_subject=reply_subject,
             reply_body=reply_body,
@@ -164,7 +164,7 @@ async def approve_draft(
     req: Optional[DraftApprovalRequest] = None,
     auth: dict = Depends(verify_auth),
 ):
-    """Approves staged AI draft response and dispatches email via n8n."""
+    """Approves staged AI draft response and dispatches email via ."""
     thread = email_service.get_thread(thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
@@ -175,7 +175,7 @@ async def approve_draft(
     if not body:
         raise HTTPException(status_code=400, detail="No draft reply content available to approve")
 
-    dispatch_result = await email_service.dispatch_reply_via_n8n(
+    dispatch_result = await email_service.dispatch_reply_via_(
         thread_id=thread_id,
         reply_subject=subject,
         reply_body=body,
@@ -184,7 +184,7 @@ async def approve_draft(
 
     return {
         "success": True,
-        "message": "Email draft approved and dispatched via n8n",
+        "message": "Email draft approved and dispatched via ",
         "thread_id": thread_id,
         "dispatch_result": dispatch_result,
     }
@@ -196,7 +196,7 @@ async def edit_and_send_draft(
     req: DraftApprovalRequest,
     auth: dict = Depends(verify_auth),
 ):
-    """Edits the AI draft response and dispatches immediately via n8n."""
+    """Edits the AI draft response and dispatches immediately via ."""
     return await approve_draft(thread_id=thread_id, req=req, auth=auth)
 
 
@@ -224,7 +224,7 @@ async def dispatch_outbound_email(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Endpoint called by n8n or automation engine to dispatch an outbound email reply."""
+    """Endpoint called by  or automation engine to dispatch an outbound email reply."""
     thread_id = body.get("thread_id")
     recipient_email = body.get("recipient_email")
     subject = body.get("subject", "Re: GLG Real Estate Inquiry")
@@ -234,7 +234,7 @@ async def dispatch_outbound_email(
         raise HTTPException(status_code=400, detail="Missing required recipient_email or body")
 
     if thread_id and email_service.get_thread(thread_id):
-        dispatch_res = await email_service.dispatch_reply_via_n8n(
+        dispatch_res = await email_service.dispatch_reply_via_(
             thread_id=thread_id,
             reply_subject=subject,
             reply_body=reply_body,

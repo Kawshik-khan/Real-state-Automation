@@ -67,7 +67,7 @@ class ReportBuilder:
             },
             "system_health": {
                 "system_uptime": "99.98%",
-                "n8n_workflows_status": "6/6 Active (Healthy)",
+                "_workflows_status": "6/6 Active (Healthy)",
                 "vector_query_latency_ms": 18,
                 "failed_deliveries": 0,
             },

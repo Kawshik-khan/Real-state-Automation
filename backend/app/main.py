@@ -214,7 +214,7 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
             elif "/knowledge" in path:
                 module = "RAGVectorDB"
             elif "/automation" in path or "/social" in path:
-                module = "n8nWebhook"
+                module = "Automation"
 
             log_streamer.record_log(
                 level=level,
@@ -227,10 +227,8 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
                 client_ip=client_ip
             )
 
-            # Dynamically update n8n workflow telemetry counter on live traffic
             try:
-                from app.services.n8n_monitoring import N8nMonitoringService
-                N8nMonitoringService.record_live_trigger(path, latency_ms)
+                MonitoringService.record_live_trigger(path, latency_ms)
             except Exception:
                 pass
         return response
