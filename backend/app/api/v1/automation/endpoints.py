@@ -1,5 +1,4 @@
-from datetime import timezone
-"""Automation endpoints consumed by  workflows.
+"""Automation endpoints consumed by n8n workflows.
 
 All endpoints require X-Automation-Secret and X-Tenant-Id headers.
 """
@@ -33,20 +32,20 @@ async def create_booking(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Receives a booking request from the Booking Calendar  workflow.
+    """Receives a booking request from the Booking Calendar n8n workflow.
 
     Expected body fields: name, email, phone, propertyId, tourDate, tourTime, message, source, tenantId
     """
     tenant_id = auth["tenant_id"]
 
-    ref_code = f"BK-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{int(datetime.now(timezone.utc).timestamp()) % 10000}"
-    tour_date_str = body.get("tourDate", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    ref_code = f"BK-{datetime.utcnow().strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp()) % 10000}"
+    tour_date_str = body.get("tourDate", datetime.utcnow().strftime("%Y-%m-%d"))
     try:
         tour_date = datetime.strptime(tour_date_str, "%Y-%m-%d")
     except Exception:
-        tour_date = datetime.now(timezone.utc)
+        tour_date = datetime.utcnow()
 
-    booking_id = f"book-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    booking_id = f"book-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
     try:
         from app.database import async_session_factory, is_db_reachable
         from app.models.models import BookingRecord
@@ -193,7 +192,7 @@ async def classify_lead(
 async def daily_digest(
     auth: dict = Depends(verify_auth),
 ):
-    """Returns a daily summary of system activity for the Daily Digest  workflow.
+    """Returns a daily summary of system activity for the Daily Digest n8n workflow.
 
     Replace with real DB aggregation queries in production.
     """
@@ -225,7 +224,7 @@ async def ingest_logs(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Accepts log entries from  workflows for centralized logging."""
+    """Accepts log entries from n8n workflows for centralized logging."""
     # TODO: Write to structured log store / DB
     return {"success": True, "logged": True, "tenantId": auth["tenant_id"]}
 
@@ -248,7 +247,7 @@ async def chat_message(
     message = body.get("message", "")
     channel = body.get("channel", "unknown")
     user_id = body.get("userId", "unknown")
-    session_id = body.get("sessionId") or body.get("conversationId") or f"session-{datetime.now(timezone.utc).timestamp()}"
+    session_id = body.get("sessionId") or body.get("conversationId") or f"session-{datetime.utcnow().timestamp()}"
 
     try:
         from app.agents.graph import ai_graph
@@ -339,6 +338,6 @@ async def record_idempotency(
 
 
 # ==========================================================
-#   WORKFLOW & NODE HEALTH MONITORING
+#  N8N WORKFLOW & NODE HEALTH MONITORING
 # ==========================================================
 

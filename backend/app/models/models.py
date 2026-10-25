@@ -294,7 +294,7 @@ class GeneratedReportRecord(Base):
     telegram_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     delivery_status: Mapped[str] = mapped_column(String(32), default="delivered")  # delivered, partially_delivered, failed
     delivery_details: Mapped[list] = mapped_column(JSON, default=list)  # channel delivery logs
-    triggered_by: Mapped[str] = mapped_column(String(64), default="scheduled_worker")  # scheduled_worker, manual, _webhook
+    triggered_by: Mapped[str] = mapped_column(String(64), default="scheduled_worker")  # scheduled_worker, manual, n8n_webhook
     tenant_id: Mapped[str] = mapped_column(String(128), default="glg-assets")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 

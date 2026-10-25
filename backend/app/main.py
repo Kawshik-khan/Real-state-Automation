@@ -228,7 +228,7 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
             )
 
             try:
-                MonitoringService.record_live_trigger(path, latency_ms)
+                N8nMonitoringService.record_live_trigger(path, latency_ms)
             except Exception:
                 pass
         return response

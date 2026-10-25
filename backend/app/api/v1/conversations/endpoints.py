@@ -282,23 +282,23 @@ async def add_message_to_conversation(
             "reason": "AI confidence low or escalation requested"
         })
 
-    # Trigger background sync to  Google Sheets webhook with strong reference
-    sync_task = asyncio.create_task(_sync_lead_to__sheets(conv))
+    # Trigger background sync to n8n Google Sheets webhook with strong reference
+    sync_task = asyncio.create_task(_sync_lead_to_n8n_sheets(conv))
     _background_tasks.add(sync_task)
     sync_task.add_done_callback(_background_tasks.discard)
         
     return conv, msg_obj
 
 
-async def _sync_lead_to__sheets(conv: dict):
-    """Asynchronously post lead/message update to  Google Sheets Sync webhook."""
+async def _sync_lead_to_n8n_sheets(conv: dict):
+    """Asynchronously post lead/message update to n8n Google Sheets Sync webhook."""
     try:
-        _base = (
-            getattr(settings, "_webhook_base_url", None)
-            or os.getenv("_WEBHOOK_BASE_URL")
-            or getattr(settings, "_api_url", "https://glg-ai.app..cloud/api/v1").replace("/api/v1", "")
+        n8n_base = (
+            getattr(settings, "n8n_webhook_base_url", None)
+            or os.getenv("N8N_WEBHOOK_BASE_URL")
+            or getattr(settings, "n8n_api_url", "https://glg-ai.app.n8n.cloud/api/v1").replace("/api/v1", "")
         ).rstrip("/")
-        url = f"{_base}/webhook/google-sheets-leads"
+        url = f"{n8n_base}/webhook/google-sheets-leads"
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(url, json={
                 "conversation_id": conv["id"],
@@ -311,7 +311,7 @@ async def _sync_lead_to__sheets(conv: dict):
                 "status": conv.get("status", "active")
             })
     except Exception as e:
-        logger.debug(f"[S-15] Non-blocking background  sheet sync failed for lead {conv.get('id')}: {e}")
+        logger.debug(f"[S-15] Non-blocking background n8n sheet sync failed for lead {conv.get('id')}: {e}")
 
 
 @router.get("", summary="List active conversations")

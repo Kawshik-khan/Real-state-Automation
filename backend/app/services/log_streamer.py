@@ -1,4 +1,3 @@
-from datetime import timezone
 """Real-time Log Streamer & Telemetry Ring Buffer Service."""
 
 import asyncio
@@ -14,8 +13,8 @@ from pydantic import BaseModel, Field
 class RealtimeLogEntry(BaseModel):
     """Structured real-time log event."""
     id: str = Field(default_factory=lambda: f"log_{int(time.time() * 1000)}_{hash(time.time()) % 10000}")
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3])
-    iso_time: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().strftime("%H:%M:%S.%f")[:-3])
+    iso_time: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     level: str = "INFO"  # DEBUG, INFO, WARN, ERROR, CRITICAL
     module: str = "System"
     message: str

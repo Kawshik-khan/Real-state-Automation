@@ -195,7 +195,7 @@ async def cross_role_summary(period: str = "7d", auth: dict = Depends(_auth)):
             },
             "engineering_infrastructure": {
                 "system_uptime_percent": 99.98,
-                "_workflows_active": "6/6 (Healthy)",
+                "n8n_workflows_active": "6/6 (Healthy)",
                 "pinecone_vector_query_latency_ms": 18,
                 "supabase_storage_status": "Synced (3 Buckets)",
                 "total_vectors_indexed": 86,
@@ -205,7 +205,7 @@ async def cross_role_summary(period: str = "7d", auth: dict = Depends(_auth)):
         "executive_insights": [
             "AI Assistant resolved 87.2% of frontline inquiries with sub-4-second response times.",
             "Manager review velocity for AI email drafts averaged 14.5 minutes with 96.4% approval rate.",
-            "Engineering pipeline uptime is 99.98% across , Pinecone serverless vector index, and Supabase."
+            "Engineering pipeline uptime is 99.98% across n8n, Pinecone serverless vector index, and Supabase."
         ],
         "tenantId": auth["tenant_id"]
     }

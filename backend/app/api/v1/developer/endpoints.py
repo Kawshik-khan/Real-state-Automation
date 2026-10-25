@@ -66,7 +66,7 @@ async def get_developer_system_health(
     total_routes = len(request.app.routes) if hasattr(request, "app") and hasattr(request.app, "routes") else 29
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
         "environment": os.getenv("ENVIRONMENT", "production-sim"),
         "python_version": sys.version.split()[0],
         "active_tenant": current_user.get("tenant_id", settings.default_tenant_id),
@@ -95,7 +95,7 @@ async def get_developer_system_health(
                 "default_model": getattr(settings, "openai_model", "openai/gpt-oss-120b"),
                 "status": "READY",
             },
-            "_telemetry_engine": {
+            "n8n_telemetry_engine": {
                 "status": "CONNECTED",
                 "registered_workflows": 6,
                 "monitored_nodes": 20,
@@ -160,7 +160,7 @@ async def simulate_incoming_webhook(
         "payload_received": {
             "text": req.message_text,
             "project_context": req.project_context,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
         },
         "diagnostic_trace": {
             "detected_intent": intent,

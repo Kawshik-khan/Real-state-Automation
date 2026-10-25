@@ -1,7 +1,7 @@
 """
- → Backend compatibility adapter.
+n8n → Backend compatibility adapter.
 
-Maps the  workflow URL paths (which use /api/v1/automation/ prefix
+Maps the n8n workflow URL paths (which use /api/v1/automation/ prefix
 for everything) to the actual backend route structure.
 
 These are thin stubs that redirect or serve as aliases.
@@ -15,7 +15,7 @@ from app.dependencies import require_automation_secret as _auth
 router = APIRouter()
 
 # ── AI / Respond ──
-@router.post("/ai/respond", summary="[ compat] AI respond")
+@router.post("/ai/respond", summary="[n8n compat] AI respond")
 async def compat_ai_respond(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -31,16 +31,16 @@ async def compat_ai_respond(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Logging (note: backend uses /logs plural) ──
-@router.post("/log", summary="[ compat] Single log entry")
+@router.post("/log", summary="[n8n compat] Single log entry")
 async def compat_log(body: dict, auth: dict = Depends(_auth)):
     return {"success": True, "logged": True, "tenantId": auth["tenant_id"]}
 
 # ── Booking ──
-@router.post("/booking", summary="[ compat] Booking")
+@router.post("/booking", summary="[n8n compat] Booking")
 async def compat_booking(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
-        "bookingId": f"book-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+        "bookingId": f"book-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
         "status": "PENDING",
         "brochure": {
             "pdfUrl": "https://glgassets.com/property-stub.pdf",
@@ -52,7 +52,7 @@ async def compat_booking(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Image ──
-@router.post("/image", summary="[ compat] Project images")
+@router.post("/image", summary="[n8n compat] Project images")
 async def compat_image(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -65,7 +65,7 @@ async def compat_image(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Retry failed ──
-@router.post("/retry", summary="[ compat] Retry failed AI call")
+@router.post("/retry", summary="[n8n compat] Retry failed AI call")
 async def compat_retry(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -75,7 +75,7 @@ async def compat_retry(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── List failed items ──
-@router.get("/failed", summary="[ compat] List failed items")
+@router.get("/failed", summary="[n8n compat] List failed items")
 async def compat_failed_list(auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -85,7 +85,7 @@ async def compat_failed_list(auth: dict = Depends(_auth)):
     }
 
 # ── Resolve failed item ──
-@router.post("/failed/resolve", summary="[ compat] Resolve failed item")
+@router.post("/failed/resolve", summary="[n8n compat] Resolve failed item")
 async def compat_failed_resolve(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -94,7 +94,7 @@ async def compat_failed_resolve(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Content generate ──
-@router.post("/content/generate", summary="[ compat] Content generation")
+@router.post("/content/generate", summary="[n8n compat] Content generation")
 async def compat_content_generate(body: dict, auth: dict = Depends(_auth)):
     return {
         "success": True,
@@ -107,7 +107,7 @@ async def compat_content_generate(body: dict, auth: dict = Depends(_auth)):
     }
 
 # ── Content approved/pending list ──
-@router.get("/content/approved", summary="[ compat] Approved content")
+@router.get("/content/approved", summary="[n8n compat] Approved content")
 async def compat_content_approved(auth: dict = Depends(_auth)):
     return {
         "success": True,
