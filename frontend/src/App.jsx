@@ -12,7 +12,6 @@ import ContentGeneratorPage from './pages/ContentGeneratorPage';
 import PropertiesPage from './pages/PropertiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SocialAnalyticsPage from './pages/SocialAnalyticsPage';
-import N8nMonitoringPage from './pages/N8nMonitoringPage';
 import DeveloperConsolePage from './pages/DeveloperConsolePage';
 import AgentCustomizationPage from './pages/AgentCustomizationPage';
 import RoleReportsPage from './pages/RoleReportsPage';
@@ -59,7 +58,6 @@ export const TAB_TO_PATH = {
   knowledge: '/knowledge',
   content: '/content',
   properties: '/properties',
-  n8n_monitoring: '/n8n',
   inbox: '/inbox',
 };
 
@@ -79,8 +77,6 @@ export const PATH_TO_TAB = {
   '/knowledge': 'knowledge',
   '/content': 'content',
   '/properties': 'properties',
-  '/n8n': 'n8n_monitoring',
-  '/n8n-monitoring': 'n8n_monitoring',
   '/inbox': 'inbox',
 };
 
@@ -96,7 +92,6 @@ function DashboardApp() {
     if (pathname.startsWith('/ai-studio') || pathname.startsWith('/agent-customization')) return 'ai_customization';
     if (pathname.startsWith('/developer')) return 'developer_console';
     if (pathname.startsWith('/social')) return 'social_analytics';
-    if (pathname.startsWith('/n8n')) return 'n8n_monitoring';
     if (pathname.startsWith('/report')) return 'role_reports';
     return PATH_TO_TAB[pathname] || 'overview';
   };
@@ -170,7 +165,6 @@ function DashboardApp() {
       case 'knowledge': return 'Knowledge Base & PDF OCR Manager';
       case 'content': return 'Social Content Generator & Approval Engine';
       case 'properties': return 'Property Inventory & Media Catalog';
-      case 'n8n_monitoring': return 'n8n Workflow & Node Health Command';
       case 'inbox': return 'Email Inbox & Inbound Inquiries';
       default: return 'Dashboard Overview';
     }
@@ -269,8 +263,6 @@ function DashboardApp() {
             <Route path="/developer-console" element={<Navigate to="/developer" replace />} />
             <Route path="/ai-studio" element={<AgentCustomizationPage setActiveParentTab={handleSetActiveTab} />} />
             <Route path="/agent-customization" element={<Navigate to="/ai-studio" replace />} />
-            <Route path="/n8n" element={<N8nMonitoringPage />} />
-            <Route path="/n8n-monitoring" element={<Navigate to="/n8n" replace />} />
             <Route path="/reports" element={<RoleReportsPage />} />
             <Route path="/role-reports" element={<Navigate to="/reports" replace />} />
             <Route path="/inbox" element={<EmailInboxPage />} />

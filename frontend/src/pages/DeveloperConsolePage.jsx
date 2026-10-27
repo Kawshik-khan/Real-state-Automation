@@ -24,7 +24,6 @@ import {
   Server,
   Sparkles,
   LayoutDashboard,
-  Workflow,
   ExternalLink,
   Gauge,
   Clock,
@@ -52,7 +51,6 @@ import {
   generateContent,
   getProjects,
   checkModeration,
-  getN8nTelemetry,
   getDeveloperLogs,
   clearDeveloperLogs,
   getDeveloperLogsStreamUrl,
@@ -67,7 +65,6 @@ import {
 import baselineEvalReport from '../assets/baseline_eval_report.json';
 import benchmarkSuitesData from '../assets/benchmark_suites.json';
 import { useAuth } from '../context/AuthContext';
-import N8nMonitoringPage from './N8nMonitoringPage';
 
 export default function DeveloperConsolePage({ setActiveParentTab }) {
   const { user } = useAuth();
@@ -75,7 +72,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
   
   // Health & Metrics State
   const [systemHealth, setSystemHealth] = useState(null);
-  const [n8nTelemetry, setN8nTelemetry] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [copiedResponse, setCopiedResponse] = useState(false);
 
@@ -566,18 +562,9 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
   const fetchHealthData = async () => {
     setHealthLoading(true);
     try {
-      const [data, n8n] = await Promise.allSettled([
-        getDeveloperSystemHealth(),
-        getN8nTelemetry()
-      ]);
-      
-      if (data.status === 'fulfilled') {
-        setSystemHealth(data.value);
-      }
-      if (n8n.status === 'fulfilled') {
-        setN8nTelemetry(n8n.value);
-      }
-      addLog('INFO', 'SystemHealth', 'System telemetry & n8n diagnostics refreshed successfully');
+      const data = await getDeveloperSystemHealth();
+      setSystemHealth(data);
+      addLog('INFO', 'SystemHealth', 'System telemetry diagnostics refreshed successfully');
     } catch (err) {
       console.warn('Developer health poll fallback:', err);
       // Fallback mock health
@@ -588,7 +575,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           supabase_postgres: { configured: true, status: 'ONLINE', latency_ms: 14, storage_buckets: ['brochures', 'floorplans', 'ocr-documents'] },
           pinecone_vector: { configured: true, status: 'HEALTHY', latency_ms: 18, index_name: 'real-state-automation', total_vector_count: 86, dimension: 1024 },
           llm_orchestrator: { openai_active: true, gemini_active: true, status: 'READY', default_model: 'llama-3.3-70b-versatile' },
-          n8n_telemetry_engine: { status: 'CONNECTED', registered_workflows: 6, monitored_nodes: 20, avg_workflow_latency_ms: 148 },
           fastapi_server: { status: 'RUNNING', port: 8000 }
         },
         system_metrics: { uptime_seconds: 86400, memory_usage_mb: 142.5, total_routes_registered: 29 }
@@ -647,10 +633,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         setHttpMethod('GET');
         setRequestPayload('{}');
         break;
-      case '/api/v1/automation/n8n/health':
-        setHttpMethod('GET');
-        setRequestPayload('{}');
-        break;
       default:
         break;
     }
@@ -686,8 +668,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         resData = await checkModeration(parsedPayload.text);
       } else if (selectedEndpoint === '/api/projects') {
         resData = await getProjects();
-      } else if (selectedEndpoint === '/api/v1/automation/n8n/health') {
-        resData = await getN8nTelemetry();
       } else {
         resData = { message: `Executed ${selectedEndpoint} successfully`, payload: parsedPayload };
       }
@@ -963,7 +943,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
         {[
           { id: 'engineering_summary', label: 'Engineering Summary & Health', icon: LayoutDashboard, count: '7 Modules', highlight: true },
           { id: 'service_integrations', label: 'Service Connections & Secrets', icon: KeyRound, count: '6 Services', highlight: true },
-          { id: 'n8n_health', label: 'n8n Workflow Health', icon: Workflow, count: '6 Workflows', highlight: true },
           { 
             id: 'evals_benchmarks', 
             label: 'AI Evals & Quality Gates', 
@@ -971,7 +950,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             count: evalsRunning ? 'Testing...' : evalsReport?.gate_status ? (evalsReport.gate_status === 'PASSED' ? 'Passed' : 'Blocked') : 'Gates', 
             highlight: true 
           },
-          { id: 'api_playground', label: 'API Playground', icon: Play, count: '6 Endpoints' },
+          { id: 'api_playground', label: 'API Playground', icon: Play, count: '5 Endpoints' },
           { id: 'webhooks', label: 'Webhook Simulator', icon: Radio, count: '5 Channels' },
           { id: 'rag_diagnostics', label: 'RAG & Vector Diagnostics', icon: Database, count: 'Pinecone' },
           { id: 'health_matrix', label: 'System Health Matrix', icon: Server, count: 'Live' },
@@ -1076,7 +1055,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 Full Architecture &amp; Development Health Summary
               </h3>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Unified status control for n8n automations, Pinecone serverless vector index, Supabase PostgreSQL, LangGraph multi-agent supervisor, and social webhooks.
+                Unified status control for Pinecone serverless vector index, Supabase PostgreSQL, LangGraph multi-agent supervisor, and social webhooks.
               </p>
             </div>
 
@@ -1103,122 +1082,13 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 <span>{syncLoading ? 'Syncing...' : 'Sync Supabase & Pinecone'}</span>
               </button>
 
-              <button
-                onClick={() => setActiveTab('n8n_health')}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, var(--accent-coral), #D95338)',
-                  border: 'none',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(232, 101, 74, 0.35)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Workflow size={15} />
-                <span>Open n8n Health Monitoring Page ➔</span>
-              </button>
             </div>
           </div>
 
-          {/* ── 6 Core Engineering Service Modules Summary Grid ── */}
+          {/* ── 5 Core Engineering Service Modules Summary Grid ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
             
-            {/* 1. n8n Automation Engine Card */}
-            <div className="glass-card" style={{
-              padding: '22px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '16px',
-              border: '1px solid var(--border-glass)',
-              background: 'var(--bg-card)',
-              boxShadow: 'var(--shadow-card)'
-            }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: 'rgba(147, 51, 234, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#9333EA'
-                    }}>
-                      <Workflow size={18} />
-                    </div>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>n8n Workflows</h4>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Multi-Channel Automation</span>
-                    </div>
-                  </div>
-                  <span style={{
-                    padding: '3px 8px',
-                    borderRadius: '12px',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    color: '#059669',
-                    border: '1px solid rgba(16, 185, 129, 0.25)'
-                  }}>
-                    ● 6/6 Active
-                  </span>
-                </div>
-
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: '0 0 12px 0' }}>
-                  Cloud-hosted execution engine for WhatsApp, Telegram, Email, and Google Sheets sync automations.
-                </p>
-
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: 'var(--bg-main)',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
-                  marginBottom: '4px'
-                }}>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Nodes:</span> <strong style={{ color: '#059669' }}>20 Active</strong></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Latency:</span> <strong style={{ color: '#0284C7' }}>148ms avg</strong></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Executions:</span> <strong style={{ color: '#9333EA' }}>1,420+</strong></div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setActiveTab('n8n_health')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    borderRadius: '8px',
-                    background: 'rgba(147, 51, 234, 0.1)',
-                    border: '1px solid rgba(147, 51, 234, 0.25)',
-                    color: '#9333EA',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>View n8n Health</span>
-                  <ArrowUpRight size={13} />
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Pinecone Vector DB & RAG Card */}
+            {/* 1. Pinecone Vector DB & RAG Card */}
             <div className="glass-card" style={{
               padding: '22px',
               display: 'flex',
@@ -1291,7 +1161,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            {/* 3. Supabase Cloud Database & Storage Card */}
+            {/* 2. Supabase Cloud Database & Storage Card */}
             <div className="glass-card" style={{
               padding: '22px',
               display: 'flex',
@@ -1364,7 +1234,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            {/* 4. LangGraph Multi-Agent Orchestrator Card */}
+            {/* 3. LangGraph Multi-Agent Orchestrator Card */}
             <div className="glass-card" style={{
               padding: '22px',
               display: 'flex',
@@ -1437,7 +1307,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            {/* 5. Multi-Channel Webhooks & Messaging Gateways Card */}
+            {/* 4. Multi-Channel Webhooks & Messaging Gateways Card */}
             <div className="glass-card" style={{
               padding: '22px',
               display: 'flex',
@@ -1510,7 +1380,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            {/* 6. Security, RBAC & Telemetry Streams Card */}
+            {/* 5. Security, RBAC & Telemetry Streams Card */}
             <div className="glass-card" style={{
               padding: '22px',
               display: 'flex',
@@ -1626,15 +1496,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                 <tbody>
                   {[
                     {
-                      name: 'n8n Workflow Automation',
-                      cat: 'Automation',
-                      endpoint: '/api/v1/automation/n8n/health',
-                      tech: 'n8n Telemetry Engine & Webhooks',
-                      latency: '148ms',
-                      status: 'HEALTHY',
-                      tabTarget: setActiveParentTab ? 'parent_n8n' : 'health_matrix'
-                    },
-                    {
                       name: 'Service Connections & Secrets Vault',
                       cat: 'Security & Auth',
                       endpoint: '/api/v1/developer/integrations',
@@ -1749,13 +1610,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                       </td>
                       <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                         <button
-                          onClick={() => {
-                            if (row.tabTarget === 'parent_n8n') {
-                              setActiveTab('n8n_health');
-                            } else {
-                              setActiveTab(row.tabTarget);
-                            }
-                          }}
+                          onClick={() => setActiveTab(row.tabTarget)}
                           style={{
                             padding: '4px 10px',
                             borderRadius: '6px',
@@ -1778,11 +1633,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
           </div>
 
         </div>
-      )}
-
-      {/* ── TAB: N8N HEALTH & WORKFLOW MONITORING ── */}
-      {activeTab === 'n8n_health' && (
-        <N8nMonitoringPage />
       )}
 
       {/* ── TAB: AI EVALUATIONS & PRODUCTION QUALITY GATES ── */}
@@ -3196,7 +3046,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
                   <option value="/api/content">POST /api/content — Social Content Generation</option>
                   <option value="/api/moderation">POST /api/moderation — AI Moderation Safety Check</option>
                   <option value="/api/projects">GET /api/projects — List Real Estate Projects</option>
-                  <option value="/api/v1/automation/n8n/health">GET /api/v1/automation/n8n/health — Telemetry Metrics</option>
                 </select>
               </div>
             </div>
@@ -3827,7 +3676,7 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
             
             {/* Supabase Postgres & Storage Card */}
             <div className="glass-card" style={{
@@ -3881,31 +3730,6 @@ export default function DeveloperConsolePage({ setActiveParentTab }) {
               </div>
             </div>
 
-            {/* n8n Automation Engine */}
-            <div className="glass-card" style={{
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-glass)',
-              borderRadius: '14px',
-              boxShadow: 'var(--shadow-sm)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Activity size={16} color="#8B5CF6" /> n8n Telemetry Engine
-                </span>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(139, 92, 246, 0.12)', color: '#8B5CF6', fontSize: '0.7rem', fontWeight: 700 }}>
-                  {systemHealth?.services?.n8n_telemetry_engine?.status || 'CONNECTED'}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>Monitored Workflows: <strong style={{ color: 'var(--text-main)' }}>6 Active</strong></div>
-                <div>Monitored Nodes: <strong style={{ color: 'var(--text-main)' }}>20 Nodes</strong></div>
-                <div>Avg Execution Latency: <strong style={{ color: 'var(--text-main)' }}>148ms</strong></div>
-              </div>
-            </div>
           </div>
         </div>
       )}

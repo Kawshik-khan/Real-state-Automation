@@ -115,7 +115,6 @@ export default function RoleReportsPage() {
           },
           engineering_infrastructure: {
             system_uptime_percent: 99.98,
-            n8n_workflows_active: "6/6 (Healthy)",
             pinecone_vector_query_latency_ms: 18,
             supabase_storage_status: "Synced (3 Buckets)",
             total_vectors_indexed: 86,
@@ -125,7 +124,7 @@ export default function RoleReportsPage() {
         executive_insights: [
           "AI Assistant autonomously resolved 87.2% of frontline inquiries with sub-4-second response times.",
           "Manager review turnaround for AI email drafts averaged 14.5 minutes with a 96.4% approval rate.",
-          "Engineering automation pipeline uptime is 99.98% across n8n, Pinecone vector store, and Supabase."
+          "Engineering automation pipeline uptime is 99.98% across the FastAPI backend, Pinecone vector store, and Supabase."
         ]
       });
     } finally {
@@ -220,7 +219,7 @@ Generated: ${reportData.generated_at}
 
 ## 4. 🛠️ Engineering & Automation Health
 - System Uptime: ${s.engineering_infrastructure.system_uptime_percent}%
-- n8n Workflows: ${s.engineering_infrastructure.n8n_workflows_active}
+- Failed API Calls: ${s.engineering_infrastructure.failed_api_calls_count}
 - Pinecone Search Latency: ${s.engineering_infrastructure.pinecone_vector_query_latency_ms}ms (${s.engineering_infrastructure.total_vectors_indexed} vectors)
 - Supabase Storage: ${s.engineering_infrastructure.supabase_storage_status}
 `;
@@ -487,7 +486,7 @@ Generated: ${reportData.generated_at}
                 {s ? `${s.engineering_infrastructure.system_uptime_percent}%` : '--'}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                n8n, Pinecone &amp; Supabase Online
+                Backend, Pinecone &amp; Supabase Online
               </div>
             </div>
           </div>
@@ -637,13 +636,13 @@ Generated: ${reportData.generated_at}
                 </span>
               </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-                System-level health of n8n webhook automations, Pinecone vector search, and cloud storage.
+                System-level health of backend automations, Pinecone vector search, and cloud storage.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                 <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>n8n Workflows</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Failed API Calls</div>
                   <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
-                    {s?.engineering_infrastructure?.n8n_workflows_active || '6/6 Active'}
+                    {s?.engineering_infrastructure?.failed_api_calls_count ?? 0}
                   </div>
                 </div>
                 <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-glass)' }}>

@@ -373,11 +373,6 @@ export default function Header({
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Booking BK-2026-8812 assigned to Sarah Connor.</div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '2px' }}>45 mins ago</div>
                 </div>
-                <div style={{ padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-glass)' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>⚡ Multi-Agent Sync</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>All 6 n8n workflows operational with 18ms latency.</div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '2px' }}>2 hrs ago</div>
-                </div>
               </div>
             </div>
           )}

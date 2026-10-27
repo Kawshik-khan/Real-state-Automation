@@ -2427,7 +2427,7 @@ export default function SocialAnalyticsPage() {
                   Top Hubs: <span style={{ color: '#7C3AED', fontWeight: 600 }}>Dhaka (Gulshan, Banani), Mumbai, London, Dubai</span>
                 </div>
                 <div style={{ color: 'var(--text-muted)' }}>
-                  Primary Inflow: <span style={{ color: '#0284C7', fontWeight: 600 }}>WhatsApp Direct Lead Sync & n8n RAG</span>
+                  Primary Inflow: <span style={{ color: '#0284C7', fontWeight: 600 }}>WhatsApp Direct Lead Sync & RAG</span>
                 </div>
               </div>
             </div>

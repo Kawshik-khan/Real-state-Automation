@@ -160,7 +160,7 @@ export default function EmailInboxPage() {
         )
       );
 
-      setToastMessage('✅ Email approved and dispatched via n8n!');
+      setToastMessage('✅ Email approved and dispatched!');
       setIsEditingDraft(false);
     } catch (e) {
       setToastMessage('✅ Email approved and sent successfully!');
@@ -230,7 +230,7 @@ export default function EmailInboxPage() {
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
               AI Email Reply Automation
               <span className="badge badge-emerald">
-                n8n Email Dispatcher Active
+                Email Dispatcher Active
               </span>
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
@@ -498,7 +498,7 @@ export default function EmailInboxPage() {
                     className="btn-gradient"
                   >
                     <CheckCircle size={16} />
-                    {isSubmitting ? 'Sending via n8n...' : 'Approve & Send via n8n'}
+                    {isSubmitting ? 'Sending...' : 'Approve & Send'}
                   </button>
                 </div>
               </div>

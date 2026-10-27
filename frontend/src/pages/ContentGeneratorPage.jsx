@@ -360,7 +360,7 @@ export default function ContentGeneratorPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>📅 Automated Social Media Content Calendar</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Multi-channel scheduled posts &amp; automated n8n webhook triggers</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Multi-channel scheduled posts</p>
               </div>
               <button onClick={() => setShowCalendarModal(false)} className="badge badge-violet" style={{ cursor: 'pointer', padding: '6px' }}>
                 <X size={18} />
@@ -399,16 +399,6 @@ export default function ContentGeneratorPage() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border-glass)', paddingTop: '16px' }}>
               <button onClick={() => setShowCalendarModal(false)} className="glass-card" style={{ padding: '8px 16px', cursor: 'pointer', color: 'var(--text-main)' }}>
                 Close
-              </button>
-              <button 
-                onClick={() => {
-                  showToast('Syncing all calendar schedules with Meta & n8n...', 'success');
-                  setShowCalendarModal(false);
-                }} 
-                className="btn-gradient" 
-                style={{ padding: '8px 18px' }}
-              >
-                Sync with n8n Automation
               </button>
             </div>
           </div>

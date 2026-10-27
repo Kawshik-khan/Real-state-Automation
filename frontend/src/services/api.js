@@ -626,46 +626,6 @@ export function getWebSocketUrl(subpath = '/api/v1/ws/chat') {
 }
 
 /**
- * Fetch n8n Workflow & Node Health Telemetry
- */
-export async function getN8nTelemetry() {
-  const response = await resilientFetch('/api/v1/automation/n8n/health', {
-    headers: {
-      ...getAuthHeaders(),
-    },
-  });
-  return handleResponse(response);
-}
-
-/**
- * Enable or disable an n8n workflow
- */
-export async function toggleN8nWorkflow(workflowId, active) {
-  const response = await resilientFetch(`/api/v1/automation/n8n/workflows/${workflowId}/toggle`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({ active }),
-  });
-  return handleResponse(response);
-}
-
-/**
- * Run latency ping test on an n8n workflow
- */
-export async function testN8nWorkflow(workflowId) {
-  const response = await resilientFetch(`/api/v1/automation/n8n/workflows/${workflowId}/test`, {
-    method: 'POST',
-    headers: {
-      ...getAuthHeaders(),
-    },
-  });
-  return handleResponse(response);
-}
-
-/**
  * Fetch Developer System Health diagnostics
  */
 export async function getDeveloperSystemHealth() {
