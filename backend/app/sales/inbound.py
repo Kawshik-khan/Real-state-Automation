@@ -8,8 +8,9 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from app.sales import agent_settings, followups, jobs, leads, messaging
+from app.sales import agent_settings, followups, leads, messaging
 from app.sales.db import as_utc, session_scope
+from app.sales.db import lazy_jobs as jobs
 from app.sales.models import CHANNELS
 
 logger = logging.getLogger(__name__)

@@ -12,8 +12,9 @@ from sqlalchemy import func, select
 
 from app.config import settings
 from app.models.models import ProjectRecord
-from app.sales import agent_settings, followups, jobs, leads, messaging, units
+from app.sales import agent_settings, followups, leads, messaging, units
 from app.sales.db import as_utc, format_dhaka, now_utc, session_scope
+from app.sales.db import lazy_jobs as jobs
 from app.sales.models import (
     ACTIVE_VISIT_STATUSES,
     OPEN_LEAD_STAGES,

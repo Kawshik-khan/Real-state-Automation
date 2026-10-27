@@ -73,3 +73,15 @@ def format_dhaka(value: datetime) -> str:
     """Human-readable local time, e.g. 'Sat 1 Nov 2026, 3:00 PM'."""
     local = to_dhaka(value)
     return local.strftime("%a %-d %b %Y, %-I:%M %p")
+
+
+class _LazyJobs:
+    """``app.sales.jobs`` loaded on first use, so importing the API doesn't load the job-queue library (startup time)."""
+
+    def __getattr__(self, name):
+        from app.sales import jobs as module
+
+        return getattr(module, name)
+
+
+lazy_jobs = _LazyJobs()
