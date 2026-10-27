@@ -1,0 +1,95 @@
+# GLG sales engine — setup and rollout
+
+The sales engine replaces the n8n lead, booking and follow-up workflows with code in this repo:
+
+- **`backend/app/sales/`** — lead pipeline, unit inventory, site visits, follow-ups, approvals, the AI sales assistant (LangGraph) and its governed tools.
+- **`backend/app/worker.py`** — the job worker (Procrastinate on Postgres): agent turns, visit reminders, no-show checks, follow-ups, unit-match alerts, the 08:00 daily digest, the stale-lead sweep and hold expiry.
+- **Dashboard** — Pipeline, Sales Inbox (with assistant settings and follow-up sequences), Inventory and Approvals.
+
+n8n keeps running untouched until each flow is verified here (plan Phase 3 and 5).
+
+## 1. Database
+
+The web app creates the sales tables on startup (`init_db`). For Alembic users, migration `0008_sales_pipeline` creates them too.
+Then create the job-queue and checkpoint tables once:
+
+```bash
+cd backend
+python -m app.worker --setup
+```
+
+> The pre-existing migration `0003_knowledge_chunks` uses `sa.TSVECTOR`, which doesn't exist, so `alembic upgrade head` fails on a fresh database. Production currently relies on `init_db`.
+
+## 2. Starting data
+
+```bash
+python scripts/seed_sales_data.py                                  # projects + default follow-up sequences
+python scripts/seed_sales_data.py --units-csv units.csv            # unit inventory (template: docs/sales/units_template.csv)
+python scripts/seed_sales_data.py --slots "5,6,0,1,2,3@11:00,15:00"   # visit slots Sat–Thu 11:00 and 15:00 for every project
+```
+
+Units and slots are never invented: they come only from the CSV, the `--slots` option or the Inventory page.
+
+## 3. Run the worker
+
+| Where | How |
+| --- | --- |
+| Docker Compose | `sales-worker` service (runs `--setup`, then the worker) |
+| Render | `glg-sales-worker` background worker in `render.yaml` |
+| Single instance | set `SALES_WORKER_IN_PROCESS=true` on the web service |
+| Local | `python -m app.worker` |
+
+## 4. Environment variables
+
+| Variable | Needed for |
+| --- | --- |
+| `DATABASE_URL` | Everything (Postgres; the same value for web and worker) |
+| `DEFAULT_TENANT_ID` | The tenant all channels and staff work in (one company per deployment) |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | The assistant's model (any OpenAI-compatible provider with tool calling). Without it every turn hands off to staff. |
+| `FACEBOOK_APP_SECRET` | Verifying Meta webhooks. Without it Meta deliveries are refused (503). |
+| `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification handshake |
+| `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` | Sending WhatsApp messages |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | Sending Messenger and Instagram messages |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | Telegram bot in and out |
+| `DEFAULT_TELEGRAM_CHAT_ID` | Staff notifications and the daily digest (can also be set on the Sales Inbox settings) |
+
+A channel without credentials is recorded as **not sent** with the reason; nothing is shown as delivered when it wasn't.
+
+## 5. Point the channels at the backend
+
+| Channel | Webhook URL | Notes |
+| --- | --- | --- |
+| WhatsApp Cloud API, Messenger, Instagram | `https://<backend>/api/v1/sales/webhooks/meta` | Verify token = `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages` |
+| Telegram | `https://<backend>/api/v1/sales/webhooks/telegram` | `setWebhook` with `secret_token = TELEGRAM_WEBHOOK_SECRET` |
+| Website chat widget | `POST /api/v1/sales/webhooks/website`, poll `GET /api/v1/sales/webhooks/website/{session_id}/messages` | Called by the site's backend with `X-Automation-Secret` |
+
+Move one channel at a time and keep the n8n path ready to switch back (plan risk table).
+
+## 6. Rollout
+
+New tenants start in **shadow** mode: the assistant writes drafts, staff rate them in the Sales Inbox, nothing is sent.
+
+| Step | Move on when |
+| --- | --- |
+| Shadow, all channels | ≥ 50 drafts rated, ≥ 85% usable, 0 invented facts |
+| Live pilot: one project, two agents | 2 weeks with 0 invented facts, p95 reply ≤ 8 s, handoff ≤ 15 min in office hours |
+| Live, all projects | Weekly review of rated samples |
+
+Switch modes and channels on the Sales Inbox → Settings & follow-ups. **Emergency stop** halts every automatic reply within one request.
+
+## How a message flows
+
+1. Webhook verified → message saved (repeat deliveries dropped) → lead and conversation created or found.
+2. A follow-up sequence starts for new leads; any customer reply pauses nurture messages.
+3. One agent turn is queued per chat (2 s debounce, never two at once).
+4. The turn checks switches and limits (20 turns per chat per 10 minutes, daily token budget), then runs: prompt-injection guard → model with tools (≤ 6 model calls, ≤ 8 tool calls, 25 s) → grounding gate.
+5. The grounding gate blocks any reply stating a price, unit code, year or time that wasn't in this turn's tool results, any discount promise, and availability claims without a unit lookup. A blocked reply becomes a handoff.
+6. Live mode sends the reply; shadow mode stores a draft. Every turn is recorded in `sales_agent_turns`.
+
+## Tests
+
+```bash
+pytest backend/tests/test_sales_services.py backend/tests/test_sales_agent.py backend/tests/test_sales_api.py
+```
+
+They run on SQLite with an in-memory job queue and a scripted model — no Postgres, network or API key needed.

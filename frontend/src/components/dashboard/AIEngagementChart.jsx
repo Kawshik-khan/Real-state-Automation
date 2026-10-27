@@ -13,21 +13,13 @@ import CustomDropdown from '../ui/CustomDropdown';
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { getTimeSeriesAnalytics } from '../../services/api';
 
-const DEFAULT_MONTHLY_DATA = [
-  { month: 'Jan', messages: 2450, leads: 82, rate: '92%' },
-  { month: 'Feb', messages: 3120, leads: 114, rate: '94%' },
-  { month: 'Mar', messages: 2890, leads: 96, rate: '93%' },
-  { month: 'Apr', messages: 3950, leads: 138, rate: '95%' },
-  { month: 'May', messages: 4620, leads: 168, rate: '96%' },
-  { month: 'Jun', messages: 4390, leads: 142, rate: '95%' }
-];
 
 export default function AIEngagementChart() {
   const [timeRange, setTimeRange] = useState('6m');
-  const [chartData, setChartData] = useState(DEFAULT_MONTHLY_DATA);
-  const [totalInteractions, setTotalInteractions] = useState(21420);
-  const [peakThroughput, setPeakThroughput] = useState(4620);
-  const [peakMonth, setPeakMonth] = useState('May');
+  const [chartData, setChartData] = useState([]);
+  const [totalInteractions, setTotalInteractions] = useState(0);
+  const [peakThroughput, setPeakThroughput] = useState(0);
+  const [peakMonth, setPeakMonth] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,7 +29,7 @@ export default function AIEngagementChart() {
         if (res && res.data && res.data.length > 0 && isMounted) {
           setChartData(res.data);
           const total = res.data.reduce((acc, cur) => acc + (cur.messages || 0), 0);
-          setTotalInteractions(total > 0 ? total : 21420);
+          setTotalInteractions(total);
 
           let peak = res.data[0];
           for (const d of res.data) {
@@ -46,12 +38,12 @@ export default function AIEngagementChart() {
             }
           }
           if (peak) {
-            setPeakThroughput(peak.messages || 4620);
-            setPeakMonth(peak.month || 'May');
+            setPeakThroughput(peak.messages || 0);
+            setPeakMonth(peak.month || null);
           }
         }
       } catch (err) {
-        // Retain default data on error
+        // Leave the chart empty: no sample figures are shown as real data
       }
     }
     loadTimeSeries();
@@ -77,7 +69,7 @@ export default function AIEngagementChart() {
             Volume: {Number(data.messages).toLocaleString()} msgs
           </p>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Leads: {data.leads} | AI Handled: {data.rate}
+            Leads: {data.leads} | AI Handled: {data.rate || '—'}
           </p>
         </div>
       );
@@ -150,7 +142,7 @@ export default function AIEngagementChart() {
               {peakThroughput.toLocaleString()} msgs
             </h4>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
-              Recorded in {peakMonth} 2026
+              {peakMonth ? `Recorded in ${peakMonth}` : 'No message data yet'}
             </span>
           </div>
 
@@ -169,7 +161,12 @@ export default function AIEngagementChart() {
 
         {/* Right: Recharts Bar Chart */}
         <div style={{ flex: 1, height: '270px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          {chartData.length === 0 && (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              No message volume recorded yet.
+            </div>
+          )}
+          {chartData.length > 0 && <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-glass)" vertical={false} />
               <XAxis 
@@ -192,7 +189,7 @@ export default function AIEngagementChart() {
                 maxBarSize={48}
               />
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer>}
         </div>
       </div>
     </Card>

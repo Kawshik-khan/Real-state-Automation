@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     default_telegram_chat_id: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     whatsapp_verify_token: Optional[str] = None
+    telegram_webhook_secret: Optional[str] = None  # sent by Telegram as X-Telegram-Bot-Api-Secret-Token
+
+    # Sales engine worker: run the job worker inside the web process (single-instance deployments only)
+    sales_worker_in_process: bool = False
 
     # Meta / Facebook / Instagram Graph API Settings
     facebook_page_id: Optional[str] = None

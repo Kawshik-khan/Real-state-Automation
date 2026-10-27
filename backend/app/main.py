@@ -44,6 +44,8 @@ from app.api.v1.notifications.endpoints import router as notifications_router
 from app.api.v1.projects.endpoints import create_project, get_project, list_projects
 from app.api.v1.projects.endpoints import router as projects_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.sales.endpoints import router as sales_router
+from app.api.v1.sales.webhooks import router as sales_webhooks_router
 from app.api.v1.search.endpoints import router as search_router
 from app.api.v1.search.endpoints import search_knowledge
 from app.api.v1.social import router as social_router
@@ -54,9 +56,43 @@ from app.database import get_session
 from app.dependencies import require_automation_secret as _auth
 from app.dependencies import require_roles
 from app.models.user import UserRole
+from app.sales.errors import SalesError
 from app.services.log_streamer import log_streamer, setup_live_logging
 
 logger = logging.getLogger(__name__)
+
+
+async def _start_sales_queue():
+    """Open the Procrastinate queue so requests can queue jobs; optionally run the worker in-process."""
+    from app.database import is_db_reachable
+    from app.sales.jobs import queue
+
+    if os.getenv("TESTING") == "true" or not is_db_reachable():
+        logger.warning("[startup] Sales job queue not opened (database unreachable or tests); jobs can't be queued.")
+        return None
+    try:
+        await queue.open_async()
+    except Exception as exc:
+        logger.error(f"[startup] Sales job queue failed to open: {exc}")
+        return None
+    if settings.sales_worker_in_process:
+        from app.worker import run_worker
+
+        logger.info("[startup] SALES_WORKER_IN_PROCESS=true — running the sales worker inside the web process.")
+        return asyncio.create_task(run_worker(open_queue=False))
+    return "opened"
+
+
+async def _stop_sales_queue(handle):
+    from app.sales.jobs import queue
+
+    if isinstance(handle, asyncio.Task) and not handle.done():
+        handle.cancel()
+    if handle:
+        try:
+            await queue.close_async()
+        except Exception:
+            pass
 
 
 @asynccontextmanager
@@ -97,6 +133,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("[startup] Gmail credentials not configured — email poller disabled.")
 
+    # Sales engine job queue: the web process queues jobs; `python -m app.worker` runs them.
+    sales_worker_task = await _start_sales_queue()
+
     # Start scheduled report generation worker
     scheduler_task = None
     from app.services.report_scheduler import report_scheduler_worker, stop_report_scheduler
@@ -105,6 +144,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    await _stop_sales_queue(sales_worker_task)
     stop_report_scheduler()
     if scheduler_task and not scheduler_task.done():
         scheduler_task.cancel()
@@ -125,6 +165,27 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
+
+
+@app.exception_handler(SalesError)
+async def _sales_error_handler(request: Request, exc: SalesError):
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message, "code": exc.code})
+
+
+def _stale_data_handler(request: Request, exc: Exception):
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=409, content={"detail": "Someone else changed this record; reload and try again", "code": "STALE_VERSION"})
+
+
+try:
+    from sqlalchemy.orm.exc import StaleDataError
+
+    app.add_exception_handler(StaleDataError, _stale_data_handler)
+except ImportError:  # pragma: no cover
+    pass
 
 app.add_middleware(
     CORSMiddleware,
@@ -370,3 +431,5 @@ app.include_router(calendar_router,     prefix="/api/v1/calendar",     tags=["ca
 app.include_router(calendar_router,     prefix="/api/calendar",        tags=["calendar"])
 app.include_router(reports_router,      prefix="/api/v1",              tags=["reports"])
 app.include_router(ws_router,           prefix="/api/v1",              tags=["websockets"])
+app.include_router(sales_router,        prefix="/api/v1/sales",        tags=["sales"])
+app.include_router(sales_webhooks_router, prefix="/api/v1/sales/webhooks", tags=["sales-webhooks"])

@@ -81,6 +81,7 @@ async def init_db():
     """Initialize database tables and enable pgvector & uuid-ossp extensions on Supabase/PostgreSQL."""
     # Ensure all AI Control Plane models are registered in Base.metadata
     import app.models.ai_control_plane  # noqa: F401
+    import app.sales.models  # noqa: F401  (sales pipeline tables)
 
     async with engine.begin() as conn:
         # Enable pgvector & UUID extensions natively
