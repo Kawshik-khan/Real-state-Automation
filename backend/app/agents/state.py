@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class ModerationResult(BaseModel):
-    action: str = "allow"  # allow, flag, block
+    action: str = "allow"  # allow, flag, block, escalate (a check could not run)
     is_spam: bool = False
     is_toxic: bool = False
     contains_pii: bool = False
@@ -77,6 +77,8 @@ class AIState(BaseModel):
     user_id: Optional[str] = None
     tenant_id: Optional[str] = None
     language: str = "en"
+    # Write lead signals (booking requests, intent scores) to the sales pipeline. Evals turn this off.
+    persist_leads: bool = True
 
     # Lead Intent Scoring Engine (0-100)
     lead_score: LeadScore = Field(default_factory=LeadScore)

@@ -43,8 +43,17 @@ class SearchUnitsInput(BaseModel):
 
 async def _search_units(args: SearchUnitsInput, ctx: dict) -> dict:
     async with session_scope() as session:
-        found = await units.search_units(session, ctx["tenant_id"], **args.model_dump(), limit=5)
-    return {"units": found, "count": len(found), "note": "Only AVAILABLE units are listed; prices are list prices in BDT."}
+        lead = await _lead(session, ctx)
+        excluded = list(lead.excluded_areas or [])
+        found = await units.search_units(session, ctx["tenant_id"], **args.model_dump(), exclude_areas=excluded, limit=5)
+    result = {"units": found, "count": len(found), "note": "Only AVAILABLE units are listed; prices are list prices in BDT."}
+    if excluded:
+        result["excluded_areas"] = excluded
+        result["note"] += f" Areas the customer ruled out are left out: {', '.join(excluded)}."
+        if args.area and any(e.lower() in args.area.lower() or args.area.lower() in e.lower() for e in excluded):
+            result["note"] += (" They ruled this area out earlier. If they now want it, save it as a preferred area with"
+                               " update_lead_profile first, then search again.")
+    return result
 
 
 class GetUnitInput(BaseModel):
@@ -69,6 +78,27 @@ class ListProjectsInput(BaseModel):
 async def _list_projects(args: ListProjectsInput, ctx: dict) -> dict:
     async with session_scope() as session:
         return {"projects": await units.list_projects(session)}
+
+
+class ProjectFactsInput(BaseModel):
+    project_id: str = Field(..., max_length=128)
+
+
+async def _get_project_facts(args: ProjectFactsInput, ctx: dict) -> dict:
+    try:
+        async with session_scope() as session:
+            project = await units.get_project(session, args.project_id)
+    except SalesError as err:
+        return _refused(err)
+    features = project.features or {}
+    return {
+        "project": {
+            "project_id": project.project_id, "name": project.name, "location": project.location,
+            "description": project.description, "amenities": features.get("amenities", []),
+            "handover": features.get("handover_date"), "approvals": features.get("approvals"),
+        },
+        "note": "Project facts only. Prices and availability come from search_units / get_unit, never from here.",
+    }
 
 
 class CalcPlanInput(BaseModel):
@@ -120,6 +150,38 @@ async def _get_project_docs(args: ProjectDocsInput, ctx: dict) -> dict:
     return {"sources": sources, "note": "Answer only from these excerpts and name the source; if they don't answer it, say a consultant will confirm."}
 
 
+class PolicyInput(BaseModel):
+    topic: str = Field(..., min_length=2, max_length=200, description=(
+        "What the customer asked about, e.g. 'documents needed to buy', 'payment terms', 'booking money', "
+        "'office address', 'rent vs buy'"))
+
+
+CONTACT_WORDS = ("contact", "phone", "number", "address", "office", "hotline", "email", "hours", "jogajog", "thikana")
+
+
+async def _get_policy(args: PolicyInput, ctx: dict) -> dict:
+    from app.repositories.contact_repository import contact_repository
+    from app.repositories.policy_repository import policy_repository
+
+    topic = args.topic.lower()
+    result: dict = {}
+    policy = policy_repository.get_policy(topic.replace(" ", "_")) or policy_repository.match_policy(topic)
+    if policy and policy.get("approved"):
+        result["policy"] = {k: policy[k] for k in ("policy_key", "title_en", "title_bn", "answer_en", "answer_bn", "effective_from")}
+    if any(word in topic for word in CONTACT_WORDS):
+        info = contact_repository.get_contact_info()
+        result["contact"] = {
+            "hotline": info["hotline"], "phone": info["primary_phone"], "whatsapp": info["whatsapp_support"],
+            "email": info["sales_email"], "office": info["head_office"]["formatted_en"],
+            "office_bn": info["head_office"]["formatted_bn"],
+            "hours": f"{info['operating_hours']['days_en']}, {info['operating_hours']['hours_en']}",
+        }
+    if not result:
+        return {"refused": "NO_APPROVED_POLICY", "message": "No approved answer for this topic; try get_project_docs or hand off."}
+    result["note"] = "Approved company answers. Quote them faithfully in the customer's language; add nothing."
+    return result
+
+
 class FreeSlotsInput(BaseModel):
     project_id: str = Field(..., max_length=128)
     from_date: Optional[date] = None
@@ -141,10 +203,15 @@ class UpdateLeadInput(BaseModel):
     email: Optional[str] = Field(None, max_length=200)
     budget_min_bdt: Optional[int] = Field(None, ge=0)
     budget_max_bdt: Optional[int] = Field(None, ge=0)
-    preferred_areas: Optional[list[str]] = Field(None, max_length=8)
+    preferred_areas: Optional[list[str]] = Field(None, max_length=8, description="The full current list; it replaces the old one")
+    excluded_areas: Optional[list[str]] = Field(None, max_length=8, description=(
+        "Areas the customer ruled out ('not Uttara'), the full current list. Unit searches will skip them."))
+    must_have: Optional[list[str]] = Field(None, max_length=8, description="e.g. 'south facing', '2 car parking'")
+    deal_breakers: Optional[list[str]] = Field(None, max_length=8, description="e.g. 'ground floor', 'under construction'")
     bedrooms: Optional[int] = Field(None, ge=1, le=10)
     timeline: Optional[str] = Field(None, max_length=60, description="When they want to buy, e.g. 'within 3 months'")
     purpose: Optional[Literal["own_use", "investment", "rental", "other"]] = None
+    financing: Optional[Literal["cash", "home_loan", "installments", "undecided"]] = None
 
 
 async def _update_lead_profile(args: UpdateLeadInput, ctx: dict) -> dict:
@@ -280,9 +347,11 @@ TOOL_SPECS: list[tuple[str, str, ToolAuthorityTier, type[BaseModel], Any]] = [
     ("search_units", "Find AVAILABLE units by area, project, bedrooms, budget (BDT) or size. Use before naming any unit or price.", ToolAuthorityTier.TIER_1_READ_ONLY, SearchUnitsInput, _search_units),
     ("get_unit", "Live status and list price of one unit, by unit_id or project_id + unit_code.", ToolAuthorityTier.TIER_1_READ_ONLY, GetUnitInput, _get_unit),
     ("calc_payment_plan", "Split a unit's list price by the project's published payment plans.", ToolAuthorityTier.TIER_1_READ_ONLY, CalcPlanInput, _calc_payment_plan),
+    ("get_project_facts", "Location, description, amenities and handover of one project.", ToolAuthorityTier.TIER_1_READ_ONLY, ProjectFactsInput, _get_project_facts),
+    ("get_policy", "Approved company answers: documents to buy or rent, payment terms, booking money, office address, hours, contact.", ToolAuthorityTier.TIER_1_READ_ONLY, PolicyInput, _get_policy),
     ("get_project_docs", "Search approved project documents (brochures, floor plans, approvals, FAQs).", ToolAuthorityTier.TIER_1_READ_ONLY, ProjectDocsInput, _get_project_docs),
     ("free_visit_slots", "Upcoming free site-visit slots for a project.", ToolAuthorityTier.TIER_1_READ_ONLY, FreeSlotsInput, _free_visit_slots),
-    ("update_lead_profile", "Save what the customer told you: name, phone, budget (BDT), areas, bedrooms, timeline, purpose.", ToolAuthorityTier.TIER_2_MUTATING_SAFE, UpdateLeadInput, _update_lead_profile),
+    ("update_lead_profile", "Save what the customer told you: name, phone, budget (BDT), areas they want or ruled out, must-haves, deal breakers, bedrooms, timeline, purpose, financing. A new statement replaces the old one.", ToolAuthorityTier.TIER_2_MUTATING_SAFE, UpdateLeadInput, _update_lead_profile),
     ("book_site_visit", "Book a site visit into a free slot from free_visit_slots.", ToolAuthorityTier.TIER_2_MUTATING_SAFE, BookVisitInput, _book_site_visit),
     ("reschedule_or_cancel_visit", "Move or cancel this customer's own visit.", ToolAuthorityTier.TIER_2_MUTATING_SAFE, ChangeVisitInput, _reschedule_or_cancel_visit),
     ("handoff_to_agent", "Pass the chat to a human sales agent. Use for negotiation, legal questions, complaints, or anything you can't answer from tools.", ToolAuthorityTier.TIER_2_MUTATING_SAFE, HandoffInput, _handoff_to_agent),

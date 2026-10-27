@@ -148,6 +148,11 @@ async def run_followup_step(enrollment_id: str) -> dict:
             await followups.stop_enrollments(session, lead, f"stage {lead.stage}")
             return {"status": "stopped", "reason": f"stage {lead.stage}"}
         conv = await messaging.get_or_create_conversation(session, lead)
+        assistant = await agent_settings.get_settings(session, lead.tenant_id)
+        if agent_settings.channel_modes(assistant).get(conv.channel) == "draft_only":
+            # Draft-only channels (email by default) never get automatic messages; staff write to them.
+            await followups.stop_enrollments(session, lead, f"{conv.channel} is draft only")
+            return {"status": "stopped", "reason": f"{conv.channel} is draft only"}
         if conv.mode == "HUMAN":
             # A person owns the chat: they decide what to send. Push the step back a day instead.
             enrollment.next_run_at = now_utc() + timedelta(days=1)
@@ -180,6 +185,7 @@ async def sweep_stale_leads() -> dict:
                     SalesLead.last_contact_at.is_not(None),
                     SalesLead.last_contact_at < cutoff,
                     SalesLead.lead_id.not_in(active_leads),
+                    leads.sales_may_message_first(),
                 ).limit(200)
             )
         ).scalars().all()
@@ -209,10 +215,12 @@ async def send_unit_match_alerts(tenant_id: str, unit_id: str) -> dict:
                     SalesLead.stage.in_(OPEN_LEAD_STAGES),
                     SalesLead.budget_max_bdt.is_not(None),
                     SalesLead.budget_max_bdt >= unit.list_price_bdt,
+                    leads.sales_may_message_first(),
                 )
             )
         ).scalars().all()
         since = now_utc() - UNIT_ALERT_GAP
+        assistant = await agent_settings.get_settings(session, tenant_id)
         for lead in candidates:
             if lead.bedrooms and unit.bedrooms and lead.bedrooms != unit.bedrooms:
                 continue
@@ -229,7 +237,7 @@ async def send_unit_match_alerts(tenant_id: str, unit_id: str) -> dict:
                 skipped += 1
                 continue
             conv = await messaging.get_or_create_conversation(session, lead)
-            if conv.mode == "HUMAN":
+            if conv.mode == "HUMAN" or agent_settings.channel_modes(assistant).get(conv.channel) == "draft_only":
                 skipped += 1
                 continue
             beds = f"{unit.bedrooms}-bed " if unit.bedrooms else ""

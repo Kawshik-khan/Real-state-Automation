@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import AuthUserRecord
@@ -14,10 +14,27 @@ from app.sales.models import (
     LEAD_STAGES,
     OPEN_LEAD_STAGES,
     LeadEvent,
+    SalesConversation,
     SalesLead,
+    SalesMessage,
     SiteVisit,
 )
 from app.sales.scoring import compute_score, is_qualified
+
+
+def sales_may_message_first():
+    """Leads the sales engine may contact on its own (follow-ups, re-engagement, unit alerts).
+
+    Leads that only the old chatbot has talked to (``source == "legacy_ai"``) are left alone until the sales side has
+    sent them something itself, so turning on shadow comparison never changes what customers receive.
+    """
+    talked = exists().where(
+        SalesConversation.lead_id == SalesLead.lead_id,
+        SalesMessage.conversation_id == SalesConversation.conversation_id,
+        SalesMessage.sender.in_(("ai", "staff")),
+        SalesMessage.status.in_(("sent", "stored")),
+    )
+    return or_(SalesLead.source.is_(None), SalesLead.source != "legacy_ai", talked)
 
 
 def iso(value) -> Optional[str]:
@@ -38,9 +55,13 @@ def lead_to_dict(lead: SalesLead) -> dict:
         "budget_min_bdt": lead.budget_min_bdt,
         "budget_max_bdt": lead.budget_max_bdt,
         "preferred_areas": lead.preferred_areas or [],
+        "excluded_areas": lead.excluded_areas or [],
+        "must_have": lead.must_have or [],
+        "deal_breakers": lead.deal_breakers or [],
         "bedrooms": lead.bedrooms,
         "timeline": lead.timeline,
         "purpose": lead.purpose,
+        "financing": lead.financing,
         "owner_user_id": lead.owner_user_id,
         "next_followup_at": iso(lead.next_followup_at),
         "last_contact_at": iso(lead.last_contact_at),
@@ -94,7 +115,7 @@ async def get_or_create_lead(
         return lead, False
     lead = SalesLead(
         tenant_id=tenant_id, channel=channel, external_id=external_id, name=name, phone=phone,
-        source=source or channel, stage="NEW", preferred_areas=[],
+        source=source or channel, stage="NEW", preferred_areas=[], excluded_areas=[], must_have=[], deal_breakers=[],
     )
     session.add(lead)
     await session.flush()
@@ -124,31 +145,61 @@ async def _rescore(session: AsyncSession, lead: SalesLead) -> None:
     )
 
 
-PROFILE_FIELDS = {"name", "phone", "email", "budget_min_bdt", "budget_max_bdt", "preferred_areas", "bedrooms", "timeline", "purpose"}
+PROFILE_FIELDS = {
+    "name", "phone", "email", "budget_min_bdt", "budget_max_bdt", "preferred_areas", "excluded_areas", "must_have",
+    "deal_breakers", "bedrooms", "timeline", "purpose", "financing",
+}
+LIST_FIELDS = {"preferred_areas", "excluded_areas", "must_have", "deal_breakers"}
+
+
+def _clean_list(values) -> list:
+    seen, out = set(), []
+    for value in values or []:
+        text = str(value).strip()
+        if text and text.lower() not in seen:
+            seen.add(text.lower())
+            out.append(text)
+    return sorted(out, key=str.lower)
+
+
+def _without(values: list, removed: list) -> list:
+    gone = {v.lower() for v in removed}
+    return [v for v in values or [] if v.lower() not in gone]
 
 
 async def update_profile(session: AsyncSession, lead: SalesLead, fields: dict, actor: str) -> dict:
-    """Update what we know about the buyer; rescore; move NEW → QUALIFIED when enough is known."""
-    changes = {}
+    """Update what we know about the buyer; rescore; move NEW → QUALIFIED when enough is known.
+
+    A later statement replaces an earlier one, and the event keeps both, so every revision is auditable: ruling an
+    area out removes it from the preferred areas, and asking for an area again lifts its exclusion.
+    """
+    fields = {k: v for k, v in fields.items() if k in PROFILE_FIELDS and v is not None}
+    for key in LIST_FIELDS & fields.keys():
+        fields[key] = _clean_list(fields[key])
+    if "excluded_areas" in fields:
+        fields["preferred_areas"] = _without(fields.get("preferred_areas", lead.preferred_areas or []), fields["excluded_areas"])
+    elif "preferred_areas" in fields:
+        fields["excluded_areas"] = _without(lead.excluded_areas or [], fields["preferred_areas"])
+    changes, previous = {}, {}
     for key, value in fields.items():
-        if key not in PROFILE_FIELDS or value is None:
-            continue
-        if key == "preferred_areas":
-            value = sorted({str(a).strip() for a in value if str(a).strip()})
-        if getattr(lead, key) != value:
+        current = getattr(lead, key)
+        if key in LIST_FIELDS:
+            current = current or []
+        if current != value:
+            previous[key] = current
             setattr(lead, key, value)
             changes[key] = value
     if lead.budget_min_bdt and lead.budget_max_bdt and lead.budget_min_bdt > lead.budget_max_bdt:
         raise SalesError("INVALID_BUDGET", "Minimum budget is above the maximum")
     await _rescore(session, lead)
     if changes:
-        await add_event(session, lead, "profile_updated", actor, changes)
+        await add_event(session, lead, "profile_updated", actor, {**changes, "previous": previous})
     if lead.stage == "NEW" and is_qualified(
         budget_max_bdt=lead.budget_max_bdt, preferred_areas=lead.preferred_areas, bedrooms=lead.bedrooms
     ):
         await change_stage(session, lead, "QUALIFIED", actor, by_ai=actor == "ai")
     await session.flush()
-    return {"changed": changes, "score": lead.score, "stage": lead.stage}
+    return {"changed": changes, "previous": previous, "score": lead.score, "stage": lead.stage}
 
 
 async def change_stage(

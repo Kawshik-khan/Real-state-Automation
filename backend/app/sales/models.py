@@ -46,9 +46,14 @@ AI_SETTABLE_STAGES = ("NEW", "QUALIFIED", "VISIT_BOOKED")
 VISIT_STATUSES = ("BOOKED", "CONFIRMED", "DONE", "NO_SHOW", "CANCELLED")
 ACTIVE_VISIT_STATUSES = ("BOOKED", "CONFIRMED")
 
-CHANNELS = ("whatsapp", "messenger", "instagram", "telegram", "website")
+CHANNELS = ("whatsapp", "messenger", "instagram", "telegram", "website", "email")
+# Per-channel assistant behaviour when the assistant is live: "live" sends, "draft_only" stores drafts for staff.
+CHANNEL_MODES = ("live", "draft_only")
+# Channels whose replies stay drafts until a manager says otherwise.
+DEFAULT_CHANNEL_MODES = {"email": "draft_only"}
 
-APPROVAL_KINDS = ("UNIT_HOLD", "PRICE_EXCEPTION")
+APPROVAL_KINDS = ("UNIT_HOLD", "PRICE_EXCEPTION", "CONTENT_POST")
+SHADOW_RATINGS = ("better", "same", "worse")
 APPROVAL_STATUSES = ("PENDING", "APPROVED", "REJECTED", "STALE")
 
 SEQUENCE_TRIGGERS = ("new_lead", "post_visit", "no_show", "reengage")
@@ -120,9 +125,14 @@ class SalesLead(Base):
     budget_min_bdt: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     budget_max_bdt: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     preferred_areas: Mapped[list] = mapped_column(JSON, default=list)
+    # Areas the buyer ruled out ("not Uttara"); unit searches never return them
+    excluded_areas: Mapped[list] = mapped_column(JSON, default=list)
+    must_have: Mapped[list] = mapped_column(JSON, default=list)  # e.g. "south facing", "2 parking"
+    deal_breakers: Mapped[list] = mapped_column(JSON, default=list)  # e.g. "ground floor", "under construction"
     bedrooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     timeline: Mapped[str | None] = mapped_column(String(64), nullable=True)
     purpose: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    financing: Mapped[str | None] = mapped_column(String(32), nullable=True)  # cash, home_loan, installments
     owner_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     next_followup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_contact_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -278,14 +288,15 @@ class SalesMessage(Base):
 
 
 class SalesApproval(Base):
-    """A request the AI raised that only a person may grant: holding a unit, or a price exception."""
+    """A request the AI raised that only a person may grant: holding a unit, a price exception, or a marketing post."""
 
     __tablename__ = "sales_approvals"
 
     approval_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     tenant_id: Mapped[str] = mapped_column(String(128), index=True)
     kind: Mapped[str] = mapped_column(String(32))
-    lead_id: Mapped[str] = mapped_column(String(36), ForeignKey("sales_leads.lead_id"), index=True)
+    # Empty for requests that aren't about one buyer (a CONTENT_POST draft)
+    lead_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sales_leads.lead_id"), nullable=True, index=True)
     unit_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("property_units.unit_id"), nullable=True)
     unit_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -308,6 +319,7 @@ class SalesAgentSettings(Base):
     tenant_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     mode: Mapped[str] = mapped_column(String(8), default="shadow")  # off, shadow, live
     enabled_channels: Mapped[list] = mapped_column(JSON, default=lambda: list(CHANNELS))
+    channel_modes: Mapped[dict] = mapped_column(JSON, default=lambda: dict(DEFAULT_CHANNEL_MODES))
     kill_switch: Mapped[bool] = mapped_column(Boolean, default=False)
     daily_token_budget: Mapped[int] = mapped_column(Integer, default=400_000)
     hold_hours: Mapped[int] = mapped_column(Integer, default=48)
@@ -331,4 +343,31 @@ class SalesAgentTurn(Base):
     tools_used: Mapped[list] = mapped_column(JSON, default=list)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+
+class AIShadowPair(Base):
+    """One customer message answered by the old pipeline, with the sales assistant's draft beside it.
+
+    Staff rate each pair better / same / worse; the ratings decide when the old pipeline can be retired.
+    """
+
+    __tablename__ = "ai_shadow_pairs"
+
+    pair_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(128), index=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)  # sales conversation
+    legacy_conversation_id: Mapped[str] = mapped_column(String(128))
+    channel: Mapped[str] = mapped_column(String(32))
+    customer_text: Mapped[str] = mapped_column(Text)
+    legacy_reply: Mapped[str] = mapped_column(Text, default="")
+    legacy_agent: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    legacy_escalated: Mapped[bool] = mapped_column(Boolean, default=False)
+    sales_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)  # drafted, skipped, error …
+    sales_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    rating: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True)
+    rating_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    rated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)

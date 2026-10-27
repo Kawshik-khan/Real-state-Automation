@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { salesApi, formatWhen, canManage, canWork, stageLabel } from '../services/salesApi';
 import '../styles/sales.css';
 
-const CHANNELS = ['whatsapp', 'messenger', 'instagram', 'telegram', 'website'];
+const CHANNELS = ['whatsapp', 'messenger', 'instagram', 'telegram', 'website', 'email'];
 const TRIGGER_LABEL = { new_lead: 'New inquiry', post_visit: 'After a visit', no_show: 'Missed visit', reengage: 'Quiet leads' };
 
 function AssistantSettings() {
@@ -73,6 +73,18 @@ function AssistantSettings() {
         {CHANNELS.map((c) => (
           <button key={c} type="button" className={`sales-chip ${settings.enabled_channels.includes(c) ? 'on' : ''}`} onClick={() => toggleChannel(c)}>{c}</button>
         ))}
+      </div>
+      <div className="sales-switch-row" style={{ marginTop: 'var(--space-3)' }}>
+        <span className="sales-kpi-label" title="When the assistant is live, a draft-only channel still stores replies for staff to send">Draft only</span>
+        {CHANNELS.filter((c) => settings.enabled_channels.includes(c)).map((c) => {
+          const draftOnly = settings.channel_modes?.[c] === 'draft_only';
+          return (
+            <button key={c} type="button" className={`sales-chip ${draftOnly ? 'on' : ''}`}
+              onClick={() => update({ channel_modes: { [c]: draftOnly ? 'live' : 'draft_only' } }, draftOnly ? `${c} replies are sent when live` : `${c} replies stay drafts`)}>
+              {c}
+            </button>
+          );
+        })}
       </div>
       <div className="sales-form" style={{ marginTop: 'var(--space-3)' }}>
         <label className="sales-field">Daily token budget

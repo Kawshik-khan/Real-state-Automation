@@ -73,6 +73,11 @@ export const salesApi = {
   settings: () => call('/settings'),
   updateSettings: (body) => call('/settings', { method: 'PATCH', body }),
   digestPreview: () => call('/digest/preview', { method: 'POST' }),
+
+  aiQuality: (days = 14) => call('/ai-quality', { params: { days } }),
+  shadowPairs: (rated) => call('/shadow/pairs', { params: { rated } }),
+  rateShadowPair: (pairId, rating, note) => call(`/shadow/pairs/${pairId}/rating`, { method: 'POST', body: { rating, note } }),
+  runContentDrafts: () => call('/content/drafts/run', { method: 'POST' }),
 };
 
 export const STAGES = [

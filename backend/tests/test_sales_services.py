@@ -137,7 +137,7 @@ async def test_lead_identity_is_reused_and_profile_qualifies(db):
         assert created and not created_again and again.lead_id == lead.lead_id
         result = await leads.update_profile(s, lead, {"budget_max_bdt": 10_000_000, "preferred_areas": ["Gulshan", "gulshan "]}, "ai")
     assert result["stage"] == "QUALIFIED"
-    assert lead.preferred_areas == ["Gulshan", "gulshan"]
+    assert lead.preferred_areas == ["Gulshan"]  # the same area typed twice is kept once
     assert lead.score == 40
 
 

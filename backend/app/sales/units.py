@@ -65,9 +65,10 @@ async def search_units(
     budget_min_bdt: Optional[int] = None,
     budget_max_bdt: Optional[int] = None,
     min_size_sqft: Optional[int] = None,
+    exclude_areas: Optional[list[str]] = None,
     limit: int = 5,
 ) -> list[dict]:
-    """Available units only, cheapest first."""
+    """Available units only, cheapest first. Projects in ``exclude_areas`` (by location or name) are never returned."""
     stmt = (
         select(PropertyUnit, ProjectRecord)
         .join(ProjectRecord, ProjectRecord.project_id == PropertyUnit.project_id)
@@ -78,6 +79,10 @@ async def search_units(
     if area:
         like = f"%{area.strip().lower()}%"
         stmt = stmt.where(or_(func.lower(ProjectRecord.location).like(like), func.lower(ProjectRecord.name).like(like)))
+    for excluded in exclude_areas or []:
+        like = f"%{excluded.strip().lower()}%"
+        if like != "%%":
+            stmt = stmt.where(~func.lower(ProjectRecord.location).like(like), ~func.lower(ProjectRecord.name).like(like))
     if bedrooms:
         stmt = stmt.where(PropertyUnit.bedrooms == bedrooms)
     if budget_max_bdt:

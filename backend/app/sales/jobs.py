@@ -96,6 +96,15 @@ async def release_holds(timestamp: int) -> dict:
     return await workflows.release_expired_holds()
 
 
+# 04:00 UTC Sunday = 10:00 Asia/Dhaka
+@queue.periodic(cron="0 4 * * 0", periodic_id="weekly-content-drafts")
+@queue.task(name="sales.content_drafts", queue="sales", queueing_lock="sales.content_drafts")
+async def content_drafts(timestamp: int) -> dict:
+    from app.sales.content import draft_weekly_posts
+
+    return await draft_weekly_posts(settings.default_tenant_id)
+
+
 # ── Deferring ─────────────────────────────────────────────────────────
 
 async def defer(task, *, schedule_at: Optional[datetime] = None, schedule_in: Optional[dict] = None,

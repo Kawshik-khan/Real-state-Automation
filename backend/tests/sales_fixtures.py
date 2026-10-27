@@ -25,7 +25,7 @@ SALES_TABLES = [
     sm.SalesLead.__table__, sm.LeadEvent.__table__, sm.VisitSlot.__table__, sm.SiteVisit.__table__,
     sm.FollowupSequence.__table__, sm.FollowupStep.__table__, sm.FollowupEnrollment.__table__,
     sm.SalesConversation.__table__, sm.SalesMessage.__table__, sm.SalesApproval.__table__,
-    sm.SalesAgentSettings.__table__, sm.SalesAgentTurn.__table__,
+    sm.SalesAgentSettings.__table__, sm.SalesAgentTurn.__table__, sm.AIShadowPair.__table__,
 ]
 
 

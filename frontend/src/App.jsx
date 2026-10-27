@@ -21,6 +21,7 @@ import EmailInboxPage from './pages/EmailInboxPage';
 import SalesPipelinePage from './pages/SalesPipelinePage';
 import SalesInventoryPage from './pages/SalesInventoryPage';
 import SalesApprovalsPage from './pages/SalesApprovalsPage';
+import SalesAIQualityPage from './pages/SalesAIQualityPage';
 import SalesInboxPage from './pages/SalesInboxPage';
 
 import EditModulesModal from './components/dashboard/EditModulesModal';
@@ -69,6 +70,7 @@ export const TAB_TO_PATH = {
   sales_inbox: '/sales-inbox',
   sales_inventory: '/inventory',
   sales_approvals: '/approvals',
+  sales_ai_quality: '/ai-quality',
 };
 
 export const PATH_TO_TAB = {
@@ -94,6 +96,7 @@ export const PATH_TO_TAB = {
   '/sales-inbox': 'sales_inbox',
   '/inventory': 'sales_inventory',
   '/approvals': 'sales_approvals',
+  '/ai-quality': 'sales_ai_quality',
 };
 
 function DashboardApp() {
@@ -188,6 +191,7 @@ function DashboardApp() {
       case 'sales_inbox': return 'Sales Inbox & AI Assistant';
       case 'sales_inventory': return 'Unit Inventory, Visit Slots & Payment Plans';
       case 'sales_approvals': return 'Approvals';
+      case 'sales_ai_quality': return 'AI Quality & Migration';
       default: return 'Dashboard Overview';
     }
   };
@@ -294,6 +298,7 @@ function DashboardApp() {
             <Route path="/sales-inbox" element={<SalesInboxPage />} />
             <Route path="/inventory" element={<SalesInventoryPage />} />
             <Route path="/approvals" element={<SalesApprovalsPage />} />
+            <Route path="/ai-quality" element={<SalesAIQualityPage />} />
             <Route path="*" element={<Navigate to={defaultRolePath} replace />} />
           </Routes>
         </main>

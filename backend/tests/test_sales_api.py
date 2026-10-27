@@ -167,3 +167,31 @@ def test_website_widget_round_trip(client, sent):
     pulled = client.get("/api/v1/sales/webhooks/website/visitor-123456/messages", headers=secret).json()["messages"]
     assert [m["text"] for m in pulled] == ["Hi! How can I help?"]
     assert client.post("/api/v1/sales/webhooks/website", json={"session_id": "visitor-123456", "text": "x"}).status_code == 401
+
+
+def test_ai_quality_shadow_ratings_and_channel_modes_over_http(client):
+    from app.sales.models import AIShadowPair
+
+    async def seed():
+        async with session_scope() as s:
+            s.add(AIShadowPair(tenant_id=settings.default_tenant_id, legacy_conversation_id="w1", channel="website",
+                               customer_text="Gulshan e flat?", legacy_reply="old", sales_reply="new", sales_outcome="drafted"))
+
+    client.portal.call(seed)
+    pairs = client.get("/api/v1/sales/shadow/pairs?rated=false", headers=VIEWER).json()["pairs"]
+    assert len(pairs) == 1
+    assert client.post(f"/api/v1/sales/shadow/pairs/{pairs[0]['pair_id']}/rating", json={"rating": "better"}, headers=VIEWER).status_code == 403
+    rated = client.post(f"/api/v1/sales/shadow/pairs/{pairs[0]['pair_id']}/rating", json={"rating": "better", "note": "clearer"}, headers=AGENT)
+    assert rated.status_code == 200 and rated.json()["pair"]["rating"] == "better"
+
+    quality = client.get("/api/v1/sales/ai-quality", headers=VIEWER).json()
+    assert quality["comparison"]["better"] == 1 and quality["routing"]["ai_route_via_sales"] == "legacy"
+    assert quality["ready_to_retire_legacy"] is False
+
+    assert client.patch("/api/v1/sales/settings", json={"channel_modes": {"email": "live"}}, headers=AGENT).status_code == 403
+    changed = client.patch("/api/v1/sales/settings", json={"channel_modes": {"email": "live", "website": "draft_only"}}, headers=MANAGER)
+    assert changed.status_code == 200 and changed.json()["settings"]["channel_modes"]["website"] == "draft_only"
+    assert client.patch("/api/v1/sales/settings", json={"channel_modes": {"email": "maybe"}}, headers=MANAGER).status_code == 422
+
+    run = client.post("/api/v1/sales/content/drafts/run", headers=MANAGER)
+    assert run.status_code == 200 and run.json() == {"created": [], "skipped_pending": []}

@@ -99,7 +99,7 @@ async def decide(
         raise SalesError("INVALID_DECISION", "Decision must be APPROVED or REJECTED")
     if approval.requested_by == actor:
         raise SalesError("SELF_APPROVAL", "You can't decide a request you raised yourself", 403)
-    lead = await session.get(SalesLead, approval.lead_id)
+    lead = await session.get(SalesLead, approval.lead_id) if approval.lead_id else None
     unit = await session.get(PropertyUnit, approval.unit_id) if approval.unit_id else None
     if decision == "APPROVED" and approval.kind == "UNIT_HOLD":
         # The unit must still be exactly as it was when the request was raised.
@@ -112,9 +112,10 @@ async def decide(
         await hold_unit(session, unit, lead.lead_id, hold_hours, actor)
     approval.status, approval.decided_by, approval.decided_at = decision, actor, now_utc()
     approval.decision_reason = (reason or "").strip() or None
-    await add_event(session, lead, "approval_decided", actor, {
-        "approval_id": approval.approval_id, "kind": approval.kind, "decision": decision, "reason": approval.decision_reason,
-    })
+    if lead is not None:
+        await add_event(session, lead, "approval_decided", actor, {
+            "approval_id": approval.approval_id, "kind": approval.kind, "decision": decision, "reason": approval.decision_reason,
+        })
     await session.flush()
     return approval_to_dict(approval, lead, unit)
 
@@ -122,7 +123,7 @@ async def decide(
 async def list_approvals(session: AsyncSession, tenant_id: str, status: Optional[str] = "PENDING") -> list[dict]:
     stmt = (
         select(SalesApproval, SalesLead)
-        .join(SalesLead, SalesLead.lead_id == SalesApproval.lead_id)
+        .outerjoin(SalesLead, SalesLead.lead_id == SalesApproval.lead_id)
         .where(SalesApproval.tenant_id == tenant_id)
     )
     if status:

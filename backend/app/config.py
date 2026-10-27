@@ -80,6 +80,22 @@ class Settings(BaseSettings):
     # Sales engine worker: run the job worker inside the web process (single-instance deployments only)
     sales_worker_in_process: bool = False
 
+    # AI workflow migration: which pipeline answers the old entry points (/api/v1/ai/chat, the conversations AI
+    # reply, the automation hook). "legacy" = the old LangGraph pipeline; "shadow" = it still answers while the
+    # sales assistant drafts beside it for comparison; "sales" = the sales pipeline answers.
+    ai_route_via_sales: str = "legacy"
+    # Inbound email goes into the sales pipeline (drafts only unless the email channel is set live)
+    email_via_sales: bool = False
+    # Public comments get a fixed reply and a DM invite; the DM becomes a sales lead
+    social_via_sales: bool = False
+    # Extra LLM moderation and safety calls in the old pipeline. Off by default: the deterministic policy engine
+    # runs either way. When on, they fail closed (an error or timeout hands the chat to staff).
+    legacy_llm_safety_checks: bool = False
+    legacy_llm_check_timeout_s: float = 5.0
+    # Chat completions: one retry and a 10 s timeout; the sales assistant's 25 s turn budget is the outer limit
+    llm_timeout_s: float = 10.0
+    llm_max_attempts: int = 2
+
     # Meta / Facebook / Instagram Graph API Settings
     facebook_page_id: Optional[str] = None
     facebook_page_access_token: Optional[str] = None

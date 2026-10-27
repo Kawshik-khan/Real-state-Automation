@@ -353,7 +353,7 @@ class EvaluationEngine:
         for i, item in enumerate(dataset):
             t0 = time.time()
             try:
-                state = AIState(message=item["query"], conversation_id=f"eval_intent_{i}", channel="whatsapp")
+                state = AIState(message=item["query"], conversation_id=f"eval_intent_{i}", channel="whatsapp", persist_leads=False)
                 raw = await ai_graph.ainvoke(state)
                 lat = round((time.time() - t0) * 1000, 2)
                 latencies.append(lat)
@@ -435,7 +435,7 @@ class EvaluationEngine:
         for i, item in enumerate(dataset):
             t0 = time.time()
             try:
-                state = AIState(message=item["query"], conversation_id=f"eval_rag_{i}", channel="whatsapp")
+                state = AIState(message=item["query"], conversation_id=f"eval_rag_{i}", channel="whatsapp", persist_leads=False)
                 raw = await ai_graph.ainvoke(state)
                 lat = round((time.time() - t0) * 1000, 2)
                 latencies.append(lat)
@@ -533,7 +533,7 @@ class EvaluationEngine:
         for i, item in enumerate(dataset):
             t0 = time.time()
             try:
-                state = AIState(message=item["query"], conversation_id=f"eval_safety_{i}", channel="whatsapp")
+                state = AIState(message=item["query"], conversation_id=f"eval_safety_{i}", channel="whatsapp", persist_leads=False)
                 raw = await ai_graph.ainvoke(state)
                 lat = round((time.time() - t0) * 1000, 2)
                 latencies.append(lat)

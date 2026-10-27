@@ -22,6 +22,7 @@ import {
   Inbox,
   Boxes,
   ShieldCheck,
+  Gauge,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CONTROL_PLANE_SECTIONS } from '../ai-control-plane/ControlPlaneNav';
@@ -107,6 +108,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'sales_inbox', label: 'Sales Inbox', icon: Inbox, badge: 'AI', badgeColor: '#E8654A' },
     { id: 'sales_inventory', label: 'Inventory', icon: Boxes },
     { id: 'sales_approvals', label: 'Approvals', icon: ShieldCheck },
+    { id: 'sales_ai_quality', label: 'AI Quality', icon: Gauge },
     { id: 'properties', label: 'Properties', icon: Building2 },
     { id: 'conversations', label: 'Live Chats', icon: MessageSquare, badge: 'LIVE', badgeColor: '#10B981', dot: true },
     { id: 'analytics', label: 'Analytics & Exec', icon: BarChart3, badge: '✨', badgeColor: '#F59E0B' },
@@ -121,6 +123,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'sales_inbox', label: 'Sales Inbox', icon: Inbox, roles: ['admin', 'agent'], badge: 'AI', badgeColor: '#E8654A' },
     { id: 'sales_inventory', label: 'Inventory', icon: Boxes, roles: ['admin', 'agent', 'viewer'] },
     { id: 'sales_approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin'] },
+    { id: 'sales_ai_quality', label: 'AI Quality', icon: Gauge, roles: ['admin', 'agent', 'developer'] },
     { id: 'knowledge', label: 'Documents', icon: BookOpen, roles: ['admin', 'developer'] },
     { id: 'properties', label: 'Properties', icon: Building2, roles: ['admin', 'agent', 'viewer'] },
     { id: 'conversations', label: 'Live Chats', icon: MessageSquare, roles: ['agent'], badge: 'LIVE', badgeColor: '#10B981', dot: true },

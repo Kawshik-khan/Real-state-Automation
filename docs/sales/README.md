@@ -2,9 +2,9 @@
 
 The sales engine replaces the n8n lead, booking and follow-up workflows with code in this repo:
 
-- **`backend/app/sales/`** — lead pipeline, unit inventory, site visits, follow-ups, approvals, the AI sales assistant (LangGraph) and its governed tools.
+- **`backend/app/sales/`** — lead pipeline, unit inventory, site visits, follow-ups, approvals, the AI sales assistant (LangGraph) and its governed tools, and the routing that moves the old chatbot's entry points onto it (`entry.py`).
 - **`backend/app/worker.py`** — the job worker (Procrastinate on Postgres): agent turns, visit reminders, no-show checks, follow-ups, unit-match alerts, the 08:00 daily digest, the stale-lead sweep and hold expiry.
-- **Dashboard** — Pipeline, Sales Inbox (with assistant settings and follow-up sequences), Inventory and Approvals.
+- **Dashboard** — Pipeline, Sales Inbox (with assistant settings and follow-up sequences), Inventory, Approvals and AI Quality.
 
 n8n keeps running untouched until each flow is verified here (plan Phase 3 and 5).
 
@@ -86,10 +86,47 @@ Switch modes and channels on the Sales Inbox → Settings & follow-ups. **Emerge
 5. The grounding gate blocks any reply stating a price, unit code, year or time that wasn't in this turn's tool results, any discount promise, and availability claims without a unit lookup. A blocked reply becomes a handoff.
 6. Live mode sends the reply; shadow mode stores a draft. Every turn is recorded in `sales_agent_turns`.
 
+## Moving the old chatbot onto the sales pipeline
+
+The old LangGraph pipeline (`app/agents/graph.py`) still answers `/api/v1/ai/chat`, the conversations AI reply and the
+automation hook until the sales assistant has proved itself. One environment variable moves them:
+
+| `AI_ROUTE_VIA_SALES` | What happens |
+| --- | --- |
+| `legacy` (default) | The old pipeline answers. Booking requests and hot leads it sees are still written to the sales pipeline as lead events. |
+| `shadow` | The old pipeline answers; the sales assistant drafts a reply to the same message. Each pair appears on **AI Quality** for staff to rate better / same / worse. |
+| `sales` | The sales assistant answers wherever it is live for that channel. Where it isn't live yet, the old pipeline answers and a comparison is stored. |
+
+Other switches:
+
+| Variable | Effect |
+| --- | --- |
+| `EMAIL_VIA_SALES=true` | Inbound email (`/api/v1/email/incoming`) becomes a lead message; the assistant drafts replies (email is **draft only** unless a manager sets it live under Sales Inbox → Settings). Sending uses `GMAIL_USER_EMAIL` / `GMAIL_APP_PASSWORD`. |
+| `SOCIAL_VIA_SALES=true` | A public comment gets a fixed thank-you (never prices in public) and a DM invite; the commenter becomes a lead whose DMs go to the assistant. |
+| `LEGACY_LLM_SAFETY_CHECKS=true` | Re-enables the old pipeline's extra AI moderation and safety calls. They fail closed: an error or timeout hands the chat to staff. Off by default; the rule-based policy engine runs either way. |
+| `LLM_TIMEOUT_S`, `LLM_MAX_ATTEMPTS` | Chat completion timeout (10 s) and attempts (2). |
+
+**AI Quality** (`/ai-quality`) shows who answers customers, the side-by-side replies to rate, and the retirement checks:
+at least 50 rated comparisons, sales reply worse in under 10%, better or the same in at least 85%, and over at least
+1,000 assistant turns a median of ≤ 2 AI calls per message, ≤ 3 for 95%, a reply within 8 s for 95%, and fewer than 10
+grounding blocks per 100 replies. The old pipeline and its agents are deleted only when every check is met.
+
+Assistant evals with known inventory (run as their own process):
+
+```bash
+python -m app.evals.sales_evals                  # grounding, multi_intent, profile_revision, language, adversarial
+python -m app.evals.sales_evals --suite grounding --json report.json
+```
+
+Marketing posts: every Sunday 10:00 the worker drafts one post per project with new units, built from inventory facts
+(an AI rewrite is kept only if it adds no fact). Each is a **Marketing post** on Approvals; approving marks it ready to
+publish, nothing is posted automatically. "Draft posts now" on Approvals runs it on demand.
+
 ## Tests
 
 ```bash
-pytest backend/tests/test_sales_services.py backend/tests/test_sales_agent.py backend/tests/test_sales_api.py
+pytest backend/tests/test_sales_services.py backend/tests/test_sales_agent.py backend/tests/test_sales_api.py \
+       backend/tests/test_ai_workflow_fixes.py backend/tests/test_ai_workflow_migration.py
 ```
 
 They run on SQLite with an in-memory job queue and a scripted model — no Postgres, network or API key needed.

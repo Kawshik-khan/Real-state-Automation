@@ -19,6 +19,7 @@ from app.sales import (
     followups,
     leads,
     messaging,
+    shadow,
     units,
     visits,
     workflows,
@@ -259,9 +260,13 @@ class ProfileUpdate(BaseModel):
     budget_min_bdt: Optional[int] = Field(None, ge=0)
     budget_max_bdt: Optional[int] = Field(None, ge=0)
     preferred_areas: Optional[list[str]] = None
+    excluded_areas: Optional[list[str]] = None
+    must_have: Optional[list[str]] = None
+    deal_breakers: Optional[list[str]] = None
     bedrooms: Optional[int] = Field(None, ge=1, le=10)
     timeline: Optional[str] = Field(None, max_length=60)
     purpose: Optional[str] = Field(None, max_length=64)
+    financing: Optional[Literal["cash", "home_loan", "installments", "undecided"]] = None
 
 
 @router.patch("/leads/{lead_id}")
@@ -461,6 +466,7 @@ async def get_assistant_settings(user: dict = Depends(can_read), session: AsyncS
 class SettingsUpdate(BaseModel):
     mode: Optional[Literal["off", "shadow", "live"]] = None
     enabled_channels: Optional[list[str]] = None
+    channel_modes: Optional[dict[str, Literal["live", "draft_only"]]] = None
     kill_switch: Optional[bool] = None
     daily_token_budget: Optional[int] = Field(None, ge=0)
     hold_hours: Optional[int] = Field(None, ge=1, le=168)
@@ -476,3 +482,46 @@ async def patch_assistant_settings(body: SettingsUpdate, user: dict = Depends(ca
 @router.post("/digest/preview")
 async def digest_preview(user: dict = Depends(can_manage), session: AsyncSession = Depends(get_sales_session)):
     return {"text": await workflows.build_digest(_tenant(user))}
+
+
+# ── Shadow comparison and AI quality (retiring the old pipeline) ──────
+
+@router.get("/shadow/pairs")
+async def get_shadow_pairs(
+    rated: Optional[bool] = Query(None), limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(can_read), session: AsyncSession = Depends(get_sales_session),
+):
+    return {"pairs": await shadow.list_pairs(session, _tenant(user), rated=rated, limit=limit)}
+
+
+class PairRating(BaseModel):
+    rating: Literal["better", "same", "worse"]
+    note: Optional[str] = Field(None, max_length=500)
+
+
+@router.post("/shadow/pairs/{pair_id}/rating")
+async def post_shadow_rating(pair_id: str, body: PairRating, user: dict = Depends(can_work), session: AsyncSession = Depends(get_sales_session)):
+    return {"pair": await shadow.rate_pair(session, _tenant(user), pair_id, body.rating, _actor(user), body.note)}
+
+
+@router.get("/ai-quality")
+async def get_ai_quality(days: int = Query(14, ge=1, le=90), user: dict = Depends(can_read), session: AsyncSession = Depends(get_sales_session)):
+    from app.config import settings as app_settings
+    from app.sales import entry
+
+    report = await shadow.quality_report(session, _tenant(user), days=days)
+    report["routing"] = {
+        "ai_route_via_sales": entry.route(),
+        "email_via_sales": app_settings.email_via_sales,
+        "social_via_sales": app_settings.social_via_sales,
+        "legacy_llm_safety_checks": app_settings.legacy_llm_safety_checks,
+    }
+    return report
+
+
+@router.post("/content/drafts/run")
+async def run_content_drafts(days: int = Query(7, ge=1, le=60), user: dict = Depends(can_manage)):
+    """Draft marketing posts for projects with new units now (the weekly job does the same every Sunday)."""
+    from app.sales.content import draft_weekly_posts
+
+    return await draft_weekly_posts(_tenant(user), days=days)

@@ -8,15 +8,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.sales.db import DHAKA, now_utc
 from app.sales.errors import SalesError
 from app.sales.leads import iso
-from app.sales.models import CHANNELS, SalesAgentSettings, SalesAgentTurn
+from app.sales.models import CHANNEL_MODES, CHANNELS, DEFAULT_CHANNEL_MODES, SalesAgentSettings, SalesAgentTurn
 
 MODES = ("off", "shadow", "live")
+
+
+def channel_modes(s: SalesAgentSettings) -> dict:
+    return {**DEFAULT_CHANNEL_MODES, **(s.channel_modes or {})}
+
+
+def effective_mode(s: SalesAgentSettings, channel: str) -> str:
+    """What the assistant does on one channel: off, shadow (drafts for staff) or live (sends)."""
+    if s.kill_switch or s.mode == "off" or channel not in (s.enabled_channels or []):
+        return "off"
+    if s.mode == "shadow":
+        return "shadow"
+    return "shadow" if channel_modes(s).get(channel, "live") == "draft_only" else "live"
 
 
 def settings_to_dict(s: SalesAgentSettings) -> dict:
     return {
         "mode": s.mode,
         "enabled_channels": s.enabled_channels or [],
+        "channel_modes": {c: channel_modes(s).get(c, "live") for c in CHANNELS},
         "kill_switch": s.kill_switch,
         "daily_token_budget": s.daily_token_budget,
         "hold_hours": s.hold_hours,
@@ -47,6 +61,12 @@ async def update_settings(session: AsyncSession, tenant_id: str, fields: dict, a
         if bad:
             raise SalesError("INVALID_CHANNEL", f"Unknown channels: {', '.join(bad)}")
         row.enabled_channels = list(fields["enabled_channels"])
+    if "channel_modes" in fields:
+        modes = dict(fields["channel_modes"] or {})
+        bad = [c for c in modes if c not in CHANNELS] + [m for m in modes.values() if m not in CHANNEL_MODES]
+        if bad:
+            raise SalesError("INVALID_CHANNEL_MODE", f"Unknown channels or modes: {', '.join(map(str, bad))}")
+        row.channel_modes = {**channel_modes(row), **modes}
     if "kill_switch" in fields:
         row.kill_switch = bool(fields["kill_switch"])
     if "daily_token_budget" in fields:

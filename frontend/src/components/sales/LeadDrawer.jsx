@@ -33,7 +33,13 @@ function describe(event) {
   const p = event.payload || {};
   if (event.type === 'stage_change') return `${stageLabel(p.from)} → ${stageLabel(p.to)}${p.lost_reason ? ` (${p.lost_reason})` : ''}`;
   if (event.type === 'note') return p.text;
-  if (event.type === 'profile_updated') return Object.keys(p).join(', ');
+  if (event.type === 'profile_updated') {
+    const revised = new Set(Object.keys(p.previous || {}).filter((k) => {
+      const before = p.previous[k];
+      return before !== null && before !== undefined && !(Array.isArray(before) && before.length === 0);
+    }));
+    return Object.keys(p).filter((k) => k !== 'previous').map((k) => (revised.has(k) ? `${k} (revised)` : k)).join(', ');
+  }
   if (p.status) return `${p.status}${p.error ? ` — ${p.error}` : ''}`;
   if (p.reason) return p.reason;
   return '';
@@ -102,7 +108,11 @@ export default function LeadDrawer({ leadId, role, onClose, onChanged }) {
                 <div><Phone size={12} /> {lead.phone || 'No phone yet'}</div>
                 <div>Budget: {lead.budget_max_bdt ? `${lead.budget_min_bdt ? `${formatBdt(lead.budget_min_bdt)}–` : 'up to '}${formatBdt(lead.budget_max_bdt)}` : 'unknown'}</div>
                 <div>Areas: {lead.preferred_areas?.length ? lead.preferred_areas.join(', ') : 'unknown'}</div>
+                {lead.excluded_areas?.length > 0 && <div>Not interested in: {lead.excluded_areas.join(', ')}</div>}
                 <div>Bedrooms: {lead.bedrooms || 'unknown'} · Timeline: {lead.timeline || 'unknown'}</div>
+                {lead.must_have?.length > 0 && <div>Must have: {lead.must_have.join(', ')}</div>}
+                {lead.deal_breakers?.length > 0 && <div>Deal breakers: {lead.deal_breakers.join(', ')}</div>}
+                {lead.financing && <div>Financing: {lead.financing.replace('_', ' ')}</div>}
                 <div>Next follow-up: {formatWhen(lead.next_followup_at)}</div>
               </div>
             </div>

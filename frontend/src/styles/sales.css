@@ -381,3 +381,90 @@
   background: rgba(232, 101, 74, 0.1);
   color: var(--primary-coral);
 }
+
+/* AI quality: routing, retirement checks and side-by-side replies */
+.sales-route {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+
+.sales-gate-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 0;
+  font-size: 0.86rem;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.sales-gate-row:last-child {
+  border-bottom: none;
+}
+
+.sales-kpi-of {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.sales-compare-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-glass);
+}
+
+.sales-compare-question {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.sales-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.sales-compare-col {
+  background: var(--bg-main);
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sales-compare-new {
+  border-color: var(--primary-coral);
+}
+
+.sales-compare-text {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sales-compare-text,
+.sales-post-text {
+  font-size: 0.87rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  white-space: pre-wrap;
+}
+
+.sales-post-text {
+  background: var(--bg-main);
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  padding: var(--space-3) var(--space-4);
+  margin: 4px 0;
+}

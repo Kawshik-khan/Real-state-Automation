@@ -94,3 +94,10 @@ async def init_db():
         # Create all tables defined in Base.metadata
         await conn.run_sync(Base.metadata.create_all)
 
+        # Columns added to existing sales tables after they first shipped (create_all never alters a table)
+        if conn.dialect.name == "postgresql":
+            from app.sales.schema_upgrades import upgrade_statements
+
+            for statement in upgrade_statements():
+                await conn.execute(text(statement))
+

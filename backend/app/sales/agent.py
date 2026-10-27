@@ -26,7 +26,7 @@ from app.sales.db import now_utc, session_scope
 from app.sales.grounding import check_reply
 from app.sales.leads import lead_to_dict
 from app.sales.models import PropertyUnit, SalesAgentTurn, SalesConversation, SalesLead, SalesMessage
-from app.sales.prompts import BLOCKED_REPLY, HANDOFF_REPLY, SYSTEM_PROMPT, profile_summary
+from app.sales.prompts import BLOCKED_REPLY, HANDOFF_REPLY, SYSTEM_PROMPT, language_hint, profile_summary
 from app.sales.tools import openai_tool_definitions, sales_tools
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ RATE_WINDOW = timedelta(minutes=10)
 RATE_LIMIT_TURNS = 20
 # In shadow mode the assistant only reads and records what it learned; it can't book, hand off or raise approvals.
 SHADOW_TOOLS = {"list_projects", "search_units", "get_unit", "calc_payment_plan", "get_project_docs",
-                "free_visit_slots", "update_lead_profile"}
+                "get_project_facts", "get_policy", "free_visit_slots", "update_lead_profile"}
 SHADOW_NOTE = ("Shadow mode: staff will review your reply before anything is sent. You can't book visits, hand off "
                "or raise approvals in this mode; say what you would do next (for example, offer the free slots).")
 
@@ -271,7 +271,8 @@ def _history_messages(history: list[SalesMessage], pending_ids: set[str]) -> lis
     return out
 
 
-async def run_turn(conversation_id: str) -> TurnResult:
+async def run_turn(conversation_id: str, *, force_shadow: bool = False) -> TurnResult:
+    """One assistant turn. ``force_shadow`` stores a draft even where the assistant is live (shadow comparison)."""
     started = time.perf_counter()
     async with session_scope() as session:
         conv = await session.get(SalesConversation, conversation_id)
@@ -288,7 +289,8 @@ async def run_turn(conversation_id: str) -> TurnResult:
         if not customer_text.strip():
             return TurnResult("skipped", "nothing to answer")
         lead = await session.get(SalesLead, conv.lead_id)
-        tenant_id, lead_id, mode = conv.tenant_id, lead.lead_id, settings.mode
+        tenant_id, lead_id = conv.tenant_id, lead.lead_id
+        mode = "shadow" if force_shadow else agent_settings.effective_mode(settings, conv.channel)
 
         limit_reason = None
         if await agent_settings.turns_since(session, conversation_id, now_utc() - RATE_WINDOW) >= RATE_LIMIT_TURNS:
@@ -308,6 +310,7 @@ async def run_turn(conversation_id: str) -> TurnResult:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "system", "content": profile_summary(lead_to_dict(lead))},
             *([{"role": "system", "content": SHADOW_NOTE}] if mode == "shadow" else []),
+            *([{"role": "system", "content": hint}] if (hint := language_hint(customer_text)) else []),
             *_history_messages(history, {m.message_id for m in pending}),
             {"role": "user", "content": customer_text},
         ]

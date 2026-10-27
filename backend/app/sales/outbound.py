@@ -50,6 +50,8 @@ async def send(channel: str, external_id: str, text: str, whatsapp_template: Opt
             return await _send_messenger(external_id, text)
         if channel == "telegram":
             return await _send_telegram(external_id, text)
+        if channel == "email":
+            return await _send_email(external_id, text)
         return OutboundResult(status="not_sent", error=f"UNKNOWN_CHANNEL:{channel}")
     except Exception as exc:  # network errors, bad JSON
         logger.error("[sales.outbound] %s send failed: %s", channel, exc)
@@ -104,3 +106,36 @@ async def _send_telegram(chat_id: str, text: str) -> OutboundResult:
         message = result.get("result") or {}
         return OutboundResult(status="sent", provider_message_id=str(message.get("message_id", "")) or None)
     return OutboundResult(status="not_sent", error=str(result.get("error") or result.get("data"))[:500])
+
+
+EMAIL_SUBJECT = "Your enquiry with GLG Assets"
+
+
+async def _send_email(address: str, text: str) -> OutboundResult:
+    """Plain-text email over the configured Gmail SMTP account (GMAIL_USER_EMAIL / GMAIL_APP_PASSWORD)."""
+    import asyncio
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.utils import make_msgid
+
+    from app.services.email_service import email_service
+
+    user, password = email_service._get_gmail_credentials()
+    if not user or not password:
+        return OutboundResult(status="not_sent", error="EMAIL_NOT_CONFIGURED")
+    if "@" not in address:
+        return OutboundResult(status="not_sent", error="INVALID_EMAIL_ADDRESS")
+    msg = MIMEText(text, "plain", "utf-8")
+    msg["From"] = f"GLG Assets <{user}>"
+    msg["To"] = address
+    msg["Subject"] = EMAIL_SUBJECT
+    msg["Message-ID"] = make_msgid(domain=user.split("@")[-1])
+
+    def deliver() -> None:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.starttls()
+            server.login(user, password)
+            server.sendmail(user, [address], msg.as_string())
+
+    await asyncio.to_thread(deliver)
+    return OutboundResult(status="sent", provider_message_id=msg["Message-ID"])
