@@ -1,7 +1,8 @@
 """Service Integrations & Secrets Management Hub (Database + Encryption + Hot-Reloading).
 
 Allows developers and admins to connect and rotate third-party credentials (Groq, Pinecone,
-Telegram, Gmail, LangSmith, WhatsApp) directly from the UI without modifying `.env` or redeploying.
+Telegram, Gmail, LangSmith, WhatsApp, Meta/Google/TikTok Ads) directly from the UI without
+modifying `.env` or redeploying.
 Credentials are encrypted at rest with AES-256-GCM / Authenticated Keystream Cipher in PostgreSQL.
 """
 
@@ -97,7 +98,50 @@ INTEGRATION_CATALOG = {
             {"key": "verify_token", "label": "Webhook Verify Token", "type": "text", "placeholder": "glg_wa_verify_2026", "required": False},
         ],
     },
+    "meta_ads": {
+        "service_key": "meta_ads",
+        "display_name": "Meta Ads (Facebook & Instagram)",
+        "category": "advertising",
+        "description": "Read-only Marketing API access: daily campaign spend, impressions, reach, leads and organic post insights.",
+        "docs_url": "https://business.facebook.com/settings/system-users",
+        "fields": [
+            {"key": "access_token", "label": "System User Access Token (ads_read)", "type": "password", "placeholder": "EAA...", "required": True},
+            {"key": "ad_account_ids", "label": "Ad Account IDs (comma-separated)", "type": "text", "placeholder": "act_1234567890", "required": True},
+            {"key": "app_secret", "label": "App Secret (for appsecret_proof)", "type": "password", "placeholder": "", "required": False},
+            {"key": "page_id", "label": "Facebook Page ID (organic posts)", "type": "text", "placeholder": "10234567890", "required": False},
+            {"key": "page_access_token", "label": "Page Access Token (organic posts)", "type": "password", "placeholder": "EAA...", "required": False},
+            {"key": "instagram_account_id", "label": "Instagram Business Account ID", "type": "text", "placeholder": "17841400000000000", "required": False},
+        ],
+    },
+    "google_ads": {
+        "service_key": "google_ads",
+        "display_name": "Google Ads",
+        "category": "advertising",
+        "description": "Read-only Google Ads API reporting for Search, Display, Performance Max and YouTube campaigns.",
+        "docs_url": "https://developers.google.com/google-ads/api/docs/get-started/dev-token",
+        "fields": [
+            {"key": "developer_token", "label": "Developer Token", "type": "password", "placeholder": "", "required": True},
+            {"key": "client_id", "label": "OAuth Client ID", "type": "text", "placeholder": "....apps.googleusercontent.com", "required": True},
+            {"key": "client_secret", "label": "OAuth Client Secret", "type": "password", "placeholder": "GOCSPX-...", "required": True},
+            {"key": "refresh_token", "label": "OAuth Refresh Token", "type": "password", "placeholder": "1//0...", "required": True},
+            {"key": "login_customer_id", "label": "Manager (MCC) Customer ID", "type": "text", "placeholder": "1234567890", "required": False},
+            {"key": "customer_ids", "label": "Customer IDs (comma-separated)", "type": "text", "placeholder": "1234567890", "required": True},
+        ],
+    },
+    "tiktok_ads": {
+        "service_key": "tiktok_ads",
+        "display_name": "TikTok Ads",
+        "category": "advertising",
+        "description": "Read-only TikTok Business API reporting: spend, impressions, reach, clicks, video views and conversions.",
+        "docs_url": "https://business-api.tiktok.com/portal/docs",
+        "fields": [
+            {"key": "access_token", "label": "Long-term Access Token", "type": "password", "placeholder": "", "required": True},
+            {"key": "advertiser_ids", "label": "Advertiser IDs (comma-separated)", "type": "text", "placeholder": "7000000000000000000", "required": True},
+        ],
+    },
 }
+
+_AD_PLATFORM_BY_SERVICE = {"meta_ads": "meta", "google_ads": "google_ads", "tiktok_ads": "tiktok"}
 
 
 class IntegrationService:
@@ -160,6 +204,10 @@ class IntegrationService:
                     "access_token": token,
                     "verify_token": getattr(settings, "whatsapp_verify_token", "glg_wa_verify_2026"),
                 }
+        elif service_key in _AD_PLATFORM_BY_SERVICE:
+            from app.services.ads.factory import env_credentials
+
+            return env_credentials(_AD_PLATFORM_BY_SERVICE[service_key])
         return {}
 
     def _mask_credentials_dict(self, creds: Dict[str, Any]) -> Dict[str, str]:
@@ -492,6 +540,22 @@ class IntegrationService:
                         message = f"Meta WhatsApp verified for: {display_name}"
                     else:
                         message = f"WhatsApp API token/phone ID invalid (HTTP {resp.status_code})"
+
+            # 7. Ad platforms: fetch every configured account's metadata
+            elif service_key in _AD_PLATFORM_BY_SERVICE:
+                from app.services.ads.factory import connectors_for, has_required
+
+                platform = _AD_PLATFORM_BY_SERVICE[service_key]
+                if not has_required(platform, creds):
+                    message = "Missing required fields for this ad platform."
+                else:
+                    accounts = []
+                    for spec in connectors_for(platform, creds):
+                        account = await spec.connector.fetch_account()
+                        accounts.append(f"{account.name or account.external_account_id} ({account.currency or '?'})")
+                    test_success = bool(accounts)
+                    details = {"accounts": accounts}
+                    message = f"Connected to {len(accounts)} ad account(s): {', '.join(accounts)}"
 
             else:
                 message = f"No automated test runner defined for {service_key}."

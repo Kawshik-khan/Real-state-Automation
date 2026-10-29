@@ -521,10 +521,12 @@ export async function getAnalyticsReport() {
 }
 
 /**
- * Fetch dynamic manager overview analytics and active campaigns
+ * Fetch the manager overview (synced ad spend, leads, tours, AI replies, campaigns)
+ * @param {{ period?: string, include_demo?: boolean }} params
  */
-export async function getManagerOverview() {
-  const response = await fetch(buildApiUrl('/api/v1/analytics/manager-overview'), {
+export async function getManagerOverview(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(buildApiUrl(`/api/v1/analytics/manager-overview${query ? `?${query}` : ''}`), {
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
@@ -534,16 +536,30 @@ export async function getManagerOverview() {
 }
 
 /**
- * Update campaign status (ACTIVE / PAUSED)
+ * Ad platform connection status and last sync results (Meta, Google Ads, TikTok)
  */
-export async function updateCampaignStatus(campaignId, status) {
-  const response = await fetch(buildApiUrl(`/api/v1/analytics/campaigns/${campaignId}/status`), {
-    method: 'PATCH',
+export async function getAdsSyncStatus() {
+  const response = await fetch(buildApiUrl('/api/v1/ads/status'), {
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ status }),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Start a manual ad metrics sync (runs in the background; poll getAdsSyncStatus)
+ * @param {{ platforms?: string[], lookback_days?: number }} body
+ */
+export async function triggerAdsSync(body = {}) {
+  const response = await fetch(buildApiUrl('/api/v1/ads/sync'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(body),
   });
   return handleResponse(response);
 }

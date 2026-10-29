@@ -1,97 +1,113 @@
-"""Automated integration tests for dynamic, database-driven Social Media KPI & Campaign Command Center."""
+"""Social Media KPI & Campaign Command Center endpoint: real synced data only, no fallbacks."""
+
+from datetime import date, timedelta
 
 import pytest
+from ads_fakes import FakeAdsRepository, FakeConnector
 from fastapi.testclient import TestClient
+
+import app.api.v1.analytics.endpoints as analytics_endpoints
+from app.core.security import create_access_token
 from app.main import app
-from app.config import settings
+from app.models.user import UserRole
+from app.services.ads.factory import ConnectorSpec
+from app.services.ads.sync_service import reporting_today, sync_all
+from app.services.ads.types import AdAccount, Campaign, DailyMetric, PeriodReach, SyncPayload
 
 client = TestClient(app)
-HEADERS = {"X-Automation-Secret": settings.automation_shared_secret}
+URL = "/api/v1/analytics/social-kpis"
 
 
-class TestDynamicSocialKpis:
-    def test_get_social_kpis_default(self):
-        """GET /api/v1/analytics/social-kpis with default params returns dynamic DB data."""
-        response = client.get("/api/v1/analytics/social-kpis?period=30d&platform=all", headers=HEADERS)
-        assert response.status_code == 200
-        data = response.json()
+def _headers(role: str) -> dict:
+    token = create_access_token({"sub": f"{role}@glgassets.com", "email": f"{role}@glgassets.com", "role": role,
+                                 "tenant_id": "glg-assets-test"})
+    return {"Authorization": f"Bearer {token}"}
 
-        assert data["success"] is True
-        assert data.get("is_live_db") is True
-        assert "kpis" in data
-        assert "platforms" in data
-        assert "campaigns" in data
-        assert "posts" in data
-        assert "ai_recommendations" in data
 
-        kpis = data["kpis"]
-        assert kpis["total_impressions"] > 0
-        assert kpis["total_reach"] > 0
-        assert kpis["total_engagements"] > 0
-        assert kpis["total_leads_generated"] > 0
-        assert kpis["total_ad_spend"] > 0
-        assert "cost_per_lead" in kpis
-        assert "click_through_rate" in kpis
-        assert "pipeline_roas" in kpis
-        assert "pipeline_value_usd" in kpis
+MANAGER = _headers(UserRole.MANAGER.value)
 
-        # Platforms verification
-        platforms = data["platforms"]
-        assert len(platforms) >= 5
-        platform_ids = [p["id"] for p in platforms]
-        for expected in ["facebook", "instagram", "linkedin", "youtube", "tiktok"]:
-            assert expected in platform_ids
 
-        # Check Facebook platform fields
-        fb = next(p for p in platforms if p["id"] == "facebook")
-        assert fb["reach"] > 0
-        assert fb["leads"] > 0
-        assert fb["ad_spend"] > 0
-        assert "cpl" in fb
+@pytest.fixture
+def repo(monkeypatch):
+    fake = FakeAdsRepository()
+    monkeypatch.setattr(analytics_endpoints, "get_ads_repository", lambda: fake)
+    return fake
 
-        # Posts verification
-        posts = data["posts"]
-        assert len(posts) >= 5
-        for post in posts:
-            assert "id" in post
-            assert "title" in post
-            assert "project" in post
-            assert "platform" in post
-            assert "views" in post
-            assert "likes" in post
-            assert "comments" in post
-            assert "leads_generated" in post
 
-    def test_filter_by_platform_facebook(self):
-        """Filtering by platform=facebook isolates Facebook metrics."""
-        response = client.get("/api/v1/analytics/social-kpis?period=30d&platform=facebook", headers=HEADERS)
-        assert response.status_code == 200
-        data = response.json()
+async def _seed_via_sync(repo: FakeAdsRepository) -> date:
+    today = reporting_today()
+    account = AdAccount("meta", "111", "GLG", "BDT")
+    payload = SyncPayload(
+        account=account,
+        campaigns=[Campaign("meta", "c1", account.id, "GLG Sky Tower Leads", "ACTIVE", "OUTCOME_LEADS", "lead_generation", "BDT")],
+        daily_metrics=[
+            DailyMetric("meta", "c1", today - timedelta(days=1), "facebook", account.id, "BDT", impressions=10000,
+                        clicks=300, spend=5000, leads=10, messaging_conversations=4),
+            DailyMetric("meta", "c1", today - timedelta(days=2), "instagram", account.id, "BDT", impressions=4000,
+                        clicks=100, spend=2000, leads=4),
+            DailyMetric("meta", "c1", today - timedelta(days=40), "facebook", account.id, "BDT", impressions=999,
+                        spend=999, leads=99),  # falls in the previous 30-day window only
+        ],
+        period_reach=[PeriodReach("meta", "__account__", 30, today - timedelta(days=29), today, 9000)],
+    )
+    await sync_all(repo, [ConnectorSpec("meta", "111", FakeConnector(payload))], trigger="manual", lookback_days=90, today=today)
+    return today
 
-        assert data["success"] is True
-        # Platforms should only contain Facebook or have Facebook as the primary focus
-        for p in data["platforms"]:
-            assert p["id"] == "facebook"
 
-        # Posts should be filtered to facebook
-        for post in data["posts"]:
-            assert post["platform"] == "facebook"
+def test_unconfigured_backend_says_so_instead_of_inventing_numbers():
+    # CI has SUPABASE_URL="" so the real factory returns no repository.
+    res = client.get(URL, headers=MANAGER)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["data_source"] == "unconfigured"
+    assert "kpis" not in body
 
-    def test_filter_by_project(self):
-        """Filtering by project_id isolates matching campaigns and posts."""
-        response = client.get("/api/v1/analytics/social-kpis?period=30d&project_id=proj_101", headers=HEADERS)
-        assert response.status_code == 200
-        data = response.json()
 
-        assert data["success"] is True
-        assert "kpis" in data
-        assert len(data["campaigns"]) >= 1
+def test_requires_authentication_and_dashboard_role(repo):
+    assert client.get(URL).status_code == 401
+    assert client.get(URL, headers=_headers(UserRole.DEVELOPER.value)).status_code == 403
+    for role in (UserRole.MANAGER, UserRole.ADMIN, UserRole.AGENT, UserRole.VIEWER):
+        assert client.get(URL, headers=_headers(role.value)).status_code == 200
 
-    def test_period_multiplier(self):
-        """Verify 7d period recalculates KPIs dynamically."""
-        res_30d = client.get("/api/v1/analytics/social-kpis?period=30d", headers=HEADERS).json()
-        res_7d = client.get("/api/v1/analytics/social-kpis?period=7d", headers=HEADERS).json()
 
-        assert res_7d["success"] is True
-        # 7d impressions should be proportionally scaled from 30d
-        assert res_7d["kpis"]["total_impressions"] < res_30d["kpis"]["total_impressions"]
+def test_empty_database_returns_empty_not_seed_numbers(repo):
+    body = client.get(URL, headers=MANAGER).json()
+    assert body["data_source"] == "empty"
+    assert body["demo_available"] is False
+    assert body["kpis"]["leads"] == 0 and body["kpis"]["cpl_bdt"] is None
+    assert body["campaigns"] == [] and body["posts"] == []
+
+
+def test_demo_rows_only_on_request(repo):
+    repo.demo_campaigns = [{"id": "u1", "platform": "facebook", "campaign_name": "Seed", "campaign_type": "lead_generation",
+                            "ad_spend_bdt": 425000, "impressions": 540000, "reach": 420000, "engagements": 32400,
+                            "leads_generated": 268, "is_demo": True}]
+    plain = client.get(URL, headers=MANAGER).json()
+    assert plain["data_source"] == "empty" and plain["demo_available"] is True
+    demo = client.get(URL, params={"include_demo": "true"}, headers=MANAGER).json()
+    assert demo["data_source"] == "demo" and demo["kpis"]["leads"] == 268
+
+
+async def test_synced_rows_flow_to_dashboard_with_real_periods(repo):
+    await _seed_via_sync(repo)
+    body = client.get(URL, params={"period": "30d"}, headers=MANAGER).json()
+    assert body["data_source"] == "live"
+    assert body["last_synced_at"]
+    k = body["kpis"]
+    assert (k["leads"], k["impressions"], k["spend_bdt"]) == (14, 14000, 7000)
+    assert k["cpl_bdt"] == 500.0
+    assert k["reach"] == 9000 and body["reach_method"] == "account_dedup"
+    assert body["deltas"]["leads"] == pytest.approx(round((14 - 99) / 99 * 100, 1))
+    assert [c["id"] for c in body["platforms"]] == ["facebook", "instagram"]
+    assert body["campaigns"][0]["name"] == "GLG Sky Tower Leads"
+
+    week = client.get(URL, params={"period": "7d", "platform": "instagram"}, headers=MANAGER).json()
+    assert week["kpis"]["leads"] == 4 and len(week["time_series"]) == 7
+    assert week["period"]["days"] == 7
+
+
+def test_campaign_status_is_read_only():
+    res = client.patch("/api/v1/analytics/campaigns/cmp-004/status", json={"status": "ACTIVE"},
+                       headers={"X-Automation-Secret": analytics_endpoints.settings.automation_shared_secret})
+    assert res.status_code == 409
+    assert "ad platform" in res.json()["detail"]

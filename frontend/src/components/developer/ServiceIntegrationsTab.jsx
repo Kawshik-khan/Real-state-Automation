@@ -20,6 +20,7 @@ import {
   Mail,
   Activity,
   Sparkles,
+  Megaphone,
   Info
 } from 'lucide-react';
 import {
@@ -36,6 +37,9 @@ const SERVICE_ICONS = {
   gmail: Mail,
   langsmith: Activity,
   whatsapp: Sparkles,
+  meta_ads: Megaphone,
+  google_ads: Megaphone,
+  tiktok_ads: Megaphone,
 };
 
 export default function ServiceIntegrationsTab() {
@@ -200,6 +204,7 @@ export default function ServiceIntegrationsTab() {
     if (categoryFilter === 'AI') return integrations.filter((i) => i.category === 'ai' || i.category === 'vector_db');
     if (categoryFilter === 'COMM') return integrations.filter((i) => i.category === 'communication');
     if (categoryFilter === 'OBS') return integrations.filter((i) => i.category === 'observability' || i.category === 'notifications');
+    if (categoryFilter === 'ADS') return integrations.filter((i) => i.category === 'advertising');
     return integrations;
   }, [integrations, categoryFilter]);
 
@@ -383,10 +388,11 @@ export default function ServiceIntegrationsTab() {
       {/* ── Category Filter Pills ── */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px' }}>
         {[
-          { key: 'ALL', label: 'All Services (6)' },
+          { key: 'ALL', label: `All Services (${integrations.length})` },
           { key: 'AI', label: 'AI & Vector Index' },
           { key: 'COMM', label: 'Communication (Gmail & WhatsApp)' },
           { key: 'OBS', label: 'Alerts & Telemetry (Telegram & LangSmith)' },
+          { key: 'ADS', label: 'Ad Platforms (Meta, Google, TikTok)' },
         ].map((f) => (
           <button
             key={f.key}

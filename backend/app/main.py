@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.ads import router as ads_router
 from app.api.v1.ai.endpoints import ai_chat
 from app.api.v1.ai.endpoints import router as ai_router
 from app.api.v1.ai_control_plane import router as ai_control_plane_router
@@ -142,9 +143,18 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(report_scheduler_worker(check_interval_seconds=60))
     logger.info("[startup] Scheduled report generator & multi-channel delivery worker started.")
 
+    # Ad platform metrics sync (Meta / Google Ads / TikTok). Idle until credentials exist.
+    from app.services.ads.sync_service import ads_sync_worker, stop_ads_sync_worker
+    ads_sync_task = asyncio.create_task(ads_sync_worker(check_interval_seconds=60)) if settings.ads_sync_enabled else None
+
     yield
 
     await _stop_sales_queue(sales_worker_task)
+
+    stop_ads_sync_worker()
+    if ads_sync_task and not ads_sync_task.done():
+        ads_sync_task.cancel()
+
     stop_report_scheduler()
     if scheduler_task and not scheduler_task.done():
         scheduler_task.cancel()
@@ -275,7 +285,7 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
             elif "/knowledge" in path:
                 module = "RAGVectorDB"
             elif "/automation" in path or "/social" in path:
-                module = "n8nWebhook"
+                module = "Automation"
 
             log_streamer.record_log(
                 level=level,
@@ -287,13 +297,6 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
                 latency_ms=latency_ms,
                 client_ip=client_ip
             )
-
-            # Dynamically update n8n workflow telemetry counter on live traffic
-            try:
-                from app.services.n8n_monitoring import N8nMonitoringService
-                N8nMonitoringService.record_live_trigger(path, latency_ms)
-            except Exception:
-                pass
         return response
     except Exception as exc:
         latency_ms = round((time.time() - start_time) * 1000, 2)
@@ -422,6 +425,7 @@ app.include_router(social_router,       prefix="/api/v1/social",       tags=["so
 app.include_router(moderation_router,   prefix="/api/v1/moderation",   tags=["moderation"])
 app.include_router(knowledge_router,    prefix="/api/v1/knowledge",    tags=["knowledge"])
 app.include_router(analytics_router,    prefix="/api/v1/analytics",    tags=["analytics"])
+app.include_router(ads_router,          prefix="/api/v1/ads",          tags=["ads"])
 app.include_router(escalations_router,  prefix="/api/v1/escalations",  tags=["escalations"])
 app.include_router(media_router,        prefix="/api/v1/media",        tags=["media"])
 app.include_router(memory_router,       prefix="/api/v1/memory",       tags=["memory"])
