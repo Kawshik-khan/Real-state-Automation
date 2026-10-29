@@ -1,4 +1,4 @@
-"""Durable jobs on Postgres (Procrastinate). Replaces the n8n schedules and webhooks for the sales flow.
+"""Durable jobs on Postgres (Procrastinate): the schedules and background work for the sales flow.
 
 Run the worker with ``python -m app.worker``. Jobs survive restarts, are retried on failure, and a conversation
 never has two agent turns running at once (``lock``) or more than one waiting (``queueing_lock``).
