@@ -37,7 +37,7 @@ services:
       - ./backend/.env
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-glg_assets}
-      - AUTOMATION_SHARED_SECRET=${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+      # AUTOMATION_SHARED_SECRET / JWT_SECRET / PASSWORD_HASH_SALT come from ./backend/.env (startup refuses defaults)
     depends_on:
       db:
         condition: service_healthy

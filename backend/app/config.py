@@ -5,6 +5,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
+# Secret values that are public (source defaults, compose files, docs) and must never be used in a deployment.
+INSECURE_SECRET_VALUES = frozenset({
+    "glg_assets_default_shared_secret_2026",
+    "glg_assets_default_jwt_secret_key_2026_minimum_32_chars",
+    "glg_assets_default_salt_2026",
+    "glg-secret-key",
+    "change-me-in-production",
+})
+
 
 class Settings(BaseSettings):
     app_name: str = "GLG Assets Automation API"
@@ -26,11 +35,17 @@ class Settings(BaseSettings):
     # Redis / Distributed Cache
     redis_url: Optional[str] = None
 
-    # Security — Core application secrets. Overridden by environment variables or .env in production.
+    # Security — Core application secrets. Must be set via environment variables or .env;
+    # startup refuses the public defaults below unless ALLOW_INSECURE_DEFAULTS=true (local dev only).
     automation_shared_secret: str = "glg_assets_default_shared_secret_2026"
     jwt_secret: str = "glg_assets_default_jwt_secret_key_2026_minimum_32_chars"
     password_hash_salt: str = "glg_assets_default_salt_2026"
+    allow_insecure_defaults: bool = False
     api_key: Optional[str] = None
+
+    # First-run admin account. Created at startup only when no user with this email exists.
+    bootstrap_admin_email: Optional[str] = None
+    bootstrap_admin_password: Optional[str] = None
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
@@ -124,6 +139,15 @@ class Settings(BaseSettings):
         if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
             return "postgresql+asyncpg://" + url[len("postgresql://"):]
         return url
+
+    def insecure_secret_settings(self) -> list[str]:
+        """Names of core secrets that are empty or set to a publicly known value."""
+        secrets = {
+            "AUTOMATION_SHARED_SECRET": self.automation_shared_secret,
+            "JWT_SECRET": self.jwt_secret,
+            "PASSWORD_HASH_SALT": self.password_hash_salt,
+        }
+        return [name for name, value in secrets.items() if not value or value in INSECURE_SECRET_VALUES]
 
     @property
     def allowed_origins(self) -> list[str]:

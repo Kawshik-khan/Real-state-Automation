@@ -62,6 +62,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    insecure_secrets = settings.insecure_secret_settings()
+    if insecure_secrets:
+        message = f"Refusing insecure default values for: {', '.join(insecure_secrets)}. Set them in the environment."
+        if not settings.allow_insecure_defaults:
+            raise RuntimeError(message)
+        logger.warning(f"[startup] {message} (ALLOW_INSECURE_DEFAULTS=true — local development only)")
+
     logger.info(f"[startup] {settings.app_name} — Initializing database connection...")
     from app.database import check_connection, init_db
     from app.services.supabase_db import supabase_db
@@ -74,7 +81,7 @@ async def lifespan(app: FastAPI):
             from app.services.integration_service import integration_service
             from app.services.user_service import user_service
             await token_store.cleanup_expired_tokens()
-            await user_service.seed_default_users()
+            await user_service.bootstrap_admin()
             await integration_service.warm_cache()
         else:
             supa_health = supabase_db.check_health()
