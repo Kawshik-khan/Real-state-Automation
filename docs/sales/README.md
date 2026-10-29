@@ -6,7 +6,7 @@ The sales engine replaces the n8n lead, booking and follow-up workflows with cod
 - **`backend/app/worker.py`** — the job worker (Procrastinate on Postgres): agent turns, visit reminders, no-show checks, follow-ups, unit-match alerts, the 08:00 daily digest, the stale-lead sweep and hold expiry.
 - **Dashboard** — Pipeline, Sales Inbox (with assistant settings and follow-up sequences), Inventory, Approvals and AI Quality.
 
-n8n keeps running untouched until each flow is verified here (plan Phase 3 and 5).
+The n8n workflows have been removed from the repository; the legacy LangGraph pipeline remains as the fallback (`ai_route_via_sales = legacy`).
 
 ## 1. Database
 
@@ -63,7 +63,7 @@ A channel without credentials is recorded as **not sent** with the reason; nothi
 | Telegram | `https://<backend>/api/v1/sales/webhooks/telegram` | `setWebhook` with `secret_token = TELEGRAM_WEBHOOK_SECRET` |
 | Website chat widget | `POST /api/v1/sales/webhooks/website`, poll `GET /api/v1/sales/webhooks/website/{session_id}/messages` | Called by the site's backend with `X-Automation-Secret` |
 
-Move one channel at a time and keep the n8n path ready to switch back (plan risk table).
+Move one channel at a time and keep the legacy pipeline (`ai_route_via_sales = legacy`) ready to switch back (plan risk table).
 
 ## 6. Rollout
 

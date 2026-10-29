@@ -1,4 +1,4 @@
-"""Automation endpoints consumed by n8n workflows.
+"""Automation endpoints consumed by internal schedulers and integrations.
 
 All endpoints require X-Automation-Secret and X-Tenant-Id headers.
 """
@@ -32,7 +32,7 @@ async def create_booking(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Receives a booking request from the Booking Calendar n8n workflow.
+    """Receives a booking request from the booking calendar integration.
 
     Expected body fields: name, email, phone, propertyId, tourDate, tourTime, message, source, tenantId
     """
@@ -192,7 +192,7 @@ async def classify_lead(
 async def daily_digest(
     auth: dict = Depends(verify_auth),
 ):
-    """Returns a daily summary of system activity for the Daily Digest n8n workflow.
+    """Returns a daily summary of system activity for the daily digest.
 
     Replace with real DB aggregation queries in production.
     """
@@ -224,7 +224,7 @@ async def ingest_logs(
     body: dict,
     auth: dict = Depends(verify_auth),
 ):
-    """Accepts log entries from n8n workflows for centralized logging."""
+    """Accepts log entries from automation integrations for centralized logging."""
     # TODO: Write to structured log store / DB
     return {"success": True, "logged": True, "tenantId": auth["tenant_id"]}
 
@@ -339,9 +339,4 @@ async def record_idempotency(
         "message_id": message_id,
         "tenantId": auth["tenant_id"],
     }
-
-
-# ==========================================================
-#  N8N WORKFLOW & NODE HEALTH MONITORING
-# ==========================================================
 

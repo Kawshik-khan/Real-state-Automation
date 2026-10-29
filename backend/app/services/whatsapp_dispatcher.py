@@ -1,8 +1,8 @@
 """WhatsApp Notification Dispatcher for GLG Assets.
 
 Handles dispatch of formatted executive intelligence summaries to Admin and Manager
-mobile devices via Meta WhatsApp Cloud API, n8n WhatsApp webhook node, or resilient
-simulated delivery with audit logging.
+mobile devices via Meta WhatsApp Cloud API, or resilient simulated delivery with
+audit logging.
 """
 
 import logging
@@ -34,7 +34,6 @@ class WhatsAppDispatcher:
     def __init__(self):
         self.phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
         self.access_token = os.getenv("WHATSAPP_ACCESS_TOKEN") or getattr(settings, "facebook_page_access_token", None)
-        self.n8n_url = os.getenv("N8N_WHATSAPP_WEBHOOK_URL")
 
     def is_cloud_api_configured(self) -> bool:
         return bool(self.phone_number_id and self.access_token and len(self.access_token) > 20)
@@ -86,32 +85,7 @@ class WhatsAppDispatcher:
             except Exception as e:
                 logger.error(f"[WhatsAppDispatcher] Failed sending via Cloud API: {e}")
 
-        # 2. n8n Automation Webhook
-        if self.n8n_url:
-            try:
-                payload = {
-                    "to": target_phone,
-                    "message": message_text,
-                    "source": "glg-executive-report-scheduler",
-                }
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.post(
-                        self.n8n_url,
-                        json=payload,
-                        headers={"X-Automation-Secret": settings.automation_shared_secret},
-                    )
-                    if resp.status_code in (200, 201, 202):
-                        return {
-                            "success": True,
-                            "status": "sent",
-                            "message_id": f"wa-n8n-{hash(message_text[:20])}",
-                            "target": target_phone,
-                            "details": "Delivered via n8n WhatsApp workflow",
-                        }
-            except Exception as e:
-                logger.error(f"[WhatsAppDispatcher] Failed sending via n8n: {e}")
-
-        # 3. Graceful Local / Development Simulation
+        # 2. Graceful Local / Development Simulation
         sim_id = f"sim-wa-{hash(target_phone + message_text[:10]) % 1000000:06d}"
         logger.info(f"[WhatsAppDispatcher] [SIMULATED SUCCESS] Delivered to {target_phone}: {message_text[:60]}... (ID: {sim_id})")
         return {

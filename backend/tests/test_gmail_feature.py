@@ -95,7 +95,7 @@ async def run_gmail_feature_test():
     # TEST 4: Human Review & Approval Inbox Dispatch
     # -------------------------------------------------------------
     print("\n" + "-" * 50)
-    print("[TEST 4] Dashboard Approval & Outbound Email Dispatch via n8n")
+    print("[TEST 4] Dashboard Approval & Outbound Email Dispatch")
     approve_res = await approve_draft(thread_id="thread-gmail-101", auth={"tenant_id": "glg-assets-main"})
     print(f"   [+] Dispatch Message: {approve_res.get('message')}")
     print(f"   [+] Dispatch Result Status: {approve_res.get('dispatch_result', {}).get('status')}")

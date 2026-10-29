@@ -3,7 +3,7 @@
 > **Google Antigravity Master Project Rulebook (`AGENTS.md`)**  
 > **Platform Version:** 2.4.0-PROD  
 > **Operating System Root:** [`.agents/`](file:///d:/Softwear%20Project/Realstate%20Automation/.agents/)  
-> **Target Architecture:** Supabase Cloud (PostgreSQL 15+ & pgvector), Pinecone Serverless, FastAPI, LangGraph, React 19, n8n
+> **Target Architecture:** Supabase Cloud (PostgreSQL 15+ & pgvector), Pinecone Serverless, FastAPI, LangGraph, React 19
 
 ---
 
@@ -38,7 +38,7 @@ Antigravity loads and executes the following specialized workspace skills locate
 | **`debugging`** | Forensic 10-step workflow for isolating root causes, reproducing defects with regression tests, and minimal fixes. |
 | **`feature-development`** | 13-phase end-to-end workflow for designing, implementing, verifying, and delivering production features. |
 | **`frontend-development`** | React 19 views, composable components, design token adherence, and SSE real-time listeners. |
-| **`integration-development`** | External messaging channels, webhook ingestion, HMAC validation, and n8n cloud automation workflows. |
+| **`integration-development`** | External messaging channels, webhook ingestion, and HMAC validation. |
 | **`migration-review`** | Auditing database schema migrations, backward compatibility, RLS policies, indexes, and rollback plans. |
 | **`performance-audit`** | Profiling latency budgets, database query execution, memory footprint, and vector retrieval speeds. |
 | **`rag-development`** | Document ingestion, 512/64 token chunking, dense pgvector search, sparse FTS, Reciprocal Rank Fusion (k=60), and grounding gates. |

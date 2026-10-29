@@ -7,7 +7,6 @@ import {
   Building2, 
   BarChart3, 
   Terminal, 
-  Workflow,
   Share2,
   Sparkles,
   Sun, 
@@ -132,7 +131,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
     { id: 'developer_console', label: 'Developer', icon: Terminal, roles: ['developer'] },
     { id: 'ai_customization', label: 'AI Studio', icon: SlidersHorizontal, roles: ['developer'], badge: 'PRO', badgeColor: '#E8654A' },
-    { id: 'n8n_monitoring', label: 'n8n Health', icon: Workflow, roles: ['developer'] },
   ];
 
   const isDark = theme === 'dark';

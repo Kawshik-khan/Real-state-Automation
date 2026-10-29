@@ -44,14 +44,14 @@
       },
       {
         "id": "crm-human-takeover",
-        "label": "CRM Sync & Human Escalation",
+        "label": "Sales Engine & Human Escalation",
         "focus": [
           "supervisor",
-          "n8n_crm",
+          "sales_engine",
           "sales_copilot",
           "api_gateway"
         ],
-        "note": "Bi-directional sales workflow: propensity scoring (>=80), n8n CRM event dispatch, and live human takeover."
+        "note": "Bi-directional sales workflow: propensity scoring (>=80), sales-engine lead alerts, and live human takeover."
       }
     ]
   },
@@ -147,10 +147,10 @@
       "tag": "State Machine"
     },
     {
-      "id": "n8n_crm",
-      "type": "cloud",
-      "label": "n8n CRM Engine",
-      "sublabel": "Cal.com & Lead Sync",
+      "id": "sales_engine",
+      "type": "backend",
+      "label": "Sales Engine",
+      "sublabel": "Visits & Follow-ups",
       "pos": [
         650,
         350
@@ -159,7 +159,7 @@
         140,
         58
       ],
-      "tag": "Event Hub"
+      "tag": "Job Queue"
     },
     {
       "id": "property_agent",
@@ -180,7 +180,7 @@
       "id": "legal_agent",
       "type": "backend",
       "label": "Legal & Tour Agent",
-      "sublabel": "RAJUK FAQ & Cal.com",
+      "sublabel": "RAJUK FAQ & Site Visits",
       "pos": [
         850,
         220
@@ -404,9 +404,9 @@
       "toSide": "bottom"
     },
     {
-      "id": "supervisor-to-crm",
+      "id": "supervisor-to-sales",
       "from": "supervisor",
-      "to": "n8n_crm",
+      "to": "sales_engine",
       "label": "hot lead",
       "variant": "dashed",
       "fromSide": "bottom",
@@ -414,10 +414,10 @@
       "labelDy": 50
     },
     {
-      "id": "crm-to-copilot",
-      "from": "n8n_crm",
+      "id": "sales-to-copilot",
+      "from": "sales_engine",
       "to": "sales_copilot",
-      "label": "CRM alert",
+      "label": "lead alert",
       "variant": "dashed",
       "fromSide": "left",
       "toSide": "right"
@@ -451,10 +451,10 @@
     },
     {
       "dot": "rose",
-      "title": "Human-in-the-Loop & CRM Sync",
+      "title": "Human-in-the-Loop & Sales Engine",
       "items": [
         "Autonomous 0-100 propensity scoring escalates high-value buyers to sales executives",
-        "n8n orchestrates Cal.com site visit booking and two-way Google Sheets CRM synchronization"
+        "The in-house sales engine books real site-visit slots and runs follow-ups as durable Postgres jobs"
       ]
     }
   ]

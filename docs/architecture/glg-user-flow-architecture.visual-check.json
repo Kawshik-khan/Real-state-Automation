@@ -6,9 +6,9 @@
   "status": "pass",
   "visualReview": "pending",
   "artifact": {
-    "path": "d:\\Softwear Project\\Realstate Automation\\glg-user-flow-architecture.html",
-    "sha256": "40205c38ff767877a6c0c9cf5f9ef0eece51a59bf91fb0177ea282d50290cea9",
-    "bytes": 828363
+    "path": "docs/architecture/glg-user-flow-architecture.html",
+    "sha256": "60c4dae6fdfa7b88e95ab2dd248ccef697d27470a07341be9512b189a7be4b06",
+    "bytes": 828377
   },
   "state": {
     "detail": "read",

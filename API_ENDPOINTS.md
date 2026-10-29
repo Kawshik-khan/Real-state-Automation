@@ -1,6 +1,6 @@
 # GLG Real Estate Automation — Live API & Webhook Endpoints Directory
 
-This document details all live API endpoints, webhook listeners, n8n Cloud triggers, authentication headers, and request/response specifications across the platform.
+This document details all live API endpoints, webhook listeners, authentication headers, and request/response specifications across the platform.
 
 ---
 
@@ -48,42 +48,28 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 | `POST` | `/api/v1/email/incoming` | Ingest incoming email, trigger AI RAG, evaluate `AUTO_SEND` vs `REQUIRES_APPROVAL` | `{ message_id, thread_id, sender_email, subject, body_text, attachments }` |
 | `GET` | `/api/v1/email/threads` | List all email threads sorted by last activity | `?status=pending_approval` (Optional Query) |
 | `GET` | `/api/v1/email/threads/{thread_id}` | Get complete message history and AI draft details | `{thread_id}` (Path Parameter) |
-| `POST` | `/api/v1/email/threads/{thread_id}/approve` | Approve & dispatch staged AI draft via n8n | `{ edited_subject, edited_reply }` (Optional) |
+| `POST` | `/api/v1/email/threads/{thread_id}/approve` | Approve & dispatch staged AI draft | `{ edited_subject, edited_reply }` (Optional) |
 | `POST` | `/api/v1/email/threads/{thread_id}/edit-and-send` | Edit draft content and dispatch immediately | `{ edited_subject, edited_reply }` |
 | `POST` | `/api/v1/email/threads/{thread_id}/reject` | Reject/discard AI draft for manual agent handling | None |
-| `POST` | `/api/v1/email/threads/dispatch-outbound` | Endpoint called by n8n relays to dispatch outbound email | `{ thread_id, recipient_email, subject, body }` |
+| `POST` | `/api/v1/email/threads/dispatch-outbound` | Endpoint called by automation integrations to dispatch outbound email | `{ thread_id, recipient_email, subject, body }` |
 
 ---
 
-## ⚙️ 4. n8n Automation & System Telemetry (`/api/v1/automation/...`)
+## ⚙️ 4. Automation & System Telemetry (`/api/v1/automation/...`)
 
 | Method | Endpoint | Description | Notes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/automation/n8n/health` | Real-time workflow state, node latency, and system health status | Consumed by Dashboard (`/monitoring`) |
-| `POST` | `/api/v1/automation/n8n/workflows/{workflow_id}/toggle` | Enable or disable specific n8n workflow | `{ active: boolean }` |
-| `POST` | `/api/v1/automation/n8n/workflows/{workflow_id}/test` | Execute real-time latency ping test across workflow nodes | Returns node-by-node execution time breakdown |
 | `POST` | `/api/v1/automation/booking` | Property tour booking ingress | `{ name, email, phone, propertyId, tourDate }` |
 | `POST` | `/api/v1/automation/notify` | Dispatch notifications across channels (Slack, Email, Telegram) | `{ channels: ["slack", "telegram"], message }` |
 | `POST` | `/api/v1/automation/classify` | Lead classification & priority scoring engine | `{ lead_email, message, source }` |
 | `GET` | `/api/v1/automation/daily-digest` | Fetch executive daily automation summary | Returns daily lead counts & AI metrics |
-| `POST` | `/api/v1/automation/logs` | Centralized log ingestion endpoint from n8n workflows | `{ workflow_id, execution_id, level, data }` |
+| `POST` | `/api/v1/automation/logs` | Centralized log ingestion endpoint for automation integrations | `{ workflow_id, execution_id, level, data }` |
 | `POST` | `/api/v1/automation/idempotency/check` | Check if message ID has been processed | `{ message_id }` |
 | `POST` | `/api/v1/automation/idempotency/record` | Record message ID to prevent duplicate processing | `{ message_id }` |
 
 ---
 
-## ☁️ 5. Cloud n8n Active Webhook Triggers (`https://glg-ai.app.n8n.cloud`)
-
-| Workflow Name | Webhook URL | Method | Status |
-| :--- | :--- | :---: | :---: |
-| **GLG Email Reply Automation** | `https://glg-ai.app.n8n.cloud/webhook/glg-email-webhook` | `POST` | **Active / Published** (`sPdLa6ogi2pJifJg`) |
-| **Social AI OS Master** | `https://glg-ai.app.n8n.cloud/webhook/lead-capture` | `POST` | **Active / Published** |
-| **Telegram Ingress Webhook** | `https://glg-ai.app.n8n.cloud/webhook/telegram-ingress` | `POST` | **Active / Published** |
-| **WhatsApp Ingress Webhook** | `https://glg-ai.app.n8n.cloud/webhook/whatsapp-ingress` | `POST` | **Active / Published** |
-
----
-
-## 📱 6. Social Media & Multi-Channel Messaging (`/api/v1/social/...`)
+## 📱 5. Social Media & Multi-Channel Messaging (`/api/v1/social/...`)
 
 | Method | Endpoint | Description | Target Channel |
 | :--- | :--- | :--- | :--- |
@@ -102,7 +88,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 ---
 
-## 📚 7. Knowledge Base & Vector Indexing (`/api/v1/knowledge/...`)
+## 📚 6. Knowledge Base & Vector Indexing (`/api/v1/knowledge/...`)
 
 | Method | Endpoint | Description | Parameters |
 | :--- | :--- | :--- | :--- |
@@ -113,7 +99,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 ---
 
-## 💬 8. Live Customer Conversations & Agent Takeover (`/api/v1/conversations/...`)
+## 💬 7. Live Customer Conversations & Agent Takeover (`/api/v1/conversations/...`)
 
 | Method | Endpoint | Description | Response / Behavior |
 | :--- | :--- | :--- | :--- |
@@ -126,7 +112,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 ---
 
-## 📊 9. Analytics & Reporting (`/api/v1/analytics/...`)
+## 📊 8. Analytics & Reporting (`/api/v1/analytics/...`)
 
 | Method | Endpoint | Description | Key Output |
 | :--- | :--- | :--- | :--- |
@@ -137,7 +123,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 ---
 
-## 🔑 10. User Auth & Identity (`/api/v1/auth/...`)
+## 🔑 9. User Auth & Identity (`/api/v1/auth/...`)
 
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :---: |
@@ -148,7 +134,7 @@ Unless otherwise noted, all automation and internal API endpoints require the fo
 
 ---
 
-## 🔌 11. Real-Time WebSockets (`/api/v1/ws/...`)
+## 🔌 10. Real-Time WebSockets (`/api/v1/ws/...`)
 
 | Method / Protocol | Endpoint | Description |
 | :--- | :--- | :--- |

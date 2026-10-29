@@ -100,12 +100,12 @@ async def trigger_schedule_now(
     }
 
 
-@router.post("/cron-trigger", summary="External n8n / cron trigger endpoint")
+@router.post("/cron-trigger", summary="External cron trigger endpoint")
 async def cron_trigger(
     body: Optional[Dict[str, Any]] = None,
     auth: dict = Depends(require_automation_secret),
 ):
-    """Webhook endpoint for external schedulers (e.g. n8n WF5 Daily Digest) to trigger scheduled reports."""
+    """Webhook endpoint for external schedulers (e.g. a cron job) to trigger scheduled reports."""
     schedule_id = (body or {}).get("schedule_id", "sched-daily-pulse")
     sched = await report_store.get_schedule(schedule_id)
     if not sched:
@@ -116,7 +116,7 @@ async def cron_trigger(
     result = await report_scheduler.generate_and_deliver(
         schedule_id=schedule_id,
         schedule_data=sched,
-        triggered_by="n8n_cron_webhook",
+        triggered_by="cron_webhook",
     )
     return {"success": True, "dispatched": True, "report_id": result.get("id")}
 

@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "GLG Assets Enterprise Agentic Multi-Agent System Architecture",
-    "subtitle": "Production AI-OS: Omnichannel Ingress/Egress, LangGraph Multi-Agent, Hybrid RAG, n8n & Supabase pgvector",
+    "subtitle": "Production AI-OS: Omnichannel Ingress/Egress, LangGraph Multi-Agent, Hybrid RAG, Sales Engine & Supabase pgvector",
     "output": "glg-assets-architecture.html",
     "visual_preset": "blueprint",
     "animation": "trace",
@@ -35,7 +35,7 @@
           "response_builder",
           "hybrid_rrf",
           "reranker",
-          "n8n_workflows",
+          "sales_worker",
           "crm_calendar",
           "supabase_postgres",
           "pgvector_hnsw",
@@ -80,8 +80,8 @@
         "note": "Dense 1536-d HNSW search, sparse FTS, Reciprocal Rank Fusion (k=60), and cross-encoder re-ranking returning context to Groq."
       },
       {
-        "id": "omnichannel-and-n8n",
-        "label": "Omnichannel Ingress/Egress & n8n Hub",
+        "id": "omnichannel-and-sales",
+        "label": "Omnichannel Ingress/Egress & Sales Engine",
         "focus": [
           "web_portal",
           "meta_whatsapp",
@@ -90,10 +90,10 @@
           "api_gateway",
           "security_auth",
           "lead_scorer",
-          "n8n_workflows",
+          "sales_worker",
           "crm_calendar"
         ],
-        "note": "Bi-directional omnichannel messaging: webhooks ingested by n8n, dispatched to LangGraph, and replies sent back to WhatsApp, Meta, and CRM."
+        "note": "Webhooks verified at the FastAPI gateway, answered via LangGraph; hot leads go to the sales engine for visits and follow-ups."
       }
     ]
   },
@@ -429,10 +429,10 @@
       "tag": "Reranker"
     },
     {
-      "id": "n8n_workflows",
-      "type": "cloud",
-      "label": "n8n Cloud Hub",
-      "sublabel": "Workflows WF-001 - 006",
+      "id": "sales_worker",
+      "type": "backend",
+      "label": "Sales Engine Worker",
+      "sublabel": "Postgres Job Queue",
       "pos": [
         1160,
         400
@@ -441,13 +441,13 @@
         160,
         62
       ],
-      "tag": "Workflow Engine"
+      "tag": "app.worker"
     },
     {
       "id": "crm_calendar",
-      "type": "external",
-      "label": "CRM & Calendar Sync",
-      "sublabel": "Google Sheets & Site Tour",
+      "type": "database",
+      "label": "Sales Pipeline",
+      "sublabel": "Leads, Visits & Follow-ups",
       "pos": [
         1160,
         520
@@ -456,7 +456,7 @@
         160,
         62
       ],
-      "tag": "CRM / Calendar"
+      "tag": "Sales Tables"
     },
     {
       "id": "supabase_postgres",
@@ -574,55 +574,7 @@
       "to": "ingress_queue"
     },
     {
-      "from": "meta_whatsapp",
-      "to": "n8n_workflows",
-      "fromSide": "left",
-      "toSide": "left",
-      "via": [
-        [
-          15,
-          291
-        ],
-        [
-          15,
-          680
-        ],
-        [
-          1125,
-          680
-        ],
-        [
-          1125,
-          431
-        ]
-      ]
-    },
-    {
-      "from": "n8n_workflows",
-      "to": "api_gateway",
-      "fromSide": "right",
-      "toSide": "left",
-      "via": [
-        [
-          1355,
-          431
-        ],
-        [
-          1355,
-          70
-        ],
-        [
-          225,
-          70
-        ],
-        [
-          225,
-          351
-        ]
-      ]
-    },
-    {
-      "from": "n8n_workflows",
+      "from": "sales_worker",
       "to": "crm_calendar"
     },
     {
@@ -868,7 +820,7 @@
     },
     {
       "from": "lead_scorer",
-      "to": "n8n_workflows",
+      "to": "sales_worker",
       "fromSide": "bottom",
       "toSide": "left",
       "via": [
@@ -905,14 +857,14 @@
         "Dynamic belief reflection reconciling customer preference updates and intent classification",
         "Domain sub-agents (Property, FAQ/Legal, Email, Social) converging into Grounding Validator",
         "Anti-hallucination verification gate ensuring 100% factual accuracy before egress dispatch",
-        "0-100 Lead Propensity engine triggering hot-lead (>=80) escalation to sales agents & n8n"
+        "0-100 Lead Propensity engine triggering hot-lead (>=80) escalation to sales agents & the sales engine"
       ]
     },
     {
       "dot": "emerald",
-      "title": "Hybrid RAG, n8n Automation & Storage Vault",
+      "title": "Hybrid RAG, Sales Engine & Storage Vault",
       "items": [
-        "Bi-directional n8n cloud automation: ingests webhooks, triggers LangGraph, and syncs CRM",
+        "Sales engine worker runs reminders, follow-ups and digests as durable, retried Postgres jobs",
         "Dual-engine hybrid RRF (k=60): dense pgvector HNSW + sparse PostgreSQL full-text search",
         "Cross-encoder semantic re-ranking with Groq LLaMA 3.3 70B & LoRA fine-tuning adapters",
         "Supabase PostgreSQL 15+ tenant isolation via strict Row-Level Security (RLS) policies"
