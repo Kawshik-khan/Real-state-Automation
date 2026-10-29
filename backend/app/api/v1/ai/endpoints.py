@@ -1,6 +1,6 @@
 """AI Services -- Main chat endpoint using LangGraph orchestration.
 
-n8n calls POST /api/chat for every incoming message.
+Channel integrations call POST /api/chat for every incoming message.
 MVP specification: {"reply":"...", "actions":["send_images","send_brochure"]}
 Backward compatible: Full format with confidence, intent, metadata
 """
@@ -26,7 +26,7 @@ async def ai_chat(
 ):
     """Process a chat message through the LangGraph AI pipeline.
 
-    n8n calls this endpoint when it receives a message from any channel.
+    Channel integrations call this endpoint when they receive a message.
     Supports both full format (backward compatible) and structured format (MVP spec).
     """
     # 1. Semantic Vector Cache Lookup: Intercept repeated real estate queries

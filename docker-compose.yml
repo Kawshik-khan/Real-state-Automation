@@ -1,6 +1,6 @@
 # ──────────────────────────────────────────────
 #  GLG Assets — Social AI OS (Production Stack)
-#  Frontend + FastAPI Backend + Platform API + Database + n8n
+#  Frontend + FastAPI Backend + Platform API + Database
 # ──────────────────────────────────────────────
 
 services:
@@ -97,57 +97,9 @@ services:
     networks:
       - glg-net
 
-  # ── n8n Workflow Automation ──
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: glg-n8n
-    ports:
-      - "5678:5678"
-    env_file:
-      - ./automation/.env
-    environment:
-      # Database — separate n8n database in PostgreSQL
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: db
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:-postgres}
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DB_POSTGRESDB_DATABASE: n8n
-      # Encryption key for credentials storage
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-glg-assets-n8n-encryption-key-change-in-prod}
-      N8N_MCP_SERVER_ENABLED: "true"
-      EXECUTIONS_DATA_PRUNE: "true"
-      EXECUTIONS_DATA_MAX_AGE: 168
-      N8N_AUTH_ENABLED: "false"
-      N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE: "true"
-
-      # ── Social AI OS — required env vars ──
-      FASTAPI_BASE_URL: http://backend:8000
-      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-glg-assets-main}
-      AUTOMATION_SHARED_SECRET: ${AUTOMATION_SHARED_SECRET:-glg-secret-key}
-      LEAD_STORAGE: postgres
-      GOOGLE_SHEETS_WEBHOOK_URL: ""
-      SUPABASE_URL: ""
-      FACEBOOK_PAGE_ID: ""
-      ADMIN_EMAIL: admin@glgassets.local
-      SUPPORT_EMAIL: support@glgassets.local
-      TELEGRAM_SUPPORT_CHAT_ID: ""
-    volumes:
-      - n8n-data:/home/node/.n8n
-      - ./automation:/automation
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - glg-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
 networks:
   glg-net:
     driver: bridge
 
 volumes:
   pgdata:
-  n8n-data:

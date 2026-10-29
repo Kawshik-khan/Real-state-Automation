@@ -178,7 +178,7 @@ class TestReportAPIEndpoints:
         assert isinstance(data["reports"], list)
 
     def test_cron_trigger_endpoint(self):
-        """POST /api/v1/reports/cron-trigger handles n8n external schedule triggers."""
+        """POST /api/v1/reports/cron-trigger handles external schedule triggers."""
         response = client.post(
             "/api/v1/reports/cron-trigger",
             json={"schedule_id": "sched-daily-pulse"},

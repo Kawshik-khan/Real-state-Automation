@@ -1,14 +1,12 @@
 """Email Service & Thread Manager.
 
 Manages email thread storage, message state transitions, attachment context aggregation,
-and outbound reply dispatch via n8n Email Node webhook API.
+and outbound reply dispatch via Gmail SMTP.
 """
 
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-
-import httpx
 
 from app.config import settings
 from app.models.email import (
@@ -129,14 +127,14 @@ class EmailService:
     def get_thread(self, thread_id: str) -> Optional[EmailThreadSchema]:
         return self._threads.get(thread_id)
 
-    async def dispatch_reply_via_n8n(
+    async def dispatch_reply(
         self,
         thread_id: str,
         reply_subject: str,
         reply_body: str,
         sender_type: str = "ai",
     ) -> Dict[str, Any]:
-        """Dispatches outbound email reply using n8n Email Node webhook API."""
+        """Dispatches outbound email reply via Gmail SMTP."""
         thread = self.get_thread(thread_id)
         if not thread:
             return {"success": False, "error": f"Thread {thread_id} not found"}
@@ -149,41 +147,15 @@ class EmailService:
 
         in_reply_to_header = last_cust_msg.message_id if last_cust_msg else None
 
-        # Build payload for n8n email send node
-        n8n_payload = {
-            "to": thread.customer_email,
-            "subject": reply_subject or f"Re: {thread.subject}",
-            "body_html": self._format_html_email(reply_body, thread.customer_name),
-            "body_text": reply_body,
-            "in_reply_to": in_reply_to_header,
-            "thread_id": thread.thread_id,
-            "tenant_id": thread.tenant_id,
-        }
-
         sent_successfully = False
-        n8n_response_data = {}
-
-        if settings.n8n_email_webhook_url:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.post(
-                        settings.n8n_email_webhook_url,
-                        json=n8n_payload,
-                        headers={"X-Automation-Secret": settings.automation_shared_secret},
-                    )
-                    if resp.status_code in (200, 201, 202):
-                        sent_successfully = True
-                        n8n_response_data = resp.json() if resp.headers.get("content-type") == "application/json" else {}
-                    else:
-                        logger.warning(f"n8n email send webhook returned status {resp.status_code}")
-            except Exception as e:
-                logger.error(f"Failed to trigger n8n email send webhook: {e}")
+        channel = "simulated"
+        dispatch_details: Dict[str, Any] = {}
 
         # Real Gmail SMTP dispatch if credentials available and recipient is a real email address
         is_dummy_test_domain = any(domain in thread.customer_email.lower() for domain in ["@example.com", "@test.com", "@domain.com", "@localhost"])
         gmail_user, gmail_pass = self._get_gmail_credentials()
 
-        if not sent_successfully and not is_dummy_test_domain and gmail_user and gmail_pass:
+        if not is_dummy_test_domain and gmail_user and gmail_pass:
             try:
                 import smtplib
                 from email.mime.multipart import MIMEMultipart
@@ -208,15 +180,15 @@ class EmailService:
                     server.sendmail(gmail_user, [thread.customer_email], msg.as_string())
 
                 sent_successfully = True
-                n8n_response_data = {"channel": "gmail_smtp", "status": "sent"}
+                channel = "gmail_smtp"
+                dispatch_details = {"channel": "gmail_smtp", "status": "sent"}
                 logger.info(f"[GMAIL SMTP DISPATCH SUCCESS] Real email delivered to {thread.customer_email}")
             except Exception as e:
                 logger.error(f"Failed to send email via Gmail SMTP: {e}")
 
-        # Fallback simulation if webhook endpoint is offline or local dev
+        # Fallback simulation when SMTP is not configured or local dev
         if not sent_successfully:
-            logger.info(f"[SIMULATED N8N EMAIL DISPATCH] Sent to {thread.customer_email}: {reply_subject}")
-            sent_successfully = True
+            logger.info(f"[SIMULATED EMAIL DISPATCH] Sent to {thread.customer_email}: {reply_subject}")
 
         # Append sent message to thread history
         outbound_msg_id = f"msg-out-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
@@ -244,11 +216,11 @@ class EmailService:
         return {
             "success": True,
             "dispatched": True,
-            "channel": "n8n_email_node",
+            "channel": channel,
             "thread_id": thread.thread_id,
             "message_id": outbound_msg_id,
             "status": thread.status.value,
-            "n8n_details": n8n_response_data,
+            "details": dispatch_details,
         }
 
     def _format_html_email(self, body_text: str, customer_name: Optional[str]) -> str:
@@ -293,7 +265,7 @@ class EmailService:
         html_body: str,
         text_body: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Dispatches an outbound standalone email directly via Gmail SMTP or n8n webhook."""
+        """Dispatches an outbound standalone email directly via Gmail SMTP."""
         plain_text = text_body or "Please view this report in an HTML-compatible email client."
         sent_successfully = False
         channel = "simulated"
@@ -330,31 +302,7 @@ class EmailService:
             except Exception as e:
                 logger.error(f"[GMAIL SMTP ERROR] Failed sending report to {to_email}: {e}")
 
-        # 2. n8n Email Webhook dispatch
-        if not sent_successfully and settings.n8n_email_webhook_url:
-            try:
-                n8n_payload = {
-                    "to": to_email,
-                    "subject": subject,
-                    "body_html": html_body,
-                    "body_text": plain_text,
-                    "tenant_id": "glg-assets",
-                    "type": "executive_report",
-                }
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.post(
-                        settings.n8n_email_webhook_url,
-                        json=n8n_payload,
-                        headers={"X-Automation-Secret": settings.automation_shared_secret},
-                    )
-                    if resp.status_code in (200, 201, 202):
-                        sent_successfully = True
-                        channel = "n8n_email_node"
-                        details = f"Delivered via n8n Email Webhook to {to_email}"
-            except Exception as e:
-                logger.error(f"[N8N EMAIL DISPATCH ERROR] Failed triggering n8n webhook: {e}")
-
-        # 3. Simulated fallback
+        # 2. Simulated fallback
         if not sent_successfully:
             sent_successfully = True
             channel = "simulated"

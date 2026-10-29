@@ -95,12 +95,6 @@ async def get_developer_system_health(
                 "default_model": getattr(settings, "openai_model", "openai/gpt-oss-120b"),
                 "status": "READY",
             },
-            "n8n_telemetry_engine": {
-                "status": "CONNECTED",
-                "registered_workflows": 6,
-                "monitored_nodes": 20,
-                "avg_workflow_latency_ms": 112,
-            },
             "fastapi_server": {
                 "status": "RUNNING",
                 "port": 8000,

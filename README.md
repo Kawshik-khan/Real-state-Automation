@@ -2,18 +2,16 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react)](https://reactjs.org/)
-[![n8n](https://img.shields.io/badge/n8n-Workflow-FF6D5A?style=flat&logo=n8n)](https://n8n.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)](https://www.docker.com/)
 
-An enterprise-grade, multi-channel AI customer engagement and lead automation platform built for real estate agencies. Combines FastAPI AI microservices, n8n workflow automation, vector search (RAG), multi-channel messaging (Telegram, WhatsApp, Meta), and a modern React dashboard.
+An enterprise-grade, multi-channel AI customer engagement and lead automation platform built for real estate agencies. Combines FastAPI AI microservices, vector search (RAG), multi-channel messaging (Telegram, WhatsApp, Meta), and a modern React dashboard.
 
 ---
 
 ## 🌟 Key Capabilities & Features
 
 - **🤖 AI-Driven Lead Qualification & RAG**: Context-aware AI assistant powered by LLMs (OpenAI / Grok / LangGraph) for property FAQs, lead scoring, and inquiry routing.
-- **⚡ n8n Workflow Automation**: Pre-built automated flows for lead capture, CRM syncing, social media engagement, and instant notifications.
 - **💬 Multi-Channel Messaging**: Seamless integration across Telegram, WhatsApp Business, Facebook Messenger, and Instagram.
 - **📊 Real-Time Analytics & Dashboard**: Modern React + Vite frontend for managing conversations, properties, leads, and analytics.
 - **🐘 Vector Search & Database**: PostgreSQL + `pgvector` for semantic search on property details, FAQs, and governance guides.
@@ -36,9 +34,6 @@ An enterprise-grade, multi-channel AI customer engagement and lead automation pl
 │   ├── src/              # Dashboard UI components & API integration
 │   ├── nginx.conf        # Production Nginx SPA & caching configuration
 │   └── Dockerfile        # Production Nginx multi-stage build
-├── automation/           # n8n Workflow Automation & Integration Scripts
-│   ├── *.json            # Exported n8n workflow definitions
-│   └── glg-assets/       # Property asset data & generator scripts
 ├── migrations/           # Alembic database migration scripts
 ├── docs/                 # Architecture, workflow guides, and audit documents
 ├── docker-compose.yml    # Full-stack production Docker Compose orchestration
@@ -49,7 +44,7 @@ An enterprise-grade, multi-channel AI customer engagement and lead automation pl
 
 ## 🚀 Quick Start (Docker Compose)
 
-The easiest way to run the entire stack (Frontend, Backend, Platform API, n8n, and PostgreSQL) is with **Docker Compose**:
+The easiest way to run the entire stack (Frontend, Backend, Platform API, and PostgreSQL) is with **Docker Compose**:
 
 ```bash
 # 1. Clone the repository
@@ -58,7 +53,6 @@ cd "Realstate Automation"
 
 # 2. Copy environment variable templates
 cp backend/.env.example backend/.env
-cp automation/.env.example automation/.env
 cp platform-api/.env.example platform-api/.env
 
 # 3. Launch all services
@@ -75,7 +69,6 @@ docker compose ps
 | **Frontend Dashboard** | `http://localhost:80` | React Web Dashboard |
 | **FastAPI Backend** | `http://localhost:8000` | AI & Automation API (`/docs` for Swagger UI) |
 | **Platform API** | `http://localhost:8001` | Platform Management API (`/docs`) |
-| **n8n Automation** | `http://localhost:5678` | n8n Workflow Editor |
 | **PostgreSQL Database** | `localhost:5432` | PostgreSQL + pgvector |
 
 ---
