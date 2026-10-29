@@ -81,8 +81,35 @@ class Settings(BaseSettings):
     facebook_page_access_token: Optional[str] = None
     facebook_app_secret: Optional[str] = None
     instagram_account_id: Optional[str] = None
-    meta_graph_api_version: str = "v19.0"
+    # v24.0 is the oldest version Meta still serves (v23.0 expired June 2026).
+    meta_graph_api_version: str = "v25.0"
     social_auto_dm_enabled: bool = True
+
+    # Ad platform reporting (read-only). Credentials can also be saved from the
+    # Developer Console integrations panel (encrypted in system_integrations).
+    # Meta Marketing API: system-user token with ads_read (+ read_insights for posts).
+    meta_ads_access_token: Optional[str] = None
+    meta_ad_account_ids: Optional[str] = None  # comma-separated, with or without the act_ prefix
+    # Google Ads API (REST): developer token + OAuth refresh token.
+    google_ads_developer_token: Optional[str] = None
+    google_ads_client_id: Optional[str] = None
+    google_ads_client_secret: Optional[str] = None
+    google_ads_refresh_token: Optional[str] = None
+    google_ads_login_customer_id: Optional[str] = None  # manager (MCC) account, digits only
+    google_ads_customer_ids: Optional[str] = None  # comma-separated, digits only
+    google_ads_api_version: str = "v25"
+    # TikTok Business API: long-term access token from advertiser authorization.
+    tiktok_ads_access_token: Optional[str] = None
+    tiktok_advertiser_ids: Optional[str] = None  # comma-separated
+
+    # Background sync of ad metrics into ad_campaign_daily_metrics.
+    ads_sync_enabled: bool = True
+    ads_sync_interval_minutes: int = 60
+    ads_sync_nightly_hour_utc: int = 20  # 02:00 in Dhaka (UTC+6)
+    # Calendar used for "today" and period boundaries on the dashboards.
+    reporting_timezone: str = "Asia/Dhaka"
+    # Optional FX fallback when fx_rates has no row, e.g. "USD=122.5,EUR=133".
+    fx_rates_to_bdt: Optional[str] = None
 
     # Gmail SMTP / IMAP Settings
     gmail_user_email: Optional[str] = None
