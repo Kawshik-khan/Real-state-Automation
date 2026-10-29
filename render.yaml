@@ -25,6 +25,14 @@ services:
         sync: false
       - key: AUTOMATION_SHARED_SECRET
         sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PASSWORD_HASH_SALT
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
       - key: DEFAULT_TENANT_ID
         value: glg-assets-main
       - key: OPENAI_API_KEY

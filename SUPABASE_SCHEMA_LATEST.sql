@@ -1088,18 +1088,7 @@ ON CONFLICT (project_id) DO UPDATE SET
     description = EXCLUDED.description,
     features = EXCLUDED.features;
 
--- Seed Default Staff Authentication Accounts (Bcrypt 12-round Hashes)
-INSERT INTO public.auth_users (id, email, full_name, role, password_hash, is_active, tenant_id)
-VALUES
-('usr-admin-001', 'admin@glgassets.com', 'Alex Mercer (Admin)', 'admin', '$2b$12$32zlI3kTf6cdD5mcza.1MOfvsEiQ9qL0mQYw64zFXcQqsO2YKHYRW', true, 'glg-default'),
-('usr-manager-002', 'manager@glgassets.com', 'Sarah Connor (Manager)', 'manager', '$2b$12$L94ecAsOADvYl3so8vPn7ewLdPI01tGGFm2zYmT3pvTiJyFnZtU3a', true, 'glg-default'),
-('usr-agent-003', 'agent@glgassets.com', 'Rahul Sharma (Agent)', 'agent', '$2b$12$3mQSF/t28zdWJXlBYJWzhOr1jfjgLPPenzOdbHC2oKdGulgcodb4W', true, 'glg-default'),
-('usr-dev-005', 'developer@glgassets.com', 'Alex Chen (Dev Lead)', 'developer', '$2b$12$h4HITrq98/4ZrumU88/06.Uwt5bEU.atkNwVN7yoD//PBIAKgK2Ei', true, 'glg-default'),
-('usr-viewer-004', 'viewer@glgassets.com', 'Guest Stakeholder (Viewer)', 'viewer', '$2b$12$zQIogUckjv40KH2.m.mV0Om0bS.9AVto1O7E0BINSabQhm/v.Jk82', true, 'glg-default')
-ON CONFLICT (email) DO UPDATE SET
-    role = EXCLUDED.role,
-    password_hash = EXCLUDED.password_hash,
-    is_active = EXCLUDED.is_active;
+-- Staff accounts are not seeded here. Create the first admin via BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD.
 
 -- Seed Default Integration Catalog Records
 INSERT INTO public.system_integrations (service_key, display_name, category, is_active, encrypted_credentials, masked_preview, last_status)

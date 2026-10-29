@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from app.agents.social_bridge_agent import social_bridge_agent
 from app.config import settings
 from app.dependencies import require_automation_secret as _auth
+from app.dependencies import require_roles
+from app.models.user import UserRole
 from app.services.ads.meta_leads import ingest_leadgen, verify_signature
 from app.services.meta_social import meta_social_service
 from app.services.telegram import telegram_service
@@ -548,7 +550,10 @@ async def telegram_webhook(request: Request, body: dict):
 
 
 @router.post("/telegram/setup-webhook", summary="Set Telegram Webhook URL")
-async def setup_telegram_webhook(body: dict):
+async def setup_telegram_webhook(
+    body: dict,
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.DEVELOPER])),
+):
     """Register public HTTPS webhook URL with Telegram Bot API."""
     url = body.get("url")
     if not url:
@@ -557,7 +562,9 @@ async def setup_telegram_webhook(body: dict):
 
 
 @router.get("/telegram/status", summary="Get Telegram Bot & Webhook Status")
-async def telegram_status():
+async def telegram_status(
+    current_user: dict = Depends(require_roles([UserRole.ADMIN, UserRole.DEVELOPER])),
+):
     """Retrieve Bot Info and current Webhook configuration."""
     bot_info = await telegram_service.get_me()
     webhook_info = await telegram_service.get_webhook_info()

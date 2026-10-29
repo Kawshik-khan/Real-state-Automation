@@ -45,6 +45,21 @@ from app.models.user import UserRole
 # Ensure rate limiting is globally disabled for all tests
 limiter.enabled = False
 
+# ── Test-only staff accounts ──
+# The app ships no default users; tests register these in the in-memory cache,
+# which is used when the test database is unreachable (as in CI).
+from app.services.user_service import user_service
+
+TEST_USERS = [
+    ("usr-admin-001", "admin@glgassets.com", "Test Admin", UserRole.ADMIN, "admin123"),
+    ("usr-manager-002", "manager@glgassets.com", "Test Manager", UserRole.MANAGER, "manager123"),
+    ("usr-agent-003", "agent@glgassets.com", "Test Agent", UserRole.AGENT, "agent123"),
+    ("usr-dev-005", "developer@glgassets.com", "Test Developer", UserRole.DEVELOPER, "dev123"),
+    ("usr-viewer-004", "viewer@glgassets.com", "Test Viewer", UserRole.VIEWER, "viewer123"),
+]
+for _user_id, _email, _name, _role, _password in TEST_USERS:
+    user_service.cache_user(_email, _name, _role, _password, user_id=_user_id)
+
 
 @pytest.fixture(scope="session")
 def test_client():

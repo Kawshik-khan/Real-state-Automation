@@ -6,6 +6,7 @@ backend/.env
 automation/.env
 platform-api/.env
 n8n-token.txt
+mcp-config.json
 
 # Local Databases
 *.db
