@@ -226,11 +226,6 @@ async def live_telemetry_logging_middleware(request: Request, call_next):
                 latency_ms=latency_ms,
                 client_ip=client_ip
             )
-
-            try:
-                N8nMonitoringService.record_live_trigger(path, latency_ms)
-            except Exception:
-                pass
         return response
     except Exception as exc:
         latency_ms = round((time.time() - start_time) * 1000, 2)
