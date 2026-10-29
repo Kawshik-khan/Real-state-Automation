@@ -250,8 +250,8 @@ async def chat_message(
     session_id = body.get("sessionId") or body.get("conversationId") or f"session-{datetime.utcnow().timestamp()}"
 
     try:
-        from app.agents.graph import ai_graph
         from app.agents.state import AIState
+        from app.sales.entry import answer_message
         from app.utils.chat_response_builder import ChatResponseBuilder
 
         initial_state = AIState(
@@ -262,7 +262,11 @@ async def chat_message(
             tenant_id=tenant_id,
             language="en"
         )
-        raw = await ai_graph.ainvoke(initial_state)
+        raw = await answer_message(initial_state, channel_message_id=body.get("messageId"))
+        if raw.get("duplicate"):
+            # A retried delivery of a message the sales pipeline already has: nothing new to send.
+            return {"success": True, "reply": "", "action": "duplicate_ignored", "confidence": 1.0,
+                    "project_ids": [], "error_message": None, "tenantId": tenant_id}
         extracted = ChatResponseBuilder.extract_workflow_data(raw)
         reply = extracted.get("agent_reply") or "Thank you for reaching out to GLG Assets! How can we assist you with our luxury properties today?"
         confidence = float(extracted.get("confidence", 0.92))

@@ -15,7 +15,7 @@ class LLMService:
         base_url = (creds.get("base_url") if creds else None) or settings.openai_base_url
         if not api_key:
             return None
-        kwargs = {"api_key": api_key, "timeout": 20.0}
+        kwargs = {"api_key": api_key, "timeout": settings.llm_timeout_s}
         if base_url:
             kwargs["base_url"] = base_url
         return AsyncOpenAI(**kwargs)
@@ -44,7 +44,8 @@ class LLMService:
         if response_format:
             kwargs["response_format"] = response_format
 
-        for attempt in range(4):
+        attempts = max(1, settings.llm_max_attempts)
+        for attempt in range(attempts):
             try:
                 resp = await client.chat.completions.create(**kwargs)
                 return resp.choices[0].message.content or ""
@@ -57,8 +58,8 @@ class LLMService:
                     print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.8-27b...")
                     kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
-                if attempt == 3:
-                    print(f"[LLMService Error] Rate limit exceeded after 4 attempts: {rle}")
+                if attempt == attempts - 1:
+                    print(f"[LLMService Error] Rate limit exceeded after {attempts} attempts: {rle}")
                     raise rle
                 err_msg = str(rle)
                 wait_sec = min(10.0, 1.5 * (2 ** attempt))
@@ -79,11 +80,29 @@ class LLMService:
                     print("[LLMService Error] Falling back from 20b to qwen/qwen3.8-27b...")
                     kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
-                if attempt == 3:
+                if attempt == attempts - 1:
                     raise ex
                 await asyncio.sleep(1.0)
 
-        return ""
+        # Every attempt went to a model fallback and none answered: an empty reply would be sent as if it were one.
+        raise RuntimeError(f"LLM chat failed after {attempts} attempts")
+
+    async def quick_json(self, messages: list, timeout_s: float, max_tokens: int = 200) -> dict:
+        """One attempt, no fallbacks, a hard timeout. Raises on any failure so callers can fail closed."""
+        client = self.get_client()
+        if not client:
+            raise ConnectionError("AI service not configured")
+        kwargs = dict(model=self.model, messages=messages, temperature=0.0, max_tokens=max_tokens)
+        if "groq.com" not in (settings.openai_base_url or ""):
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = await asyncio.wait_for(client.chat.completions.create(**kwargs), timeout=timeout_s)
+        content = resp.choices[0].message.content or ""
+        if "```" in content:
+            content = content.split("```json")[-1].split("```")[0].strip()
+        data = json.loads(content)
+        if not isinstance(data, dict):
+            raise ValueError("expected a JSON object")
+        return data
 
     async def structured_chat(
         self,
@@ -106,7 +125,8 @@ class LLMService:
         if "groq.com" not in (settings.openai_base_url or ""):
             kwargs["response_format"] = {"type": "json_object"}
             
-        for attempt in range(4):
+        attempts = max(1, settings.llm_max_attempts)
+        for attempt in range(attempts):
             try:
                 resp = await client.chat.completions.create(**kwargs)
                 content = resp.choices[0].message.content or "{}"
@@ -125,7 +145,7 @@ class LLMService:
                     print("[LLMService RateLimit] Falling back from 20b to qwen/qwen3.8-27b in structured_chat...")
                     kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
-                if attempt == 3:
+                if attempt == attempts - 1:
                     print(f"[LLMService Error] structured_chat rate limit exceeded: {rle}")
                     break
                 err_msg = str(rle)
@@ -147,7 +167,7 @@ class LLMService:
                     print("[LLMService Error] Falling back from 20b to qwen/qwen3.8-27b in structured_chat...")
                     kwargs["model"] = "qwen/qwen3.8-27b"
                     continue
-                if attempt == 3:
+                if attempt == attempts - 1:
                     return {"reply": "I am unable to process that right now.", "intent": "fallback", "confidence": 0.5}
                 await asyncio.sleep(1.0)
 

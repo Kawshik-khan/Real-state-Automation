@@ -50,6 +50,20 @@ async def incoming_email_webhook(
             "message": f"Message-ID {payload.message_id} already ingested",
         }
 
+    # 1b. Sales pipeline: the email becomes a lead message and the sales assistant drafts the reply (email stays
+    #     draft-only until a manager sets the channel live). Staff send from the Sales Inbox.
+    if settings.email_via_sales:
+        from app.sales.inbound import InboundMessage, handle_inbound
+
+        body = f"Subject: {payload.subject}\n\n{payload.body_text}".strip()
+        result = await handle_inbound(InboundMessage(
+            tenant_id=settings.default_tenant_id, channel="email", external_id=payload.sender_email.strip().lower(),
+            text=body, channel_message_id=payload.message_id, name=payload.sender_name, source="email",
+            email=payload.sender_email.strip().lower(),
+        ))
+        idempotency_service.record_processed(payload.message_id)
+        return {"success": True, "routed_to": "sales_pipeline", **result}
+
     # 2. Extract text from attachments if present
     attachment_texts = []
     for att in payload.attachments:

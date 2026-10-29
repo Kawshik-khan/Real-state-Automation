@@ -368,27 +368,19 @@ async def get_volume_timeseries(
             rows = res.mappings().all()
             if rows:
                 timeseries = [
-                    {"month": r["month"], "messages": int(r["messages"]), "leads": int(r["leads"]), "rate": "95%"}
+                    {"month": r["month"], "messages": int(r["messages"]), "leads": int(r["leads"]), "rate": None}
                     for r in rows
                 ]
                 return {"success": True, "data": timeseries, "timeseries": timeseries}
     except Exception:
         pass
 
-    fallback_data = [
-        {"month": "Jan", "messages": 2450, "leads": 82, "rate": "92%"},
-        {"month": "Feb", "messages": 3120, "leads": 114, "rate": "94%"},
-        {"month": "Mar", "messages": 2890, "leads": 96, "rate": "93%"},
-        {"month": "Apr", "messages": 3950, "leads": 138, "rate": "95%"},
-        {"month": "May", "messages": 4620, "leads": 168, "rate": "96%"},
-        {"month": "Jun", "messages": 4390, "leads": 142, "rate": "95%"}
-    ]
-
-
+    # No data (or the database is offline): say so instead of showing sample figures as if they were real.
     return {
         "success": True,
-        "data": fallback_data,
-        "timeseries": fallback_data
+        "data": [],
+        "timeseries": [],
+        "no_data": True,
     }
 
 

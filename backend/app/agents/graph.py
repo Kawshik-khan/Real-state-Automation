@@ -5,10 +5,19 @@ of fields to update — LangGraph merges them into the state object.
 """
 from __future__ import annotations
 
+import logging
+
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agents.state import Action, AIState, IntentResult, LeadScore, ModerationResult
+
+logger = logging.getLogger(__name__)
+
+SAFETY_HANDOFF_REPLY = (
+    "Thank you for your message. A member of our sales team will get back to you shortly.\n"
+    "আপনার বার্তার জন্য ধন্যবাদ। আমাদের সেলস টিমের একজন সদস্য শীঘ্রই আপনার সাথে যোগাযোগ করবেন।"
+)
 
 # ── Entry ───────────────────────────────────────────────────
 
@@ -39,33 +48,49 @@ async def moderation_node(state: AIState) -> dict:
 
     clean_message = policy_res.sanitized_text if policy_res.action == "sanitize" else state.message
 
-    # 2. LLM-based Moderation
+    # 2. Optional LLM moderation. It fails closed: an error, a timeout or an answer we can't read hands the chat
+    #    to staff instead of letting the message through unchecked.
+    from app.config import settings
+
+    if not settings.legacy_llm_safety_checks or llm_service.get_client() is None:
+        return {"moderation": ModerationResult(action="allow"), "moderated": True, "message": clean_message}
     try:
-        result = await llm_service.structured_chat(
+        result = await llm_service.quick_json(
             [
                 {"role": "system", "content": MODERATION_PROMPT},
                 {"role": "user", "content": clean_message},
             ],
-            json_schema={},
-            temperature=0.1,
+            timeout_s=settings.legacy_llm_check_timeout_s,
         )
-        return {
-            "moderation": ModerationResult(**result),
-            "moderated": True,
-            "message": clean_message,
-        }
-    except Exception:
-        return {
-            "moderation": ModerationResult(action="allow"),
-            "moderated": True,
-            "message": clean_message,
-        }
+        moderation = ModerationResult(**{k: v for k, v in result.items() if k in ModerationResult.model_fields})
+        if "action" not in result or moderation.action not in ("allow", "flag", "block"):
+            raise ValueError(f"unreadable moderation answer: {result!r}"[:200])
+    except Exception as exc:
+        logger.warning("[ai_graph] moderation failed closed: %s", exc)
+        moderation = ModerationResult(action="escalate", reason=f"moderation unavailable: {type(exc).__name__}")
+    return {"moderation": moderation, "moderated": True, "message": clean_message}
 
 
 def moderation_router(state: AIState) -> str:
     if state.moderation.action == "block":
         return "blocked"
+    if state.moderation.action == "escalate":
+        return "escalated"
     return "memory_load"
+
+
+async def escalated_node(state: AIState) -> dict:
+    """A safety check couldn't run: nothing is answered automatically, a person takes the chat."""
+    return {
+        "agent_used": "safety_escalation",
+        "agent_reply": SAFETY_HANDOFF_REPLY,
+        "agent_done": True,
+        "requires_escalation": True,
+        "escalation_reason": state.moderation.reason or "safety check unavailable",
+        "safety_check_passed": False,
+        "safety_checked": True,
+        "output_built": True,
+    }
 
 
 async def blocked_node(state: AIState) -> dict:
@@ -118,6 +143,28 @@ async def memory_reflection_node(state: AIState) -> dict:
 
 # ── Supervisor ──────────────────────────────────────────────
 
+CONSUMER_RETAIL_TERMS = (
+    "jacket", "shirt", "pant", "t-shirt", "dress", "clothing", "shoe", "shoes",
+    "chocolate", "kitkat", "candy", "iphone", "laptop", "bike", "food", "grocery", "groceries", "medicine",
+)
+PROPERTY_CONTEXT_TERMS = (
+    "flat", "apartment", "plot", "duplex", "penthouse", "bhk", "building", "parking", "garage", "lift",
+    "sqft", "square feet", "handover", "booking", "project", "site", "visit", "floor", "bedroom", "property",
+    "rent", "ফ্ল্যাট", "প্রজেক্ট", "প্রকল্প", "আবাসন", "পার্কিং", "বাসা",
+    "banani", "gulshan", "uttara", "dhanmondi", "baridhara", "mirpur", "bashundhara", "purbachal",
+)
+
+
+def is_retail_goods_query(msg_lower: str) -> bool:
+    """True for questions about consumer goods we don't sell, never for a message that mentions property."""
+    import re
+
+    if any(term in msg_lower for term in PROPERTY_CONTEXT_TERMS):
+        return False
+    return any(re.search(rf"\b{re.escape(term)}\b", msg_lower) for term in CONSUMER_RETAIL_TERMS)
+
+
+
 async def supervisor_node(state: AIState) -> dict:
     from app.services.llm import llm_service
 
@@ -137,15 +184,11 @@ async def supervisor_node(state: AIState) -> dict:
             "messages_used": state.messages_used + 1
         }
 
-    import re
-
-    # Non-property retail goods inquiry safeguard -> routes cleanly to fallback_handler
-    consumer_retail_terms = [
-        "jacket", "shirt", "pant", "t-shirt", "dress", "clothing", "shoe", "shoes",
-        "chocolate", "kitkat", "candy", "phone", "iphone", "laptop",
-        "watch", "car", "bike", "food", "grocery", "groceries", "medicine", "ticket"
-    ]
-    if any(re.search(rf"\b{re.escape(term)}\b", msg_lower) for term in consumer_retail_terms):
+    # Non-property retail goods inquiry safeguard -> routes cleanly to fallback_handler.
+    # Words that also come up in property questions ("car parking", "phone number of the site office",
+    # "watch the flat", "booking ticket") are deliberately absent, and the rule never fires when the message
+    # mentions property at all.
+    if is_retail_goods_query(msg_lower):
         return {
             "intent": IntentResult(
                 intent="other",
@@ -160,7 +203,7 @@ async def supervisor_node(state: AIState) -> dict:
     # Require explicit property indicators (or recognized project/locations), not generic single words like "price"
     real_estate_explicit_terms = [
         "flat", "apartment", "plot", "duplex", "penthouse", "bhk", "building",
-        "floor plan", "sqft", "square feet", "handover", "booking",
+        "floor plan", "sqft", "square feet", "handover", "booking", "parking", "পার্কিং",
         "project", "projects", "প্রজেক্ট", "প্রকল্প", "আবাসন"
     ]
     location_terms = ["banani", "gulshan", "uttara", "dhanmondi", "baridhara", "mirpur"]
@@ -223,8 +266,8 @@ def intent_router(state: AIState) -> str:
         return "property_agent"
     elif intent == "faq":
         return "faq_agent"
-    elif intent == "content_request":
-        return "content_agent"
+    # content_request is deliberately absent: marketing copy is drafted by the weekly content job and approved by a
+    # manager, never written for a customer in chat. Those messages get the general fallback answer.
     return "fallback_handler"
 
 
@@ -329,17 +372,6 @@ async def faq_agent_node(state: AIState) -> dict:
                 "agent_used": "faq_agent", "agent_done": True, "agent_error": str(e)}
 
 
-async def content_agent_node(state: AIState) -> dict:
-    from app.agents.content_agent import content_agent
-
-    try:
-        reply = await content_agent.handle(state.message)
-        return {"agent_reply": reply, "agent_used": "content_agent", "agent_done": True}
-    except Exception as e:
-        return {"agent_reply": "I'm sorry, I couldn't generate that content right now.",
-                "agent_used": "content_agent", "agent_done": True, "agent_error": str(e)}
-
-
 async def greeting_handler_node(state: AIState) -> dict:
     from app.utils.language import is_english_query
 
@@ -395,6 +427,22 @@ async def booking_handler_node(state: AIState) -> dict:
     )
     hitl_proposal = await booking_tool.propose_site_visit(proposal_input)
 
+    # The request reaches the sales pipeline as a lead event staff can act on. No site visit is created here:
+    # a visit needs a real slot, which a consultant confirms.
+    lead_id = None
+    if state.persist_leads:
+        from app.sales.legacy_bridge import record_lead_signal
+
+        lead_id = await record_lead_signal(
+            conversation_id=state.conversation_id,
+            channel=state.channel,
+            event_type="visit_requested",
+            payload={"project": project_target, "message": (state.message or "")[:300],
+                     "intent_score": state.lead_score.score},
+            name=None if client_name == "Valued Client" else client_name,
+            notify=f"Site visit requested by chat ({project_target}); confirm a slot",
+        )
+
     if is_english:
         reply = (
             f"Thank you for your interest! 🎉\n\n"
@@ -412,7 +460,7 @@ async def booking_handler_node(state: AIState) -> dict:
 
     return {
         "agent_reply": reply,
-        "agent_actions": [Action(type="escalate", payload={"reason": "site_visit_proposal_hitl", "priority": "high", "proposal": hitl_proposal})],
+        "agent_actions": [Action(type="escalate", payload={"reason": "site_visit_proposal_hitl", "priority": "high", "proposal": hitl_proposal, "lead_id": lead_id})],
         "agent_used": "booking_handler",
         "agent_done": True,
         "requires_escalation": True,
@@ -483,44 +531,45 @@ async def safety_check_node(state: AIState) -> dict:
             "safety_checked": True,
         }
 
-    # 2. LLM-based Safety Content Check
+    # 2. Optional LLM safety check, failing closed like moderation.
+    from app.config import settings
+
+    if not settings.legacy_llm_safety_checks or llm_service.get_client() is None:
+        return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
     prompt = f"""You are a safety checker. Review this message for harmful or inappropriate content.
 Reply should be allowed for a real-estate customer communication channel.
 
 Message: "{sanitized_reply[:500]}"
 
 Respond with JSON: {{"safe": true, "reason": ""}} or {{"safe": false, "reason": "..."}}"""
-
     try:
-        result = await llm_service.structured_chat(
-            [{"role": "user", "content": prompt}], json_schema={}, temperature=0.1,
+        result = await llm_service.quick_json(
+            [{"role": "user", "content": prompt}], timeout_s=settings.legacy_llm_check_timeout_s,
         )
-        if result.get("safe") is False:
-            return {
-                "agent_reply": "I'm sorry, I couldn't generate an appropriate response. Let me connect you with a team member.",
-                "requires_escalation": True,
-                "safety_check_passed": False,
-                "safety_checked": True,
-            }
-        return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
-    except Exception:
-        return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
+        safe = result.get("safe")
+        if not isinstance(safe, bool):
+            raise ValueError(f"unreadable safety answer: {result!r}"[:200])
+        reason = "" if safe else (result.get("reason") or "reply judged unsafe")
+    except Exception as exc:
+        logger.warning("[ai_graph] safety check failed closed: %s", exc)
+        safe, reason = False, f"safety check unavailable: {type(exc).__name__}"
+    if not safe:
+        return {
+            "agent_reply": SAFETY_HANDOFF_REPLY,
+            "requires_escalation": True,
+            "escalation_reason": reason,
+            "safety_check_passed": False,
+            "safety_checked": True,
+        }
+    return {"agent_reply": sanitized_reply, "safety_check_passed": True, "safety_checked": True}
 
 
 # ── Response Builder ────────────────────────────────────────
 
 async def response_builder_node(state: AIState) -> dict:
-    from app.schemas.chat import MemoryEntry
     from app.services.belief_memory import belief_memory_service
-    from app.services.memory import conversation_memory
 
-    user_entry = MemoryEntry(role="user", content=state.message)
-    await conversation_memory.add(state.conversation_id, user_entry)
-
-    assistant_entry = MemoryEntry(role="assistant", content=state.agent_reply)
-    await conversation_memory.add(state.conversation_id, assistant_entry)
-
-    # Persist updated belief state
+    # Chat history is persisted by the endpoint that answered (the conversation store); only beliefs are saved here.
     await belief_memory_service.save_beliefs(state.conversation_id, state.beliefs)
 
     return {"output_built": True}
@@ -588,9 +637,20 @@ async def lead_scoring_node(state: AIState) -> dict:
     )
 
     updates = {"lead_score": lead_score_obj}
-    if is_hot:
-        updates["requires_escalation"] = True
-        updates["escalation_reason"] = f"🔥 HOT LEAD (Score {total_score}/100) — High Intent Sales Opportunity"
+
+    # Booking requests are recorded by the booking handler; other property interest is recorded here.
+    worth_recording = state.intent.intent in ("property_search", "lead") or total_score >= 50
+    if state.persist_leads and worth_recording and state.intent.intent != "booking":
+        from app.sales.legacy_bridge import record_intent_score
+
+        await record_intent_score(
+            conversation_id=state.conversation_id,
+            channel=state.channel,
+            score=total_score,
+            hot=is_hot,
+            payload={"intent": state.intent.intent, **lead_score_obj.scoring_breakdown,
+                     "budget_status": budget_status, "timeline_urgency": timeline_urgency},
+        )
 
     return updates
 
@@ -603,6 +663,7 @@ def build_ai_graph() -> CompiledStateGraph:
     workflow.add_node("entry", entry_node)
     workflow.add_node("moderation", moderation_node)
     workflow.add_node("blocked", blocked_node)
+    workflow.add_node("escalated", escalated_node)
     workflow.add_node("memory_load", memory_load_node)
     workflow.add_node("memory_reflection", memory_reflection_node)
     workflow.add_node("supervisor", supervisor_node)
@@ -611,7 +672,6 @@ def build_ai_graph() -> CompiledStateGraph:
     workflow.add_node("booking_handler", booking_handler_node)
     workflow.add_node("property_agent", property_agent_node)
     workflow.add_node("faq_agent", faq_agent_node)
-    workflow.add_node("content_agent", content_agent_node)
     workflow.add_node("fallback_handler", fallback_handler_node)
     workflow.add_node("safety_check", safety_check_node)
     workflow.add_node("response_builder", response_builder_node)
@@ -621,9 +681,11 @@ def build_ai_graph() -> CompiledStateGraph:
     workflow.add_edge("entry", "moderation")
     workflow.add_conditional_edges("moderation", moderation_router, {
         "blocked": "blocked",
+        "escalated": "escalated",
         "memory_load": "memory_load",
     })
     workflow.add_edge("blocked", "safety_check")
+    workflow.add_edge("escalated", "response_builder")
     workflow.add_edge("memory_load", "memory_reflection")
     workflow.add_edge("memory_reflection", "supervisor")
     workflow.add_edge("supervisor", "lead_scoring")
@@ -632,10 +694,9 @@ def build_ai_graph() -> CompiledStateGraph:
         "booking_handler": "booking_handler",
         "property_agent": "property_agent",
         "faq_agent": "faq_agent",
-        "content_agent": "content_agent",
         "fallback_handler": "fallback_handler",
     })
-    for agent in ["greeting_handler", "booking_handler", "property_agent", "faq_agent", "content_agent", "fallback_handler"]:
+    for agent in ["greeting_handler", "booking_handler", "property_agent", "faq_agent", "fallback_handler"]:
         workflow.add_edge(agent, "safety_check")
     workflow.add_edge("safety_check", "response_builder")
     workflow.add_edge("response_builder", "output_formatter")
