@@ -81,6 +81,7 @@ async def init_db():
     """Initialize database tables and enable pgvector & uuid-ossp extensions on Supabase/PostgreSQL."""
     # Ensure all AI Control Plane models are registered in Base.metadata
     import app.models.ai_control_plane  # noqa: F401
+    import app.sales.models  # noqa: F401  (sales pipeline tables)
 
     async with engine.begin() as conn:
         # Enable pgvector & UUID extensions natively
@@ -92,4 +93,11 @@ async def init_db():
         
         # Create all tables defined in Base.metadata
         await conn.run_sync(Base.metadata.create_all)
+
+        # Columns added to existing sales tables after they first shipped (create_all never alters a table)
+        if conn.dialect.name == "postgresql":
+            from app.sales.schema_upgrades import upgrade_statements
+
+            for statement in upgrade_statements():
+                await conn.execute(text(statement))
 

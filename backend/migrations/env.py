@@ -20,6 +20,7 @@ try:
     import app.models.ai_control_plane  # ensure AI Control Plane tables are registered in metadata
 except ImportError:
     pass
+import app.sales.models  # noqa: E402,F401  (sales pipeline tables)
 
 
 config = context.config

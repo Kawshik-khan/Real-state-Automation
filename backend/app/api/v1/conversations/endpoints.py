@@ -571,8 +571,8 @@ async def send_customer_message(conv_id: str, body: dict, auth: dict = Depends(r
     # 2. If AI is active (not paused), trigger LangGraph AI pipeline
     if not conv.get("aiPaused", False):
         try:
-            from app.agents.graph import ai_graph
             from app.agents.state import AIState
+            from app.sales.entry import answer_message
             from app.utils.chat_response_builder import ChatResponseBuilder
 
             initial_state = AIState(
@@ -581,7 +581,7 @@ async def send_customer_message(conv_id: str, body: dict, auth: dict = Depends(r
                 channel=channel,
                 language="en",
             )
-            raw = await ai_graph.ainvoke(initial_state)
+            raw = await answer_message(initial_state, name=body.get("name"))
             extracted = ChatResponseBuilder.extract_workflow_data(raw)
             reply_text = extracted.get("agent_reply") or "Thank you for reaching out! How else can GLG Assets assist you?"
             confidence = extracted.get("confidence", 0.90)

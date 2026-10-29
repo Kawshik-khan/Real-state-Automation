@@ -133,7 +133,11 @@ jobs:
             -e DATABASE_URL=postgresql+asyncpg://localhost:5432/test \
             -p 8000:8000 \
             glg-backend-ci:${{ github.sha }}
-          sleep 5
+          # Poll instead of a fixed sleep: worker start-up time varies on shared runners.
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 1
+          done
           docker logs ci-test || true
           curl -f http://localhost:8000/health || (docker logs ci-test && exit 1)
           docker stop ci-test

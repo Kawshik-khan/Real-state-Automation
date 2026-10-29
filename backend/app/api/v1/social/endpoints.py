@@ -28,6 +28,9 @@ async def _execute_comment_bridge(
     tenant_id: str = "glg-assets-main"
 ) -> dict[str, Any]:
     """Executes the dual-action comment-to-DM bridge pipeline."""
+    if settings.social_via_sales:
+        return await _comment_to_sales_lead(comment_id, comment_text, author_id, author_name, platform, post_id)
+
     # 1. AI Social Bridge Agent Generates Responses & Lead Score
     bridge_result = await social_bridge_agent.process_comment(
         comment_text=comment_text,
@@ -136,6 +139,89 @@ async def _execute_comment_bridge(
         "is_hot_lead": is_hot_lead,
         "conversation_id": conv_id,
         "tenant_id": tenant_id
+    }
+
+
+# ── Sales pipeline path (SOCIAL_VIA_SALES) ────────────────────────────
+
+COMMENT_REPLY = {
+    "en": "Thank you for your interest, {name}! We've sent you a message — please check your inbox. 😊",
+    "bn": "ধন্যবাদ {name}! আপনাকে একটি মেসেজ পাঠানো হয়েছে, অনুগ্রহ করে ইনবক্স চেক করুন। 😊",
+}
+COMMENT_DM = {
+    "en": ("Hi {name}, thanks for your comment! Tell us what you're looking for (area, bedrooms, budget) and we'll "
+           "share the matching flats, prices and visit times here."),
+    "bn": ("আসসালামু আলাইকুম {name}, মন্তব্যের জন্য ধন্যবাদ! আপনি কোন এলাকায়, কত বেডরুমের এবং কোন বাজেটের ফ্ল্যাট খুঁজছেন "
+           "জানালে এখানেই মিলে যাওয়া ফ্ল্যাট, দাম ও ভিজিটের সময় জানিয়ে দেব।"),
+}
+
+
+def _sent_status(result: dict) -> tuple[str, Optional[str]]:
+    """Meta's simulated mode (no page token) is not a delivery."""
+    if result.get("mode") == "simulated":
+        return "not_sent", "META_NOT_CONFIGURED (simulated)"
+    if result.get("success"):
+        return "sent", None
+    return "not_sent", str(result.get("error") or "send failed")[:500]
+
+
+async def _comment_to_sales_lead(
+    comment_id: str, comment_text: str, author_id: str, author_name: str, platform: str, post_id: Optional[str],
+) -> dict[str, Any]:
+    """A public comment never gets prices or unit facts in public: a fixed thank-you there, a DM inviting the
+    conversation, and the commenter becomes a sales lead whose DM replies go to the sales assistant."""
+    from app.sales import leads, messaging
+    from app.sales.db import session_scope
+    from app.sales.models import SalesLead, SalesMessage
+    from app.utils.language import detect_language
+
+    lang = "en" if detect_language(comment_text).get("language") == "en" else "bn"
+    name = (author_name or "").strip() or ("there" if lang == "en" else "")
+    public_reply = COMMENT_REPLY[lang].format(name=name).replace("  ", " ")
+    private_dm = COMMENT_DM[lang].format(name=name).replace("  ", " ")
+    channel = "instagram" if platform.lower().startswith("insta") else "messenger"
+
+    async with session_scope() as session:
+        lead, created = await leads.get_or_create_lead(
+            session, settings.default_tenant_id, channel, author_id or f"comment-{comment_id}",
+            name=author_name or None, source="comment",
+        )
+        conv = await messaging.get_or_create_conversation(session, lead)
+        stored = await messaging.record_inbound(session, conv, f"[Comment on post] {comment_text}"[:4000], f"comment:{comment_id}")
+        lead_id, conversation_id = lead.lead_id, conv.conversation_id
+    if stored is None:  # the same comment delivered again: it was already answered
+        return {"success": True, "routed_to": "sales_pipeline", "duplicate": True, "comment_id": comment_id,
+                "lead_id": lead_id, "conversation_id": conversation_id}
+
+    pub_res = await meta_social_service.post_public_comment_reply(comment_id=comment_id, message=public_reply, platform=platform)
+    dm_res = await meta_social_service.send_private_reply_dm(comment_id=comment_id, message=private_dm, platform=platform)
+    dm_status, dm_error = _sent_status(dm_res)
+
+    async with session_scope() as session:
+        lead = await session.get(SalesLead, lead_id)
+        await leads.add_event(session, lead, "comment", "customer", {
+            "platform": platform, "comment_id": comment_id, "post_id": post_id, "text": comment_text[:1000],
+            "public_reply_status": _sent_status(pub_res)[0],
+        })
+        session.add(SalesMessage(
+            tenant_id=lead.tenant_id, conversation_id=conversation_id, direction="out", sender="ai",
+            text=private_dm, status=dm_status, error=dm_error, channel_message_id=dm_res.get("message_id"),
+        ))
+
+    return {
+        "success": True,
+        "routed_to": "sales_pipeline",
+        "platform": platform,
+        "comment_id": comment_id,
+        "author_name": author_name,
+        "public_reply": public_reply,
+        "private_dm": private_dm,
+        "public_reply_status": pub_res,
+        "private_dm_status": dm_res,
+        "lead_id": lead_id,
+        "new_lead": created,
+        "conversation_id": conversation_id,
+        "tenant_id": settings.default_tenant_id,
     }
 
 

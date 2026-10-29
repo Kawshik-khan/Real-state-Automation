@@ -51,6 +51,27 @@ services:
     networks:
       - glg-net
 
+  # ── Sales engine worker: agent turns, visit reminders, follow-ups, alerts, daily digest ──
+  sales-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: glg-sales-worker
+    entrypoint: ["sh", "-c", "python -m app.worker --setup && exec python -m app.worker"]
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-glg_assets}
+      - AUTOMATION_SHARED_SECRET=${AUTOMATION_SHARED_SECRET:-glg-secret-key}
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - glg-net
+
   # ── Platform API (Workstreams 34-45) ──
   platform-api:
     build:

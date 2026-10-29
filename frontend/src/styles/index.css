@@ -269,7 +269,7 @@ input:-webkit-autofill:active {
 }
 
 /* Button Variants */
-.btn-coral, .btn-gradient {
+.btn-coral, .btn-gradient, .btn-emerald, .btn-rose {
   background: var(--primary-coral);
   color: #FFFFFF;
   font-family: 'Outfit', sans-serif;

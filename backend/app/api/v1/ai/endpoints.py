@@ -6,7 +6,6 @@ Backward compatible: Full format with confidence, intent, metadata
 """
 from fastapi import APIRouter, Depends, Header, Request
 
-from app.agents.graph import ai_graph
 from app.agents.state import AIState
 from app.core.rate_limiter import AI_CHAT_LIMIT, limiter
 from app.dependencies import require_automation_secret as _auth
@@ -31,12 +30,15 @@ async def ai_chat(
     """
     # 1. Semantic Vector Cache Lookup: Intercept repeated real estate queries
     from app.core.semantic_cache import semantic_cache
+    from app.sales import entry
 
+    # The sales pipeline quotes live prices and availability, so its answers are never served from the cache.
+    use_cache = entry.route() == "legacy"
     cached_entry = await semantic_cache.lookup(
         query=body.message,
         tenant_id=body.tenant_id,
         language=body.language or "en",
-    )
+    ) if use_cache else None
 
     is_cache_hit = False
     if cached_entry:
@@ -53,14 +55,14 @@ async def ai_chat(
             language=body.language or "en",
         )
 
-        # Run the graph -- LangGraph returns state dict
-        raw: dict = await ai_graph.ainvoke(initial_state)
+        # Old graph or sales pipeline, per AI_ROUTE_VIA_SALES -- both return the graph's state dict shape
+        raw: dict = await entry.answer_message(initial_state)
 
         # Extract LangGraph output for both formats
         extracted_data = ChatResponseBuilder.extract_workflow_data(raw)
 
         # Store in semantic cache if not an escalation
-        if not extracted_data.get("requires_escalation"):
+        if use_cache and not extracted_data.get("requires_escalation"):
             import asyncio
             asyncio.create_task(
                 semantic_cache.store(

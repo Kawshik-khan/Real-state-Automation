@@ -91,3 +91,7 @@ def admin_token():
 def admin_headers(admin_token):
     """Authorization headers for admin role."""
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+# ── Sales engine fixtures (SQLite database, fake channel sender, in-memory job queue, scripted LLM) ──
+from sales_fixtures import db, jobs_queue, llm, project, sent  # noqa: E402, F401

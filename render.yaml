@@ -57,6 +57,10 @@ services:
         sync: false
       - key: LANGSMITH_PROJECT
         value: glg-assets-ai-os
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
       # Ad platform reporting (read-only). Leave unset for platforms you do not use;
       # credentials can also be saved from Developer Console → Service Integrations.
       - key: META_ADS_ACCESS_TOKEN
@@ -82,6 +86,36 @@ services:
       - key: TIKTOK_ADVERTISER_IDS
         sync: false
       - key: FX_RATES_TO_BDT
+        sync: false
+
+  # ── Sales Engine Worker (Procrastinate jobs on the same Postgres) ──
+  - type: worker
+    name: glg-sales-worker
+    env: python
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.worker --setup && python -m app.worker
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DEFAULT_TENANT_ID
+        value: glg-assets-main
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: llama-3.3-70b-versatile
+      - key: OPENAI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: FACEBOOK_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: DEFAULT_TELEGRAM_CHAT_ID
         sync: false
 
   # ── React Frontend Static Site ──

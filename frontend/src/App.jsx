@@ -17,6 +17,11 @@ import AgentCustomizationPage from './pages/AgentCustomizationPage';
 import RoleReportsPage from './pages/RoleReportsPage';
 import ManagerDashboardPage from './pages/ManagerDashboardPage';
 import EmailInboxPage from './pages/EmailInboxPage';
+import SalesPipelinePage from './pages/SalesPipelinePage';
+import SalesInventoryPage from './pages/SalesInventoryPage';
+import SalesApprovalsPage from './pages/SalesApprovalsPage';
+import SalesAIQualityPage from './pages/SalesAIQualityPage';
+import SalesInboxPage from './pages/SalesInboxPage';
 
 import EditModulesModal from './components/dashboard/EditModulesModal';
 import QuickChatDrawer from './components/dashboard/QuickChatDrawer';
@@ -59,6 +64,11 @@ export const TAB_TO_PATH = {
   content: '/content',
   properties: '/properties',
   inbox: '/inbox',
+  sales_pipeline: '/pipeline',
+  sales_inbox: '/sales-inbox',
+  sales_inventory: '/inventory',
+  sales_approvals: '/approvals',
+  sales_ai_quality: '/ai-quality',
 };
 
 export const PATH_TO_TAB = {
@@ -78,6 +88,11 @@ export const PATH_TO_TAB = {
   '/content': 'content',
   '/properties': 'properties',
   '/inbox': 'inbox',
+  '/pipeline': 'sales_pipeline',
+  '/sales-inbox': 'sales_inbox',
+  '/inventory': 'sales_inventory',
+  '/approvals': 'sales_approvals',
+  '/ai-quality': 'sales_ai_quality',
 };
 
 function DashboardApp() {
@@ -166,6 +181,11 @@ function DashboardApp() {
       case 'content': return 'Social Content Generator & Approval Engine';
       case 'properties': return 'Property Inventory & Media Catalog';
       case 'inbox': return 'Email Inbox & Inbound Inquiries';
+      case 'sales_pipeline': return 'Sales Pipeline';
+      case 'sales_inbox': return 'Sales Inbox & AI Assistant';
+      case 'sales_inventory': return 'Unit Inventory, Visit Slots & Payment Plans';
+      case 'sales_approvals': return 'Approvals';
+      case 'sales_ai_quality': return 'AI Quality & Migration';
       default: return 'Dashboard Overview';
     }
   };
@@ -266,6 +286,11 @@ function DashboardApp() {
             <Route path="/reports" element={<RoleReportsPage />} />
             <Route path="/role-reports" element={<Navigate to="/reports" replace />} />
             <Route path="/inbox" element={<EmailInboxPage />} />
+            <Route path="/pipeline" element={<SalesPipelinePage />} />
+            <Route path="/sales-inbox" element={<SalesInboxPage />} />
+            <Route path="/inventory" element={<SalesInventoryPage />} />
+            <Route path="/approvals" element={<SalesApprovalsPage />} />
+            <Route path="/ai-quality" element={<SalesAIQualityPage />} />
             <Route path="*" element={<Navigate to={defaultRolePath} replace />} />
           </Routes>
         </main>
